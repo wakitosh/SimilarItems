@@ -8,6 +8,7 @@ use Omeka\Module\AbstractModule;
 use Laminas\View\Renderer\PhpRenderer;
 use Laminas\Mvc\Controller\AbstractController;
 use SimilarItems\Form\ConfigForm;
+use Laminas\ServiceManager\ServiceLocatorInterface;
 
 /**
  * Minimal bootstrap for the SimilarItems module.
@@ -48,11 +49,11 @@ class Module extends AbstractModule {
       'similaritems_use_item_sets' => (int) ($settings->get('similaritems.use_item_sets') ?? 1),
       'similaritems_weight_item_sets' => (int) ($settings->get('similaritems.weight_item_sets') ?? 3),
 
-      'similaritems_prop1_term' => (string) ($settings->get('similaritems.prop1.term') ?? ''),
+      'similaritems_prop1_term' => (string) ($settings->get('similaritems.prop1.term') ?? 'dcterms:subject'),
       'similaritems_prop1_match' => (string) ($settings->get('similaritems.prop1.match') ?? 'eq'),
       'similaritems_prop1_weight' => (int) ($settings->get('similaritems.prop1.weight') ?? 2),
 
-      'similaritems_prop2_term' => (string) ($settings->get('similaritems.prop2.term') ?? ''),
+      'similaritems_prop2_term' => (string) ($settings->get('similaritems.prop2.term') ?? 'dcterms:creator'),
       'similaritems_prop2_match' => (string) ($settings->get('similaritems.prop2.match') ?? 'eq'),
       'similaritems_prop2_weight' => (int) ($settings->get('similaritems.prop2.weight') ?? 1),
 
@@ -70,6 +71,41 @@ class Module extends AbstractModule {
 
     $form->prepare();
     return $renderer->formCollection($form);
+  }
+
+  /**
+   * Set default settings on module install so they persist as initial values.
+   */
+  public function install(ServiceLocatorInterface $services): void {
+    $settings = $services->get('Omeka\Settings');
+
+    // Only set defaults if not already set.
+    $defaults = [
+      'similaritems.scope_site' => 1,
+      'similaritems.use_item_sets' => 1,
+      'similaritems.weight_item_sets' => 3,
+      'similaritems.prop1.term' => 'dcterms:subject',
+      'similaritems.prop1.match' => 'eq',
+      'similaritems.prop1.weight' => 2,
+      'similaritems.prop2.term' => 'dcterms:creator',
+      'similaritems.prop2.match' => 'eq',
+      'similaritems.prop2.weight' => 1,
+      'similaritems.prop3.term' => '',
+      'similaritems.prop3.match' => 'eq',
+      'similaritems.prop3.weight' => 1,
+      'similaritems.prop4.term' => '',
+      'similaritems.prop4.match' => 'eq',
+      'similaritems.prop4.weight' => 1,
+      'similaritems.terms_per_property' => 6,
+      'similaritems.pool_multiplier' => 4,
+    ];
+
+    foreach ($defaults as $key => $value) {
+      $current = $settings->get($key);
+      if ($current === NULL) {
+        $settings->set($key, $value);
+      }
+    }
   }
 
   /**
