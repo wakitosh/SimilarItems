@@ -1,0 +1,141 @@
+<?php
+/**
+ * Similar Items (module default view)
+ *
+ * Standalone default renderer so the module works without a theme override.
+ * Uses Omeka standard thumbnail sizes and minimal markup.
+ * If a theme provides the same path partial, it will override this.
+ */
+
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+
+// Current Item/Resource
+$item = $this->vars()->offsetExists('item') ? $this->vars()->offsetGet('item') : ($this->vars()->offsetExists('resource') ? $this->vars()->offsetGet('resource') : null);
+if (!$item || !method_exists($item, 'id')) {
+    return;
+}
+$currentId = (int) $item->id();
+
+// Site scope (if any)
+$site = $this->site ?? (method_exists($this, 'currentSite') ? $this->currentSite() : null);
+$siteId = $site && method_exists($site, 'id') ? (int) $site->id() : null;
+
+// Defaults (avoid depending on theme settings)
+$maxResults = 6;
+$maxPool = max($maxResults * 4, 40);
+
+// Collect features
+$itemSetIds = [];
+try { foreach ((array) $item->itemSets() as $set) { if ($set && method_exists($set, 'id')) { $itemSetIds[] = (int) $set->id(); } } } catch (\Throwable $e) {}
+$subjects = [];
+try {
+    $vals = (array) $item->value('dcterms:subject', ['all' => true, 'type' => 'literal']);
+    foreach ($vals as $v) { $s = trim((string) $v); if ($s !== '') { $subjects[] = mb_strtolower($s); } }
+} catch (\Throwable $e) {}
+$creators = [];
+try {
+    $vals = (array) $item->value('dcterms:creator', ['all' => true, 'type' => 'literal']);
+    foreach ($vals as $v) { $s = trim((string) $v); if ($s !== '') { $creators[] = mb_strtolower($s); } }
+} catch (\Throwable $e) {}
+
+// Scoring aggregator
+$scores = [];
+$addItems = function(array $items, int $weight) use (&$scores, $currentId) {
+    foreach ($items as $res) {
+        if (!$res || !method_exists($res, 'id')) continue;
+        $id = (int) $res->id();
+        if ($id === $currentId) continue;
+        if (!isset($scores[$id])) { $scores[$id] = ['score' => 0, 'res' => $res]; }
+        $scores[$id]['score'] += $weight;
+    }
+};
+
+$search = function(array $query) use ($siteId) {
+    try {
+        if ($siteId) { $query['site_id'] = $siteId; }
+        $resp = $this->api()->search('items', $query);
+        return $resp ? (array) $resp->getContent() : [];
+    } catch (\Throwable $e) { return []; }
+};
+
+// 1) Item sets
+if (!empty($itemSetIds)) {
+    $items = $search([
+        'item_set_id' => $itemSetIds,
+        'sort_by' => 'modified',
+        'sort_order' => 'desc',
+        'per_page' => min($maxPool, 100),
+    ]);
+    $addItems($items, 3);
+}
+
+// 2) Subjects
+if (!empty($subjects)) {
+    $seen = []; $count = 0; $limit = 6;
+    foreach ($subjects as $term) {
+        if ($term === '' || isset($seen[$term])) continue; $seen[$term] = true; $count++; if ($count > $limit) break;
+        $items = $search([
+            'property' => [[ 'property' => 'dcterms:subject', 'type' => 'eq', 'text' => $term ]],
+            'sort_by' => 'modified', 'sort_order' => 'desc', 'per_page' => min((int) ceil($maxPool / 2), 100),
+        ]);
+        $addItems($items, 2);
+    }
+}
+
+// 3) Creators
+if (!empty($creators)) {
+    $seen = []; $count = 0; $limit = 6;
+    foreach ($creators as $term) {
+        if ($term === '' || isset($seen[$term])) continue; $seen[$term] = true; $count++; if ($count > $limit) break;
+        $items = $search([
+            'property' => [[ 'property' => 'dcterms:creator', 'type' => 'eq', 'text' => $term ]],
+            'sort_by' => 'modified', 'sort_order' => 'desc', 'per_page' => min((int) ceil($maxPool / 2), 100),
+        ]);
+        $addItems($items, 1);
+    }
+}
+
+if (empty($scores)) { return; }
+
+uksort($scores, function($a, $b) use ($scores) {
+    $sa = $scores[$a]['score']; $sb = $scores[$b]['score'];
+    if ($sa !== $sb) return ($sb <=> $sa);
+    $ra = $scores[$a]['res']; $rb = $scores[$b]['res'];
+    $ta = 0; $tb = 0;
+    try { $ma = method_exists($ra, 'modified') ? $ra->modified() : null; $ta = $ma instanceof DateTime ? $ma->getTimestamp() : (is_string($ma) ? (strtotime($ma) ?: 0) : 0); } catch (\Throwable $e) { $ta = 0; }
+    try { $mb = method_exists($rb, 'modified') ? $rb->modified() : null; $tb = $mb instanceof DateTime ? $mb->getTimestamp() : (is_string($mb) ? (strtotime($mb) ?: 0) : 0); } catch (\Throwable $e) { $tb = 0; }
+    return ($tb <=> $ta);
+});
+
+$top = array_slice(array_values($scores), 0, $maxResults);
+
+$lang = '';
+try { $lang = (string) $this->lang(); } catch (\Throwable $e) { $lang = ''; }
+$isJa = (substr($lang, 0, 2) === 'ja');
+$heading = $isJa ? '類似アイテム' : 'Similar items';
+?>
+<div class="resource-block similar-items">
+  <h3 class="block-title"><?php echo $escape($translate($heading)); ?></h3>
+  <div class="resource-list">
+    <?php foreach ($top as $entry): $res = $entry['res']; if (!$res) continue; ?>
+      <?php
+        $pm = null; $thumb = '';
+        try { $pm = method_exists($res, 'primaryMedia') ? $res->primaryMedia() : null; } catch (\Throwable $e) {}
+        if ($pm && method_exists($pm, 'thumbnailUrl')) {
+            try { $thumb = (string) ($pm->thumbnailUrl('medium') ?: $pm->thumbnailUrl('square') ?: $pm->thumbnailUrl('large')); } catch (\Throwable $e) { $thumb = ''; }
+        }
+        $title = '';
+        try { $title = (string) $res->displayTitle(); } catch (\Throwable $e) { $title = ''; }
+        $url = '';
+        try { $url = (string) $res->url(); } catch (\Throwable $e) { $url = ''; }
+      ?>
+      <div class="resource">
+        <a class="resource-link" href="<?php echo $this->escapeHtmlAttr($url); ?>">
+          <?php if ($thumb): ?><img class="thumbnail" src="<?php echo $this->escapeHtmlAttr($thumb); ?>" alt="" loading="lazy"><?php endif; ?>
+          <span class="resource-name"><?php echo $escape($title); ?></span>
+        </a>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</div>
