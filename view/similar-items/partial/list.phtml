@@ -1,0 +1,102 @@
+<?php
+/**
+ * Partial: render <li> entries for similar items list.
+ * Expects $results = [ [ 'resource' => ItemRepresentation, 'score' => float, 'signals' => [] ], ... ]
+ */
+
+$escape = $this->plugin('escapeHtml');
+// Debug logging switch.
+$debugSi = FALSE;
+try { $debugSi = ((int) ($this->setting('similaritems.debug_log') ?? 0) === 1); } catch (\Throwable $e) { $debugSi = FALSE; }
+// Logger helper (Omeka logger) when available.
+$logger = NULL;
+if ($debugSi) {
+    try { $logger = method_exists($this, 'logger') ? $this->logger() : NULL; } catch (\Throwable $e) { $logger = NULL; }
+}
+
+if (empty($results)) {
+    // nothing to render
+    return;
+}
+
+foreach ($results as $entry):
+    $res = $entry['resource'] ?? null;
+    if (!$res) {
+        continue;
+    }
+    $title = '';
+    try { $title = (string) $res->displayTitle(); } catch (\Throwable $e) { $title = ''; }
+    // Truncate title by configured max length.
+    $maxLen = 0;
+    try { $maxLen = (int) ($this->setting('similaritems.title_max_length') ?: 0); } catch (\Throwable $e) { $maxLen = 0; }
+    if ($maxLen > 0) {
+        $len = function_exists('mb_strlen') ? (int) mb_strlen($title) : (int) strlen($title);
+        if ($len > $maxLen) {
+            $slice = function_exists('mb_substr') ? (string) mb_substr($title, 0, $maxLen) : (string) substr($title, 0, $maxLen);
+            $title = rtrim($slice) . '…';
+        }
+    }
+    $url = '';
+    // If controller prepared a link, use it.
+    if (isset($entry['link']) && is_string($entry['link']) && $entry['link'] !== '') {
+        $url = (string) $entry['link'];
+    } else {
+        try {
+            // Prefer site-aware helper first (pretty URL via CleanUrl 等)。
+            if (!empty($siteSlug) && method_exists($res, 'siteUrl')) {
+                try { $url = (string) $res->siteUrl($siteSlug); } catch (\Throwable $e3) { $url = ''; }
+            }
+            // Next, build via router when site slug is known.
+            if ($url === '' && !empty($siteSlug) && method_exists($res, 'id')) {
+                try {
+                    $url = (string) $this->url('site/resource-id', [
+                        'site-slug' => $siteSlug,
+                        'controller' => 'item',
+                        'id' => (int) $res->id(),
+                    ]);
+                } catch (\Throwable $e2) { /* ignore */ }
+            }
+            // If router helper failed for some reason, compose a sane default.
+            if ($url === '' && !empty($siteSlug) && method_exists($res, 'id')) {
+                $url = '/s/' . rawurlencode((string) $siteSlug) . '/item/' . (int) $res->id();
+            }
+            // Finally, fall back to admin URL。
+            if ($url === '' && method_exists($res, 'url')) {
+                try { $url = (string) $res->url(); } catch (\Throwable $e4) { $url = ''; }
+            }
+        } catch (\Throwable $e) { $url = ''; }
+    }
+    if ($url === '') {
+        if ($logger) {
+            try {
+                $logger->info('[SimilarItems] list.phtml: empty URL fallback for id=' . (method_exists($res, 'id') ? (int) $res->id() : 0) . ' siteSlug=' . (isset($siteSlug) ? (string) $siteSlug : ''));
+            } catch (\Throwable $e) { /* ignore */ }
+        }
+        $url = '#';
+    }
+    $thumb240 = '';
+    try { $pm = method_exists($res, 'primaryMedia') ? $res->primaryMedia() : null; } catch (\Throwable $e) { $pm = null; }
+        if ($pm) {
+        $src = '';
+        try { $src = (string) $pm->source(); } catch (\Throwable $e) { $src = ''; }
+        if ($src !== '') {
+            $iiifBase = preg_replace('/\/info\.json$/', '', $src);
+            if ($iiifBase && $iiifBase !== $src) {
+                // Prefer lighter IIIF size to speed up loading.
+                $thumb240 = $iiifBase . '/square/240,/0/default.jpg';
+            }
+        }
+        if ($thumb240 === '') {
+            try { $thumb240 = (string) ($pm->thumbnailUrl('square') ?: $pm->thumbnailUrl('medium') ?: ''); } catch (\Throwable $e) { $thumb240 = ''; }
+        }
+    }
+?>
+    <li class="resource">
+        <a class="resource-link" href="<?php echo $this->escapeHtmlAttr($url); ?>">
+            <span class="resource-name"><?php echo $escape($title); ?></span>
+            <?php if ($thumb240): ?>
+                <span class="thumb-popover"><img src="<?php echo $this->escapeHtmlAttr($thumb240); ?>" alt="" loading="lazy" decoding="async" onload="this.closest('.thumb-popover') && this.closest('.thumb-popover').classList.add('is-loaded')" onerror="if(!this.dataset.fallback){ this.dataset.fallback='1'; this.src=this.src.replace('/square/240,/', '/square/max/'); }"></span>
+            <?php endif; ?>
+        </a>
+    </li>
+<?php endforeach; ?>
