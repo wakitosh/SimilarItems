@@ -27,8 +27,14 @@ foreach ($results as $entry):
     $title = '';
     try { $title = (string) $res->displayTitle(); } catch (\Throwable $e) { $title = ''; }
     // Truncate title by configured max length.
+    // Prefer theme setting; fall back to module setting for backward compatibility.
     $maxLen = 0;
-    try { $maxLen = (int) ($this->setting('similaritems.title_max_length') ?: 0); } catch (\Throwable $e) { $maxLen = 0; }
+    try { $maxLenTheme = (int) ($this->themeSetting('similar_items_title_max_length') ?: 0); } catch (\Throwable $e) { $maxLenTheme = 0; }
+    if ($maxLenTheme > 0) {
+        $maxLen = $maxLenTheme;
+    } else {
+        try { $maxLen = (int) ($this->setting('similaritems.title_max_length') ?: 0); } catch (\Throwable $e) { $maxLen = 0; }
+    }
     if ($maxLen > 0) {
         $len = function_exists('mb_strlen') ? (int) mb_strlen($title) : (int) strlen($title);
         if ($len > $maxLen) {

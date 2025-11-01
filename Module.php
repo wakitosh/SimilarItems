@@ -88,7 +88,6 @@ class Module extends AbstractModule {
 
       // Title rules.
       'similaritems_title_volume_separators' => (string) ($settings->get('similaritems.title_volume_separators') ?? ' , '),
-      'similaritems_title_max_length' => (int) ($settings->get('similaritems.title_max_length') ?? 60),
     ]);
 
     $form->prepare();
@@ -221,7 +220,6 @@ class Module extends AbstractModule {
 
     // Title rules.
     $settings->set('similaritems.title_volume_separators', $getStr('similaritems_title_volume_separators', ' , '));
-    $settings->set('similaritems.title_max_length', max(0, $getInt('similaritems_title_max_length', 60)));
 
     $controller->messenger()->addSuccess('SimilarItems settings were saved.');
     return TRUE;

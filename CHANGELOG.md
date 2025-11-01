@@ -2,10 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2025-11-01
+
+### Added
+- Theme setting `similar_items_title_max_length` to control the display title truncation length from the active theme (0 = unlimited).
+- Debug meta now includes `cur_buckets` (current item's bucket keys) to help verify bucket-based weights.
+
+### Changed
+- Removed the module-side config input for "Max display title length"; title truncation is now theme-driven. The module still reads `similaritems.title_max_length` as a backward-compatible fallback only.
+- README updated to clarify that title max length is theme-controlled.
+
+### Fixed
+- Bucket evaluation now derives `class_number` from `call_number` when a dedicated class property is not mapped, ensuring rules like `class_number` prefix match work as expected (e.g., "210-H..." -> 210).
+
+### 追加（日本語）
+- テーマ設定 `similar_items_title_max_length` を追加（表示タイトルの最大文字数をテーマ側で制御、0 は無制限）。
+- デバッグメタに `cur_buckets`（現在アイテムのバケットキー）を追加し、バケット系ウェイトの検証を容易化。
+
+### 変更（日本語）
+- モジュール側の「表示タイトルの最大文字数」入力欄を撤去。以後はテーマ側で制御。モジュールの `similaritems.title_max_length` は互換フォールバックとしてのみ参照。
+- README を更新（表示タイトルの最大長はテーマ側で制御）。
+
+### 修正（日本語）
+- 分類プロパティ未設定時でも `call_number` から `class_number` を派生して評価するようにし、`class_number` の prefix 条件が期待通りに効くように修正（例: "210-H..." → 210）。
+
 ## [0.2.1] - 2025-11-01
 
 ### Added
 - Jitter-aware tie-breaking: when light jitter is enabled, items with equal scores are randomly ordered per reload before falling back to modified date, ensuring visible variation even when many top candidates tie.
+- Expanded debug payload: when `debug=1`, each row now includes `values` containing the actual property values behind signals and proximity context (buckets, shelf, class_number).
+ - Debug meta now includes `cur_buckets` showing the current item's bucket keys for easier troubleshooting of bucket-based weights.
 
 ### Changed
 - README updated to clarify jitter behavior (tie-breaking and selection), and IIIF thumbnail default noted as `/square/240,/0/default.jpg` with client-side fallback.
@@ -15,6 +41,8 @@ All notable changes to this project will be documented in this file.
 
 ### 追加（日本語）
 - ジッター対応の同点タイブレーク: 微揺らぎが有効な場合、スコアが同点の要素は modified の前にリロード毎ランダムで並べ替え、同点が多いときでも目に見える変化を保証します。
+- デバッグ出力の拡充: `debug=1` のとき、各行に `values`（シグナルの根拠となる実際のプロパティ値と近接コンテキスト: buckets, shelf, class_number）を追加。
+ - `debug_meta` に現在アイテムの `cur_buckets` を追加し、バケット系ウェイトの検証を容易化。
 
 ### 変更（日本語）
 - README を更新（ジッターの挙動: 同点タイブレークと上位プール抽出の説明、IIIF サムネイル既定 `/square/240,/0/default.jpg` とフォールバックの明記）。

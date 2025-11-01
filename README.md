@@ -57,7 +57,7 @@ Title–volume separators (one per line)
 - Default: ` , `; you may add `，` or `、` or ` - `. Minor spacing/variant differences are handled.
 
 Title display
-- Max display title length: configurable (default 60; set 0 for unlimited).
+- Max display title length: controlled by theme setting (e.g., `similar_items_title_max_length` in the active theme). The module's `similaritems.title_max_length` is still read as a fallback for backward compatibility.
 
 What you should see
 - A good mix of “related but not identical” items. Series volumes (same base title/Bib ID) are pushed down, and, if alternatives exist, different titles are prioritized. If no alternatives exist at all, the module will show volumes later in the list.
@@ -66,7 +66,9 @@ Testing (two options)
 1) Turn on Debug log and open an item page. The helper logs signals, queries, and final counts to `logs/application.log`.
 2) Call the async endpoint with `debug=1`:
    `/similar-items/recommend?id={ITEM_ID}&limit=12&site={SITE_SLUG}&debug=1`
-   → JSON contains `html` and `debug` arrays (id, title, url, score, base_title, signals).
+   → JSON contains `html` and `debug` arrays (id, title, url, score, base_title, signals, values) and `debug_meta`.
+   - `values` includes the actual property values behind signals per result: `{ properties: { term: [values...] }, buckets: [...], shelf, class_number }`.
+   - `debug_meta` includes request context like `site_param`, `limit`, and `cur_buckets` (the current item's bucket keys).
 
 ---
 
@@ -83,7 +85,7 @@ Final-stage diversification
 
 Async endpoint
 - `GET /similar-items/recommend?id=...&limit=...&site=...` returns `{ html }`
-- Add `debug=1` to also get `{ debug: [...] }` with structured rows.
+- Add `debug=1` to also get `{ debug: [...] }` with structured rows including `signals` and `values` (per-signal property values and proximity context).
 
 Thumbnails
 - Prefer IIIF `/square/240,/0/default.jpg` from media `info.json`, falling back to Omeka `thumbnailUrl('square'|'medium')`. If the IIIF server rejects upscaling, the client falls back to `/square/max/0/default.jpg` automatically.
@@ -165,7 +167,7 @@ License: MIT
 - 既定値は ` , `。必要に応じて `，` や `、`、` - ` を追加できます。空白や全角・半角の差はある程度吸収されます。
 
 タイトル表示
-- 表示タイトルの最大文字数を設定可能（既定 60。0 で無制限）。
+- 表示タイトルの最大文字数は「テーマ側の設定」（例：アクティブテーマの `similar_items_title_max_length`）で制御します。モジュールの `similaritems.title_max_length` は互換目的のフォールバックとしてのみ参照します。
 
 期待される表示
 - 「同じではないが関連が強い」アイテムが混ざった一覧になります。シリーズ（同一ベースタイトル/BibID）は下位に回され、代替がある場合は異なるタイトルが優先されます。代替が全く無い場合は、シリーズ巻が後段に表示されます。
@@ -174,7 +176,8 @@ License: MIT
 1) デバッグログをオンにしてアイテムページを開くと、シグナル・検索・最終件数が `logs/application.log` に出力されます。
 2) `debug=1` を付けて非同期エンドポイントを叩きます：
    `/similar-items/recommend?id={ITEM_ID}&limit=12&site={SITE_SLUG}&debug=1`
-   → `html` と `debug`（id, title, url, score, base_title, signals）を含む JSON が返ります。
+   → `html` と `debug`（id, title, url, score, base_title, signals, values）に加えて `debug_meta`（`site_param`、`limit`、`cur_buckets`）を含む JSON が返ります。
+   - `values` は各シグナルの根拠となるプロパティ値（`properties` の語彙→値配列）と、`buckets`・`shelf`・`class_number` などの近接コンテキストを含みます。
 
 ---
 
@@ -191,7 +194,7 @@ License: MIT
 
 非同期エンドポイント
 - `GET /similar-items/recommend?id=...&limit=...&site=...` は `{ html }` を返します。
-- `debug=1` を付けると `{ debug: [...] }` で構造化行（id, title, url, score, base_title, signals）も返します。
+- `debug=1` を付けると `{ debug: [...] }` で構造化行（id, title, url, score, base_title, signals, values）も返します。`values` には各シグナルの元となった実値と近接コンテキストが入ります。
 
 サムネイル
 - メディアの `info.json` から IIIF `/square/240,/0/default.jpg` を優先し、無い場合は Omeka の `thumbnailUrl('square'|'medium')` を使用します。サーバーが拡大を許可しない場合は、クライアント側で自動的に `/square/max/0/default.jpg` にフォールバックします。

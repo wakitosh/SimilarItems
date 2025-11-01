@@ -22,7 +22,7 @@ class RecommendController extends AbstractActionController {
     $view = $services->get('ViewRenderer');
     $vh = $services->get('ViewHelperManager');
 
-    /** @var callable $similarHelper */
+    /** @var \SimilarItems\View\Helper\SimilarItems $similarHelper */
     $similarHelper = $vh->get(SimilarItemsHelper::class);
 
     $id = (int) $this->params()->fromQuery('id', 0);
@@ -71,7 +71,7 @@ class RecommendController extends AbstractActionController {
       if ($siteIdOpt) {
         $opts['site_id'] = (int) $siteIdOpt;
       }
-      $results = (array) $similarHelper($item, $opts);
+      $results = (array) $similarHelper->__invoke($item, $opts);
     }
     catch (\Throwable $e) {
       $results = [];
@@ -128,6 +128,13 @@ class RecommendController extends AbstractActionController {
 
     $payload = ['html' => (string) $html];
     if ($debug) {
+      // Compute current item's buckets for debug visibility.
+      try {
+        $curBuckets = (array) $similarHelper->computeBucketsForResource($item);
+      }
+      catch (\Throwable $e) {
+        $curBuckets = [];
+      }
       $debugOut = [];
       foreach ($results as $row) {
         $r = $row['resource'] ?? NULL;
@@ -155,6 +162,7 @@ class RecommendController extends AbstractActionController {
           'score' => isset($row['score']) ? (float) $row['score'] : 0.0,
           'base_title' => isset($row['base_title']) ? (string) $row['base_title'] : '',
           'signals' => $row['signals'] ?? [],
+          'values' => $row['debug_values'] ?? NULL,
         ];
       }
       $payload['debug'] = $debugOut;
@@ -162,6 +170,7 @@ class RecommendController extends AbstractActionController {
       $payload['debug_meta'] = [
         'site_param' => $siteSlug,
         'limit' => $limit,
+        'cur_buckets' => $curBuckets,
       ];
     }
 

@@ -440,6 +440,63 @@ class SimilarItems extends AbstractHelper {
           $entry['signals'][] = ['item_sets', $weightItemSets];
         }
       }
+
+      // Debug values: include actual property values that relate to signals.
+      // This is used only when the controller requests debug output.
+      $propVals = [];
+      try {
+        if ($mapBib) {
+          $vals = $this->firstStrings($it, $mapBib);
+          if (!empty($vals)) {
+            $propVals[$mapBib] = $vals;
+          }
+        }
+        if ($mapNcid) {
+          $vals = $this->firstStrings($it, $mapNcid);
+          if (!empty($vals)) {
+            $propVals[$mapNcid] = $vals;
+          }
+        }
+        if ($mapAuthorId) {
+          $vals = $this->firstStrings($it, $mapAuthorId);
+          if (!empty($vals)) {
+            $propVals[$mapAuthorId] = $vals;
+          }
+        }
+        if ($mapAuthName) {
+          $vals = $this->firstStrings($it, $mapAuthName);
+          if (!empty($vals)) {
+            $propVals[$mapAuthName] = $vals;
+          }
+        }
+        if ($mapSubject) {
+          $vals = $this->firstStrings($it, $mapSubject);
+          if (!empty($vals)) {
+            $propVals[$mapSubject] = $vals;
+          }
+        }
+        if ($mapCall) {
+          $vals = $this->firstStrings($it, $mapCall);
+          if (!empty($vals)) {
+            $propVals[$mapCall] = $vals;
+          }
+        }
+        if ($mapClass) {
+          $vals = $this->firstStrings($it, $mapClass);
+          if (!empty($vals)) {
+            $propVals[$mapClass] = $vals;
+          }
+        }
+      }
+      catch (\Throwable $e) {
+        // Ignore debug value collection errors.
+      }
+      $entry['debug_values'] = [
+        'properties' => $propVals,
+        'buckets' => $candBuckets,
+        'shelf' => $candShelf,
+        'class_number' => $candClassNum,
+      ];
     }
     unset($entry);
 
@@ -836,9 +893,18 @@ class SimilarItems extends AbstractHelper {
     if (!is_array($data) || !isset($data['buckets']) || !is_array($data['buckets'])) {
       return [];
     }
+    // Build context. If class is empty, derive numeric class from call
+    // (e.g., "210-H..." -> "210").
+    $classNorm = (string) $class;
+    if ($classNorm === '' && $call !== '') {
+      $num = $this->parseClassNumber($call);
+      if ($num !== NULL) {
+        $classNorm = (string) $num;
+      }
+    }
     $ctx = [
       'call_number' => (string) $call,
-      'class_number' => (string) $class,
+      'class_number' => $classNorm,
     ];
     $matched = [];
     foreach ($data['buckets'] as $bucket) {
@@ -951,6 +1017,24 @@ class SimilarItems extends AbstractHelper {
       return (int) $m[0];
     }
     return NULL;
+  }
+
+  /**
+   * Public utility: compute bucket keys for a resource using current settings.
+   *
+   * @param \Omeka\Api\Representation\AbstractResourceEntityRepresentation $res
+   *   Resource to evaluate.
+   *
+   * @return string[]
+   *   Matched bucket keys.
+   */
+  public function computeBucketsForResource(AbstractResourceEntityRepresentation $res): array {
+    $mapCall = (string) ($this->settings->get('similaritems.map.call_number') ?? '');
+    $mapClass = (string) ($this->settings->get('similaritems.map.class_number') ?? '');
+    $bucketRules = (string) ($this->settings->get('similaritems.bucket_rules') ?? '');
+    $call = $mapCall ? ($this->firstString($res, $mapCall) ?? '') : '';
+    $class = $mapClass ? ($this->firstString($res, $mapClass) ?? '') : '';
+    return $this->evalBuckets($bucketRules, (string) $call, (string) $class);
   }
 
 }

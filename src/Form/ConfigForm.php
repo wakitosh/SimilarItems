@@ -510,26 +510,7 @@ class ConfigForm extends Form {
         ],
       ]);
 
-    // Title display options.
-    $this
-      ->add([
-        'name' => 'similaritems_title_max_length',
-        'type' => NumberElement::class,
-        'options' => [
-          // @translate
-          'label' => '表示タイトルの最大文字数（0で無制限）',
-        ],
-        'attributes' => [
-          'id' => 'similaritems_title_max_length',
-          'min' => 0,
-          'step' => 1,
-          'value' => 60,
-        ],
-      ]);
-
-    // ==============================
     // Domain bucket rules (JSON)
-    // ==============================
     $this
       ->add([
         'name' => 'similaritems_bucket_rules',
@@ -584,8 +565,7 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_serendipity_demote_same_bibid', 'required' => FALSE])
       ->add(['name' => 'similaritems_same_bibid_penalty', 'required' => FALSE])
       ->add(['name' => 'similaritems_serendipity_same_title_mode', 'required' => FALSE])
-      ->add(['name' => 'similaritems_title_volume_separators', 'required' => FALSE])
-      ->add(['name' => 'similaritems_title_max_length', 'required' => FALSE]);
+      ->add(['name' => 'similaritems_title_volume_separators', 'required' => FALSE]);
   }
 
 }
