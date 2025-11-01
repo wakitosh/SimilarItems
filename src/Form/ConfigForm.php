@@ -73,6 +73,36 @@ class ConfigForm extends Form {
       ]);
 
     // ==============================
+    // Shelf seeding (optional)
+    // ==============================
+    $this
+      ->add([
+        'name' => 'similaritems_use_shelf_seeding',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => '候補の種まき: 棚（請求記号の接頭一致）を使用',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_use_shelf_seeding',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_shelf_seed_limit',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => '棚シーディングの上限件数',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_shelf_seed_limit',
+          'min' => 1,
+          'step' => 1,
+          'value' => 50,
+        ],
+      ]);
+
+    // ==============================
     // Display options
     // ==============================
     $this
@@ -430,6 +460,48 @@ class ConfigForm extends Form {
         ],
       ])
       ->add([
+        'name' => 'similaritems_weight_material_type',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => '重み: 資料種別の一致（軽いブースト）',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_weight_material_type',
+          'min' => 0,
+          'step' => 1,
+          'value' => 2,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_weight_issued_proximity',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => '重み: 出版年の近さ（軽いブースト）',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_weight_issued_proximity',
+          'min' => 0,
+          'step' => 1,
+          'value' => 1,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_issued_proximity_threshold',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => '閾値: 出版年の差（年、例: 5）',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_issued_proximity_threshold',
+          'min' => 0,
+          'step' => 1,
+          'value' => 5,
+        ],
+      ])
+      ->add([
         'name' => 'similaritems_class_proximity_threshold',
         'type' => NumberElement::class,
         'options' => [
@@ -533,6 +605,8 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_use_item_sets', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_item_sets', 'required' => FALSE])
       ->add(['name' => 'similaritems_debug_log', 'required' => FALSE])
+      ->add(['name' => 'similaritems_use_shelf_seeding', 'required' => FALSE])
+      ->add(['name' => 'similaritems_shelf_seed_limit', 'required' => FALSE])
       ->add(['name' => 'similaritems_limit', 'required' => FALSE])
       ->add(['name' => 'similaritems_jitter_enable', 'required' => FALSE])
       ->add(['name' => 'similaritems_jitter_pool_multiplier', 'required' => FALSE]);
@@ -560,6 +634,9 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_weight_domain_bucket', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_call_shelf', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_class_proximity', 'required' => FALSE])
+      ->add(['name' => 'similaritems_weight_material_type', 'required' => FALSE])
+      ->add(['name' => 'similaritems_weight_issued_proximity', 'required' => FALSE])
+      ->add(['name' => 'similaritems_issued_proximity_threshold', 'required' => FALSE])
       ->add(['name' => 'similaritems_class_proximity_threshold', 'required' => FALSE])
       ->add(['name' => 'similaritems_bucket_rules', 'required' => FALSE])
       ->add(['name' => 'similaritems_serendipity_demote_same_bibid', 'required' => FALSE])

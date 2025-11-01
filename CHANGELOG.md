@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2025-11-01
+
+### Added
+- Light boosts (optional):
+  - Material type equality boost (case-insensitive) with configurable weight.
+  - Issued-year proximity boost with configurable weight and threshold (±N years).
+- Debug values now surface optional mapped properties for visibility: Location, Issued, Material type, and Viewing direction (when mappings are set).
+
+### Changed
+- Shelf seeding robustness: prioritize "starts-with" candidates first with Unicode normalization (e.g., full-/half-width), then apply a precise exact-shelf post-filter; improved diagnostics and counters in logs.
+- README updated (EN/JA) to document the new light boosts and added debug fields.
+
+### 追加（日本語）
+- 軽いブースト（任意）を追加：
+  - 資料種別の一致ブースト（大文字小文字を無視、重みを設定可）。
+  - 刊行年の近接ブースト（±N 年、重み・閾値を設定可）。
+- デバッグ値に任意マッピングのプロパティ（所在／刊行年／資料種別／閲覧方向）を表示（マッピングされている場合）。
+
+### 変更（日本語）
+- 棚の種まきを強化：Unicode 正規化を行った上で「前方一致」を優先的に収集し、その後に厳密な同一棚の後段フィルタを適用。ログの統計（scanned/exact/dups/added/mismatched/no_call など）を拡充。
+- README を更新（英日）— 新しい軽いブーストとデバッグ追加項目を記載。
+
 ## [0.2.2] - 2025-11-01
 
 ### Added

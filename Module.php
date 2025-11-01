@@ -50,7 +50,10 @@ class Module extends AbstractModule {
       'similaritems_limit' => (int) ($settings->get('similaritems.limit') ?? 6),
       'similaritems_weight_item_sets' => (int) ($settings->get('similaritems.weight_item_sets') ?? 2),
       'similaritems_debug_log' => (int) ($settings->get('similaritems.debug_log') ?? 0),
-    // Jitter.
+      // Shelf seeding.
+      'similaritems_use_shelf_seeding' => (int) ($settings->get('similaritems.use_shelf_seeding') ?? 0),
+      'similaritems_shelf_seed_limit' => (int) ($settings->get('similaritems.shelf_seed_limit') ?? 50),
+      // Jitter.
       'similaritems_jitter_enable' => (int) ($settings->get('similaritems.jitter.enable') ?? 0),
       'similaritems_jitter_pool_multiplier' => (string) ($settings->get('similaritems.jitter.pool_multiplier') ?? '1.5'),
 
@@ -76,6 +79,9 @@ class Module extends AbstractModule {
       'similaritems_weight_domain_bucket' => (int) ($settings->get('similaritems.weight.domain_bucket') ?? 2),
       'similaritems_weight_call_shelf' => (int) ($settings->get('similaritems.weight.call_shelf') ?? 1),
       'similaritems_weight_class_proximity' => (int) ($settings->get('similaritems.weight.class_proximity') ?? 1),
+      'similaritems_weight_material_type' => (int) ($settings->get('similaritems.weight.material_type') ?? 2),
+      'similaritems_weight_issued_proximity' => (int) ($settings->get('similaritems.weight.issued_proximity') ?? 1),
+      'similaritems_issued_proximity_threshold' => (int) ($settings->get('similaritems.issued_proximity_threshold') ?? 5),
       'similaritems_class_proximity_threshold' => (int) ($settings->get('similaritems.class_proximity_threshold') ?? 5),
 
       // Domain bucket rules JSON.
@@ -107,6 +113,9 @@ class Module extends AbstractModule {
       'similaritems.limit' => 6,
       'similaritems.weight_item_sets' => 2,
       'similaritems.debug_log' => 0,
+      // Shelf seeding defaults.
+      'similaritems.use_shelf_seeding' => 0,
+      'similaritems.shelf_seed_limit' => 50,
 
       // Property mapping defaults.
       'similaritems.map.call_number' => 'dcndl:callNumber',
@@ -130,7 +139,10 @@ class Module extends AbstractModule {
       'similaritems.weight.domain_bucket' => 2,
       'similaritems.weight.call_shelf' => 1,
       'similaritems.weight.class_proximity' => 1,
+      'similaritems.weight.material_type' => 2,
+      'similaritems.weight.issued_proximity' => 1,
       'similaritems.class_proximity_threshold' => 5,
+      'similaritems.issued_proximity_threshold' => 5,
 
       // Domain bucket rules JSON default.
       'similaritems.bucket_rules' => $this->getDefaultBucketRules(),
@@ -176,6 +188,9 @@ class Module extends AbstractModule {
     $settings->set('similaritems.limit', max(1, $getInt('similaritems_limit', 6)));
     $settings->set('similaritems.weight_item_sets', max(0, $getInt('similaritems_weight_item_sets', 3)));
     $settings->set('similaritems.debug_log', $getInt('similaritems_debug_log', 0));
+    // Shelf seeding.
+    $settings->set('similaritems.use_shelf_seeding', $getInt('similaritems_use_shelf_seeding', 0));
+    $settings->set('similaritems.shelf_seed_limit', max(0, $getInt('similaritems_shelf_seed_limit', 50)));
     // Jitter.
     $settings->set('similaritems.jitter.enable', $getInt('similaritems_jitter_enable', 0));
     $poolMulRaw = $getStr('similaritems_jitter_pool_multiplier', '1.5');
@@ -209,6 +224,9 @@ class Module extends AbstractModule {
     $settings->set('similaritems.weight.class_proximity', max(0, $getInt('similaritems_weight_class_proximity', 1)));
     $settings->set('similaritems.class_proximity_threshold', max(0, $getInt('similaritems_class_proximity_threshold', 5)));
     $settings->set('similaritems.weight.subject', max(0, $getInt('similaritems_weight_subject', 4)));
+    $settings->set('similaritems.weight.material_type', max(0, $getInt('similaritems_weight_material_type', 2)));
+    $settings->set('similaritems.weight.issued_proximity', max(0, $getInt('similaritems_weight_issued_proximity', 1)));
+    $settings->set('similaritems.issued_proximity_threshold', max(0, $getInt('similaritems_issued_proximity_threshold', 5)));
 
     // Save bucket rules JSON (no validation here; UI can include a test tool).
     $settings->set('similaritems.bucket_rules', $getStr('similaritems_bucket_rules', ''));

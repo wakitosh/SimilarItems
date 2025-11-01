@@ -114,6 +114,11 @@ class SimilarItems extends AbstractHelper {
     $mapAuthorId = (string) ($this->settings->get('similaritems.map.author_id') ?? '');
     $mapAuthName = (string) ($this->settings->get('similaritems.map.authorized_name') ?? '');
     $mapSubject = (string) ($this->settings->get('similaritems.map.subject') ?? '');
+    // Optional mapped properties for light boosts and debug visibility.
+    $mapLocation = (string) ($this->settings->get('similaritems.map.location') ?? '');
+    $mapIssued = (string) ($this->settings->get('similaritems.map.issued') ?? '');
+    $mapMaterial = (string) ($this->settings->get('similaritems.map.material_type') ?? '');
+    $mapViewing = (string) ($this->settings->get('similaritems.map.viewing_direction') ?? '');
 
     // Weights.
     $wBib = (int) ($this->settings->get('similaritems.weight.bibid') ?? 0);
@@ -125,12 +130,21 @@ class SimilarItems extends AbstractHelper {
     $wShelf = (int) ($this->settings->get('similaritems.weight.call_shelf') ?? 2);
     $wClassProx = (int) ($this->settings->get('similaritems.weight.class_proximity') ?? 1);
     $classThresh = (int) ($this->settings->get('similaritems.class_proximity_threshold') ?? 5);
+    // Optional small boosts.
+    $wMaterial = (int) ($this->settings->get('similaritems.weight.material_type') ?? 2);
+    $wIssuedProx = (int) ($this->settings->get('similaritems.weight.issued_proximity') ?? 1);
+    $issuedThresh = (int) ($this->settings->get('similaritems.issued_proximity_threshold') ?? 5);
+    // Optional: seed by shelf (call-number prefix) to broaden candidates.
+    $useShelfSeeding = (int) ($this->settings->get('similaritems.use_shelf_seeding') ?? 0) === 1;
+    $shelfSeedLimit = (int) ($this->settings->get('similaritems.shelf_seed_limit') ?? 50);
+    $log('weights: bib=' . $wBib . ' ncid=' . $wNcid . ' author_id=' . $wAuthorId . ' auth_name=' . $wAuthName . ' subject=' . $wSubject . ' bucket=' . $wBucket . ' shelf=' . $wShelf . ' class_prox=' . $wClassProx . ' class_thresh=' . $classThresh . ' material=' . $wMaterial . ' issued_prox=' . $wIssuedProx . ' issued_thresh=' . $issuedThresh);
 
     // Serendipity options: demote same-bibid (series/巻違い) aggressively.
     $demoteSameBib = (int) ($this->settings->get('similaritems.serendipity.demote_same_bibid') ?? 1) === 1;
     $sameBibPenalty = (int) ($this->settings->get('similaritems.serendipity.same_bibid_penalty') ?? 100);
     $sameTitleMode = (string) ($this->settings->get('similaritems.serendipity.same_title_mode') ?? 'allow');
     $excludeSameTitle = ($sameTitleMode === 'exclude');
+    $log('serendipity: demote_same_bibid=' . ($demoteSameBib ? '1' : '0') . ' same_title_mode=' . $sameTitleMode);
 
     // Gather current item signals.
     $sig = [
@@ -141,6 +155,10 @@ class SimilarItems extends AbstractHelper {
       'call' => $mapCall ? $this->firstString($resource, $mapCall) : NULL,
       'class' => $mapClass ? $this->firstString($resource, $mapClass) : NULL,
       'subject' => $mapSubject ? $this->firstStrings($resource, $mapSubject) : [],
+      'location' => $mapLocation ? $this->firstString($resource, $mapLocation) : NULL,
+      'issued' => $mapIssued ? $this->firstString($resource, $mapIssued) : NULL,
+      'material' => $mapMaterial ? $this->firstString($resource, $mapMaterial) : NULL,
+      'viewing' => $mapViewing ? $this->firstString($resource, $mapViewing) : NULL,
     ];
 
     $log('item ' . (int) $resource->id() . ' signals: ' . json_encode([
@@ -323,6 +341,89 @@ class SimilarItems extends AbstractHelper {
       }
     }
 
+    // Optional seeding by shelf: add items whose call number starts with the
+    // current shelf prefix (e.g., "210...") so that shelf weight can surface
+    // more neighbors even when no other properties match.
+    if ($useShelfSeeding && $wShelf > 0 && $mapCall && $curShelf !== '') {
+      $pid = $propId($mapCall);
+      $limitShelf = max(1, min(200, $shelfSeedLimit));
+      $modes = [
+        // Prefer starts-with when supported by the API.
+        ['type' => 'sw', 'text' => $curShelf, 'label' => 'sw'],
+        // Fallback to broad LIKE (contains) with user-provided wildcard.
+        ['type' => 'like', 'text' => $curShelf . '%', 'label' => 'like'],
+      ];
+      foreach ($modes as $mode) {
+        $query = [
+          'property' => [
+            [
+              'property' => $pid,
+              'type' => $mode['type'],
+              'text' => $mode['text'],
+            ],
+          ],
+          'limit' => $limitShelf,
+        ];
+        if ($siteId) {
+          $query['site_id'] = $siteId;
+        }
+        $log('shelf seeding (' . $mode['label'] . '): shelf=' . $curShelf . ' pid=' . (is_int($pid) ? (string) $pid : $pid) . ' limit=' . $limitShelf);
+        try {
+          $resp = $api->search('items', $query);
+          $scanned = 0;
+          $added = 0;
+          $exact = 0;
+          $dups = 0;
+          $mismatch = 0;
+          $noCall = 0;
+          $mismatchSamples = [];
+          foreach ($resp->getContent() as $it) {
+            if ($it->id() === $resource->id()) {
+              continue;
+            }
+            $scanned++;
+            // Filter to exact same shelf after normalization.
+            $callVal = $mapCall ? ($this->firstString($it, $mapCall) ?? '') : '';
+            $seedShelf = $this->parseShelf((string) $callVal);
+            if ($seedShelf === '') {
+              $noCall++;
+              continue;
+            }
+            if ($seedShelf !== $curShelf) {
+              $mismatch++;
+              if (count($mismatchSamples) < 5) {
+                $mismatchSamples[] = $callVal;
+              }
+              continue;
+            }
+            $exact++;
+            $id = $it->id();
+            if (!isset($candidates[$id])) {
+              $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
+              $added++;
+            }
+            else {
+              $dups++;
+            }
+          }
+          $msg = 'shelf seeding (' . $mode['label'] . ') scanned: ' . $scanned . ' exact: ' . $exact . ' dups: ' . $dups . ' added: ' . $added . ' mismatched: ' . $mismatch . ' no_call: ' . $noCall . ' (total candidates: ' . count($candidates) . ')';
+          if ($mismatch > 0 && empty($exact) && !empty($mismatchSamples)) {
+            $msg .= ' mismatch_samples=' . json_encode($mismatchSamples, JSON_UNESCAPED_UNICODE);
+          }
+          $log($msg);
+          // If we found exact matches or added new ones, stop trying modes.
+          if ($exact > 0 || $added > 0) {
+            break;
+          }
+          // Otherwise, try next mode.
+        }
+        catch (\Throwable $e) {
+          // Try next mode on errors.
+          continue;
+        }
+      }
+    }
+
     // Last-chance fallback: if still no candidates but we have item sets,
     // fetch a small batch directly from those sets (no site filter) so that
     // the block never comes up empty when item set overlap exists.
@@ -356,20 +457,27 @@ class SimilarItems extends AbstractHelper {
     catch (\Throwable $e) {
       $baseTitle = '';
     }
-    // Strong penalty to push out near duplicates. Align with same-bibid.
-    $sameTitlePenalty = max(100, (int) $sameBibPenalty);
+    // Strong penalty to push out near duplicates.
+    // NOTE: When "demote same bibid" is disabled, also disable
+    // same-title penalty.
+    // Use case: avoid offsetting a positive bibid weight by a strong
+    // same-title penalty during tests.
+    // Apply only when demote_same_bibid is enabled.
+    $applySameTitlePenalty = $demoteSameBib;
+    $sameTitlePenalty = $applySameTitlePenalty ? max(100, (int) $sameBibPenalty) : 0;
+    $log('serendipity: same_title_penalty_applied=' . ($applySameTitlePenalty ? '1' : '0') . ' penalty=' . $sameTitlePenalty . ' same_bibid_penalty=' . (int) $sameBibPenalty);
 
     // Post-process candidates with bucket/shelf/class proximity and
     // item sets. Also compute candidate base titles for diversification.
     foreach ($candidates as &$entry) {
       /** @var \Omeka\Api\Representation\AbstractResourceEntityRepresentation $it */
       $it = $entry['resource'];
-      // Serendipity: penalize near-duplicate title base.
+      // Serendipity: penalize near-duplicate title base (when enabled).
       if ($baseTitle !== '') {
         try {
           $candTitle = $this->normalizeTitleBase((string) $it->displayTitle());
           $entry['base_title'] = $candTitle;
-          if ($candTitle !== '' && $candTitle === $baseTitle) {
+          if ($applySameTitlePenalty && $sameTitlePenalty > 0 && $candTitle !== '' && $candTitle === $baseTitle) {
             $entry['score'] -= $sameTitlePenalty;
             $entry['signals'][] = ['same_title_penalty', -$sameTitlePenalty];
           }
@@ -423,6 +531,41 @@ class SimilarItems extends AbstractHelper {
         if ($diff <= $classThresh) {
           $entry['score'] += $wClassProx;
           $entry['signals'][] = ['class_proximity', $wClassProx];
+        }
+      }
+      // Material type equality (light boost).
+      if ($wMaterial > 0 && $mapMaterial) {
+        try {
+          $curMat = isset($sig['material']) ? (string) ($sig['material'] ?? '') : '';
+          $candMat = (string) ($this->firstString($it, $mapMaterial) ?? '');
+          if ($curMat !== '' && $candMat !== '') {
+            // Case-insensitive compare after trimming.
+            if (mb_strtolower(trim($curMat)) === mb_strtolower(trim($candMat))) {
+              $entry['score'] += $wMaterial;
+              $entry['signals'][] = ['material_type', $wMaterial];
+            }
+          }
+        }
+        catch (\Throwable $e) {
+          // Ignore.
+        }
+      }
+      // Issued proximity (within threshold years, light boost).
+      if ($wIssuedProx > 0 && $mapIssued && $issuedThresh >= 0) {
+        try {
+          $curYear = $this->parseYear((string) ($sig['issued'] ?? ''));
+          $candIssued = (string) ($this->firstString($it, $mapIssued) ?? '');
+          $candYear = $this->parseYear($candIssued);
+          if ($curYear !== NULL && $candYear !== NULL) {
+            $diff = abs($curYear - $candYear);
+            if ($diff <= $issuedThresh) {
+              $entry['score'] += $wIssuedProx;
+              $entry['signals'][] = ['issued_proximity', $wIssuedProx];
+            }
+          }
+        }
+        catch (\Throwable $e) {
+          // Ignore.
         }
       }
       if ($useItemSets && $weightItemSets > 0 && $curItemSetIds) {
@@ -487,6 +630,30 @@ class SimilarItems extends AbstractHelper {
             $propVals[$mapClass] = $vals;
           }
         }
+        if ($mapLocation) {
+          $vals = $this->firstStrings($it, $mapLocation);
+          if (!empty($vals)) {
+            $propVals[$mapLocation] = $vals;
+          }
+        }
+        if ($mapIssued) {
+          $vals = $this->firstStrings($it, $mapIssued);
+          if (!empty($vals)) {
+            $propVals[$mapIssued] = $vals;
+          }
+        }
+        if ($mapMaterial) {
+          $vals = $this->firstStrings($it, $mapMaterial);
+          if (!empty($vals)) {
+            $propVals[$mapMaterial] = $vals;
+          }
+        }
+        if ($mapViewing) {
+          $vals = $this->firstStrings($it, $mapViewing);
+          if (!empty($vals)) {
+            $propVals[$mapViewing] = $vals;
+          }
+        }
       }
       catch (\Throwable $e) {
         // Ignore debug value collection errors.
@@ -529,61 +696,56 @@ class SimilarItems extends AbstractHelper {
       return ($ma > $mb) ? -1 : 1;
     });
 
-    // Final-stage diversification: prefer different titles if available.
+    // Final-stage diversification.
+    // Allow: Keep score order (ties use jitter/modified date).
+    // Exclude: Drop same-base-title items and promote diversity.
     $diversified = [];
-    $seenBases = [];
-    $preferred = [];
-    $sameSeries = [];
-    foreach ($candidates as $e) {
-      $bt = isset($e['base_title']) ? (string) $e['base_title'] : '';
-      if ($baseTitle !== '' && $bt !== '' && $bt === $baseTitle) {
-        $sameSeries[] = $e;
-      }
-      else {
+    if (!$excludeSameTitle) {
+      $diversified = $candidates;
+    }
+    else {
+      $seenBases = [];
+      $preferred = [];
+      foreach ($candidates as $e) {
+        $bt = isset($e['base_title']) ? (string) $e['base_title'] : '';
+        if ($baseTitle !== '' && $bt !== '' && $bt === $baseTitle) {
+          // In exclude mode, same-series entries are not taken.
+          continue;
+        }
         $preferred[] = $e;
       }
-    }
-    // 1) First pass: take at most 1 per base title from preferred group.
-    foreach ($preferred as $e) {
-      if ($limit > 0 && count($diversified) >= $limit) {
-        break;
-      }
-      $bt = isset($e['base_title']) ? (string) $e['base_title'] : '';
-      if ($bt !== '' && isset($seenBases[$bt])) {
-        continue;
-      }
-      if ($bt !== '') {
-        $seenBases[$bt] = TRUE;
-      }
-      $diversified[] = $e;
-    }
-    // 2) Second pass: fill remaining from preferred regardless of base.
-    if ($limit <= 0 || count($diversified) < $limit) {
+      // 1) まずは1ベースタイトル1件を優先してピック。
       foreach ($preferred as $e) {
         if ($limit > 0 && count($diversified) >= $limit) {
           break;
         }
-        // Skip entries already taken.
-        $already = FALSE;
-        foreach ($diversified as $d) {
-          if ($d['resource']->id() === $e['resource']->id()) {
-            $already = TRUE;
-            break;
-          }
-        }
-        if ($already) {
+        $bt = isset($e['base_title']) ? (string) $e['base_title'] : '';
+        if ($bt !== '' && isset($seenBases[$bt])) {
           continue;
+        }
+        if ($bt !== '') {
+          $seenBases[$bt] = TRUE;
         }
         $diversified[] = $e;
       }
-    }
-    // 3) Third pass: fill from same-series last (unless excluded by setting).
-    if (!$excludeSameTitle && ($limit <= 0 || count($diversified) < $limit)) {
-      foreach ($sameSeries as $e) {
-        if ($limit > 0 && count($diversified) >= $limit) {
-          break;
+      // 2) If still short, allow base-title duplicates to fill.
+      if ($limit <= 0 || count($diversified) < $limit) {
+        foreach ($preferred as $e) {
+          if ($limit > 0 && count($diversified) >= $limit) {
+            break;
+          }
+          $already = FALSE;
+          foreach ($diversified as $d) {
+            if ($d['resource']->id() === $e['resource']->id()) {
+              $already = TRUE;
+              break;
+            }
+          }
+          if ($already) {
+            continue;
+          }
+          $diversified[] = $e;
         }
-        $diversified[] = $e;
       }
     }
 
@@ -985,7 +1147,12 @@ class SimilarItems extends AbstractHelper {
    */
   private function parseCallAndClass(string $call, string $class): array {
     $shelf = $this->parseShelf($call);
+    // Prefer explicit class when present; if it's non-numeric, fall back to
+    // deriving from call number.
     $classNum = $this->parseClassNumber($class !== '' ? $class : $call);
+    if ($classNum === NULL && $class !== '') {
+      $classNum = $this->parseClassNumber($call);
+    }
     return [$shelf, $classNum];
   }
 
@@ -996,11 +1163,43 @@ class SimilarItems extends AbstractHelper {
     if ($call === '') {
       return '';
     }
-    if (preg_match('/^[A-Za-z]{1,3}/', $call, $m)) {
+    // Normalize common Unicode separators to ASCII for robust prefix parsing.
+    $s = (string) $call;
+    // 1) Convert fullwidth alphanumerics and spaces to ASCII when available.
+    // This fixes cases like "２１０-H12" vs "210-H12".
+    try {
+      if (function_exists('mb_convert_kana')) {
+        // 'a' => alnum to ASCII, 's' => spaces to ASCII.
+        $s = mb_convert_kana($s, 'as', 'UTF-8');
+      }
+    }
+    catch (\Throwable $e) {
+      // Ignore; fallback to manual normalization below.
+    }
+    // Full-width space -> space.
+    $s = preg_replace('/\x{3000}/u', ' ', $s) ?? $s;
+    // Various Unicode hyphens and minus signs -> '-'.
+    $s = preg_replace('/[\x{2010}\x{2011}\x{2012}\x{2013}\x{2014}\x{2212}\x{FF0D}]/u', '-', $s) ?? $s;
+    // Full-width dot -> '.'.
+    $s = preg_replace('/\x{FF0E}/u', '.', $s) ?? $s;
+    // Japanese middle dot -> space (acts as delimiter).
+    $s = preg_replace('/\x{30FB}/u', ' ', $s) ?? $s;
+    $s = trim($s);
+    if ($s === '') {
+      return '';
+    }
+    // If starts with digits, return that digit block
+    // (e.g., 210 from 210-..., 121.52-...).
+    if (preg_match('/^\d+/', $s, $m)) {
       return strtoupper($m[0]);
     }
-    // Fallback: up to first space or dot.
-    if (preg_match('/^[^\s\.\-]+/', $call, $m)) {
+    // If starts with 1–3 ASCII letters (e.g., QA76), return that.
+    if (preg_match('/^[A-Za-z]{1,3}/', $s, $m)) {
+      return strtoupper($m[0]);
+    }
+    // Fallback: take until first space, dot, or hyphen
+    // (Unicode-normalized above).
+    if (preg_match('/^[^\s\.\-]+/u', $s, $m)) {
       return strtoupper($m[0]);
     }
     return '';
@@ -1013,8 +1212,46 @@ class SimilarItems extends AbstractHelper {
     if ($s === '') {
       return NULL;
     }
+    // Normalize fullwidth alphanumerics to ASCII for digit extraction.
+    try {
+      if (function_exists('mb_convert_kana')) {
+        $s = mb_convert_kana($s, 'as', 'UTF-8');
+      }
+    }
+    catch (\Throwable $e) {
+      // Ignore and continue.
+    }
     if (preg_match('/\d+/', $s, $m)) {
       return (int) $m[0];
+    }
+    return NULL;
+  }
+
+  /**
+   * Extract a 4-digit year from an issued/date string.
+   */
+  private function parseYear(string $s): ?int {
+    if ($s === '') {
+      return NULL;
+    }
+    // Normalize fullwidth alphanumerics/spaces to ASCII for digits.
+    try {
+      if (function_exists('mb_convert_kana')) {
+        $s = mb_convert_kana($s, 'as', 'UTF-8');
+      }
+    }
+    catch (\Throwable $e) {
+      // Ignore.
+    }
+    // Look for 4-digit year in a reasonable range (e.g., 1000–2999).
+    if (preg_match('/\b(1\d{3}|2\d{3})\b/', $s, $m)) {
+      $y = (int) $m[1];
+      return $y;
+    }
+    // Fallback: first 3-4 digit sequence.
+    if (preg_match('/(\d{3,4})/', $s, $m)) {
+      $y = (int) $m[1];
+      return $y;
     }
     return NULL;
   }

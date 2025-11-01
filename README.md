@@ -15,6 +15,7 @@ Settings (Admin → Modules → Similar Items → Configure)
 - Use Item Sets seeding: On
 - Item Set weight: 2
 - Debug log: Off (turn On temporarily for testing; logs go to `logs/application.log`)
+- Shelf seeding (optional): Off by default. When On, the helper seeds candidates by call-number prefix (same “shelf”), so Shelf weight can surface more neighbors even without other matches. Limit is configurable. The helper prefers a “starts-with” filter and falls back to a broad LIKE only if needed, and normalizes full‑width digits/letters/spaces (e.g., “２１０” → “210”) to improve matching.
 - Same-title handling when no alternatives exist: Allow (default) or Exclude
 - Light jitter (reload-level variation): Off by default. When enabled, results are sampled from a slightly larger top pool so the list varies subtly on each reload without losing relevance.
 
@@ -49,9 +50,10 @@ Tuning tips
 - Stack‑browsing feel: gently raise Shelf to 2 or Class proximity to 2, but monitor variety.
 
 Serendipity
-- Demote same Bib ID: On; Penalty: 150
-- Same base title penalty: automatically the same as above (min 100)
-- If "Same-title handling" is Exclude and no recommendation candidates remain, the module fetches a random set of items (site-scoped if enabled) so something is shown.
+- Demote same Bib ID (switch): when On, items sharing the same Bib ID as the current item receive a strong penalty. When Off, that penalty is not applied.
+- Same Bib ID penalty (value): the penalty magnitude applied when the switch above is On. Typical: 100–200.
+- Same base title penalty: applied only when “Demote same Bib ID” is On (aligned in strength, min 100). When Off, base‑title penalty is disabled to avoid offsetting positive Bib ID tests.
+- Same‑title handling: Allow keeps score order; Exclude drops same‑base‑title items and promotes diversity. If Exclude removes all candidates, the module fetches a random set (site‑scoped if enabled) so the UI still shows entries.
 
 Title–volume separators (one per line)
 - Default: ` , `; you may add `，` or `、` or ` - `. Minor spacing/variant differences are handled.
@@ -69,6 +71,8 @@ Testing (two options)
    → JSON contains `html` and `debug` arrays (id, title, url, score, base_title, signals, values) and `debug_meta`.
    - `values` includes the actual property values behind signals per result: `{ properties: { term: [values...] }, buckets: [...], shelf, class_number }`.
    - `debug_meta` includes request context like `site_param`, `limit`, and `cur_buckets` (the current item's bucket keys).
+   - When Shelf seeding is enabled and Debug log is On, logs include seeding diagnostics such as: `scanned`, `exact`, `dups`, `added`, `mismatched`, `no_call`, and sometimes `mismatch_samples` to help diagnose non‑matches.
+   - Debug `values.properties` also includes optional fields when mapped (Location / Issued / Material type / Viewing direction) for verification.
 
 ---
 
@@ -78,6 +82,11 @@ Signals and scoring
 - Equality queries: NCID / Author ID / Authorized name / Subject
 - Seeding: Item Sets (fallback for sparse mappings)
 - Proximity: Domain bucket / Shelf / Class (threshold)
+ - Light boosts (optional):
+   - Material type equality: small nudge when both items share the same material type (default +2).
+   - Issued proximity: small nudge when years are within a threshold (default ±5 years, weight +1). Year is parsed from the mapped Issued property.
+   - Class proximity is a light “boost” for nearby classification, not a hard filter. Typical weight 1–2 with a threshold around 5 (adjust per collection).
+   - If the mapped Class property is present but non‑numeric (e.g., a subject string), the helper falls back to deriving a numeric class from the call number when possible.
 - Penalties: Same base title / Same Bib ID (configurable)
 
 Final-stage diversification
@@ -125,6 +134,7 @@ License: MIT
 - アイテムセットで種まき：オン
 - アイテムセット重み：2
 - デバッグログ：オフ（テスト時のみオン。出力先は `logs/application.log`）
+- 棚シーディング（任意）：既定オフ。オンにすると、請求記号の接頭一致（同じ「棚」）で候補プールを拡張し、棚の重みだけでも近い資料が上位に出やすくなります。上限件数は設定可能です。検索は「前方一致（starts‑with）」を優先し、必要時のみ LIKE にフォールバックします。また、全角の数字・英字・空白を半角に正規化（例：「２１０」→「210」）して一致率を高めます。
 - 代替候補が無いときの同一タイトルの扱い：許可（既定）/ 除外
 - 微揺らぎ（リロード毎にわずかに変動）：既定オフ。オンにすると上位候補のやや広いプールから重み付きで抽出し、関連性を保ったまま表示が微妙に入れ替わります。
 
@@ -159,9 +169,10 @@ License: MIT
 - 「棚ブラウジング」感を強めたい: 棚を 2、または分類近接を 2 へ。ただし一覧の多様性に注意して微調整。
 
 セレンディピティ（多様性）
-- 同一BibIDの降格：オン、ペナルティ 150
-- 同一ベースタイトルの降格：上記と同程度（最低100）
-- 「同一タイトルの扱い」を「完全除外」にし、推薦候補が残らない場合は、（サイト範囲設定がオンならそのサイト内で）無作為にアイテムを取得して表示します。
+- 「同一BibIDの降格（スイッチ）」：オンのとき、現アイテムと同一BibIDの候補に強い減点を適用します。オフのとき、この減点は適用しません。
+- 「ペナルティ：同一BibID（値）」：上記スイッチがオンのときに適用する減点の大きさ（例：100〜200）。
+- 「同一ベースタイトルの減点」：同一BibIDの降格がオンのときのみ適用（強さはおおむね同程度、最低100）。オフのときは無効化し、BibIDの正の加点テストを相殺しないようにしています。
+- 「同一タイトルの扱い」：許可はスコア順を保持／除外は同一ベースタイトルを落として多様性を優先。除外で全て消えた場合は（サイト範囲がオンなら）サイト内から無作為に取得して表示します。
 
 タイトル・巻区切り（1 行に 1 つ）
 - 既定値は ` , `。必要に応じて `，` や `、`、` - ` を追加できます。空白や全角・半角の差はある程度吸収されます。
@@ -178,6 +189,8 @@ License: MIT
    `/similar-items/recommend?id={ITEM_ID}&limit=12&site={SITE_SLUG}&debug=1`
    → `html` と `debug`（id, title, url, score, base_title, signals, values）に加えて `debug_meta`（`site_param`、`limit`、`cur_buckets`）を含む JSON が返ります。
    - `values` は各シグナルの根拠となるプロパティ値（`properties` の語彙→値配列）と、`buckets`・`shelf`・`class_number` などの近接コンテキストを含みます。
+   - 棚シーディング有効＋デバッグログONのときは、ログに `scanned`（走査）/`exact`（棚一致）/`dups`（重複）/`added`（新規追加）/`mismatched`（棚不一致）/`no_call`（請求記号なし）/`mismatch_samples`（不一致例の一部）などが出力され、原因の切り分けに役立ちます。
+   - `values.properties` にはマッピング済みなら（所在／発行年／資料種別／綴じ方向）も表示され、検証に使えます。
 
 ---
 
@@ -187,6 +200,11 @@ License: MIT
 - 等価一致：NCID／著者ID／権限定名／件名
 - 種まき：アイテムセット（マッピングが疎な場合のフォールバック）
 - 近接：分野バケット／棚／分類（閾値）
+ - 軽いブースト（任意）：
+   - 資料種別の一致で少量の加点（既定 +2）。
+   - 出版年の近さ（±閾値、既定 5 年以内）で少量の加点（既定 +1）。出版年はマッピングした Issued から年を抽出して判定します。
+   - 分類近接は「近い分類をそっと押し上げる」ための軽いブーストであり、フィルタではありません。重みは 1〜2、閾値は 5 前後が目安です（コレクションに応じて調整）。
+   - マッピングした「分類」プロパティが存在しても内容が数値でない場合（例：件名文字列）、可能であれば請求記号から数値分類を導出して代替します。
 - ペナルティ：同一ベースタイトル／同一BibID（設定可能）
 
 最終段の多様化
