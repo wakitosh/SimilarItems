@@ -30,6 +30,24 @@ Recommended weights (balanced, diverse)
 - Domain bucket: 2; Shelf: 1; Class proximity: 1; Threshold: 5
 - Item Sets: 2
 
+Why these weights (rationale)
+- NCID (6): A strong bibliographic signal that often links near‑editions/printings without collapsing to the exact same volume. It pulls truly related records while avoiding “duplicates.”
+- Author ID (5): An authority‑based exact link across a creator’s works. Strong, but slightly below NCID to keep topical balance and prevent author‑only clusters.
+- Authorized name (3): Weaker than Author ID because of name variants/homonyms; used as a fallback when IDs are missing.
+- Subject (5): High topical affinity but can be broad/noisy depending on cataloging practice. Balanced with NCID/Author to avoid overly general lists.
+- Domain bucket (2), Shelf (1), Class proximity (1): Light “stack browsing” flavor. These signals add serendipity via physical/notation proximity but are kept low to avoid homogenizing the list.
+- Item Sets (2): Curated group membership is useful especially when mappings are sparse; a modest weight prevents one set from dominating results.
+- Bib ID (0) + penalty: Series/volume siblings are plentiful. With a strong penalty for same BibID (and same base title), they won’t flood the top while still appearing when alternatives are scarce.
+
+Diversity and thresholds
+- Class proximity threshold (≈5) allows near neighbors in classification without drifting too far.
+- Final “diversification” stage prefers different base titles first; the above weights cooperate by preventing any single signal from overwhelming variety.
+
+Tuning tips
+- More author‑centric lists: raise Author ID (and possibly Authorized name) by +1–2.
+- Strong, well‑curated subjects: raise Subject to 6–7; consider lowering Shelf/Class if lists look too homogeneous.
+- Stack‑browsing feel: gently raise Shelf to 2 or Class proximity to 2, but monitor variety.
+
 Serendipity
 - Demote same Bib ID: On; Penalty: 150
 - Same base title penalty: automatically the same as above (min 100)
@@ -119,6 +137,24 @@ License: MIT
 - BibID：0、NCID：6、著者ID：5、権限定名：3、件名：5
 - 分野バケット：2、棚：1、分類近接：1、閾値：5
 - アイテムセット：2
+
+なぜこの配分か（背景・理由）
+- NCID（6）: 同一巻を避けつつ、版や刷の近い書誌をうまく引き寄せる強い信号。重複に落ちず「本当に関連が強い」領域を押し上げます。
+- 著者ID（5）: 権威IDによる厳密なリンク。著者偏重になりすぎないように NCID よりわずかに低く設定し、主題とのバランスを取っています。
+- 権限定名（3）: ID 不在時の代替。表記揺れや同名異人の影響があるため、ID より弱めに設定。
+- 件名（5）: 主題的な近さを強く反映。ただし目録実務により広すぎたりノイズが混ざる場合があるため、NCID/著者とのバランスで 5 に。
+- 分野バケット（2）・棚（1）・分類近接（1）: 「棚での近さ」によるセレンディピティを少量付与。均質化を避けるため弱めにとどめています。
+- アイテムセット（2）: キュレーションされた集合の近さは有用（特にマッピングが疎な場合）が、支配的にならない程度に控えめ。
+- BibID（0）＋強いペナルティ: 同一シリーズ（巻違い）が多数出やすいため、上位を独占しないよう強く抑制。代替が無いときは後段で拾います。
+
+多様性と閾値
+- 分類近接の閾値（≈5）は「近すぎず遠すぎない」範囲に調整。
+- 最終段の「多様化」により、まず異なるベースタイトルを優先。上記ウェイトは単一の信号が多様性を壊さないよう配慮しています。
+
+調整の指針
+- 著者中心に寄せたい: 著者ID（必要に応じて権限定名も）を +1〜2。
+- 件名付与の品質が高い: 件名を 6〜7 に引き上げ、均質化が見られる場合は棚／分類の重みを下げる。
+- 「棚ブラウジング」感を強めたい: 棚を 2、または分類近接を 2 へ。ただし一覧の多様性に注意して微調整。
 
 セレンディピティ（多様性）
 - 同一BibIDの降格：オン、ペナルティ 150
