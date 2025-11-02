@@ -42,34 +42,19 @@ All settings are located in **Admin → Modules → Similar Items → Configure*
 
 Map the module's concepts to your vocabulary's properties.
 
-| Concept                 | Recommended Property        | Purpose                                                              |
-| ----------------------- | --------------------------- | -------------------------------------------------------------------- |
-| **Call number**         | `dcndl:callNumber`          | Used for shelf seeding and class proximity.                          |
-| **Class number**        | `dc:subject`                | Used for class-based proximity signals. Falls back to call number.   |
-| **Bibliographic ID**    | `tsukubada:bibid`           | Identifies a bibliographic record (e.g., a book series). Used for penalties. |
-| **NCID**                | `dcndl:sourceIdentifier`    | A strong signal for related works (e.g., different editions).        |
-| **Author ID**           | `tsukubada:authorId`        | An authority-controlled identifier for a creator.                    |
-| **Authorized name**     | `tsukubada:authorizedName`  | A fallback for author matching when IDs are unavailable.             |
-| **Subject**             | (Your subject property)     | Matches items with shared subjects.                                  |
-| **Location** (Optional) | (Your location property)    | For debug display.                                                   |
-| **Issued** (Optional)   | `dcterms:issued`            | Used for the "Issued proximity" boost.                               |
-| **Material** (Optional) | (Your material property)    | Used for the "Material type equality" boost.                         |
-| **Viewing** (Optional)  | `bibo:viewingDirection`     | For debug display.                                                   |
-
-#### Weights and Penalties
-
-These settings control the scoring algorithm. Higher weights have more influence.
-
-- **Signal Weights**:
-    - Recommended defaults: NCID: 6, Author ID: 5, Subject: 5, Authorized name: 3, Domain bucket: 2, Item Sets: 2, Shelf: 1, Class proximity: 1.
-    - **Light Boosts (Optional)**:
-        - `Material type equality`: A small bonus (default: +2) if the material type is the same.
-        - `Issued proximity`: A small bonus (default: +1) if the publication years are within a certain threshold (default: ±5 years).
-
-- **Penalties (for Serendipity)**:
-    - `Demote same Bib ID`: (Switch) When on, applies a strong penalty to items sharing the same Bib ID as the current item.
-    - `Same Bib ID penalty`: (Value) The score to subtract when the above switch is on (e.g., 150).
-    - `Same base title penalty`: Automatically applied when "Demote same Bib ID" is on. This prevents items from the same series/set from dominating the results.
+| Concept                 | Purpose                                                              |
+| ----------------------- | -------------------------------------------------------------------- |
+| **Call number**         | Used for shelf seeding and class proximity.                          |
+| **Class number**        | Used for class-based proximity signals. Falls back to call number.   |
+| **Bibliographic ID**    | Identifies a bibliographic record (e.g., a book series). Used for penalties. |
+| **NCID**                | A strong signal for related works (e.g., different editions).        |
+| **Author ID**           | An authority-controlled identifier for a creator.                    |
+| **Authorized name**     | A fallback for author matching when IDs are unavailable.             |
+| **Subject**             | Matches items with shared subjects.                                  |
+| **Location** (Optional) | For debug display.                                                   |
+| **Issued** (Optional)   | Used for the "Issued proximity" boost.                               |
+| **Material** (Optional) | Used for the "Material type equality" boost.                         |
+| **Viewing** (Optional)  | For debug display.                                                   |
 
 #### Shelf Seeding
 
@@ -87,7 +72,166 @@ This feature helps discover physically co-located items.
 
 - **Title–volume separators**: Define characters or strings used to separate a base title from volume information (e.g., ` , `, ` - `, ` : `). This helps the module correctly identify items belonging to the same series.
 
+### 3. Configuration Guide: Weights and Serendipity
+
+This section provides guidance on tuning the scoring algorithm to achieve your desired recommendation behavior.
+
+#### Recommended Weights (Balanced & Diverse)
+
+These defaults provide a good starting point for a balanced mix of topical relevance and serendipity.
+
+- **Core Signals**:
+    - `NCID`: 6
+    - `Author ID`: 5
+    - `Subject`: 5
+    - `Authorized name`: 3
+    - `Item Sets`: 2
+- **Proximity & Boosts**:
+    - `Domain bucket`: 2
+    - `Shelf`: 1
+    - `Class proximity`: 1 (Threshold: 5)
+    - `Material type equality`: 2
+    - `Issued proximity`: 1 (Threshold: 5 years)
+- **Bibliographic ID**:
+    - `Bib ID weight`: 0
+    - `Same Bib ID penalty`: 150
+
+#### Rationale Behind the Weights
+
+- **Strong Signals (NCID, Author ID, Subject)**: `NCID` (6) is weighted highest as it links different editions or printings without being an exact duplicate. `Author ID` (5) and `Subject` (5) provide strong creator and topic affinity.
+- **Fallback Signals (Authorized name, Item Sets)**: `Authorized name` (3) is a weaker author signal, while `Item Sets` (2) provides a curated context, useful when other metadata is sparse.
+- **"Stack-Browsing" Signals (Domain, Shelf, Class)**: These are intentionally weighted low (1-2) to add a flavor of physical "shelf browsing" and serendipity without overpowering the topical signals.
+- **Light Boosts (Material, Issued)**: These provide a gentle nudge towards items of the same type or from a similar time period, adding subtle relevance.
+- **Bib ID (0 weight + penalty)**: Items from the same series (e.g., volumes of a journal) are often plentiful. By setting the weight to 0 and applying a strong penalty (150), they are pushed down the list, making room for more diverse results while still being available if no better matches exist.
+
+#### Tuning Tips
+
+- **For more author-centric results**: Increase the `Author ID` weight to 6 or 7.
+- **For stronger topical matching**: If your subject cataloging is strong, increase the `Subject` weight to 6 or 7.
+- **For a "stack-browsing" feel**: Gently increase `Shelf` or `Class proximity` to 2. Monitor results to ensure they don't become too homogeneous.
+
+#### Serendipity and Diversity Controls
+
+These settings work together to prevent results from being dominated by items from the same series.
+
+- **Demote same Bib ID (Switch)**: This is the master switch for diversity. When **On**:
+    - The `Same Bib ID penalty` is applied to any item sharing the current item's Bib ID.
+    - The `Same base title penalty` is also automatically applied.
+- **When Off**: Both penalties are disabled. This can be useful for testing or if you want to prioritize direct series relationships.
+- **Final-Stage Diversification**: After all scoring is complete, the module performs a final reordering step. It prioritizes showing items with *different* base titles first, which significantly enhances the variety of the results.
+
 ---
+
+## Testing and Debugging
+
+You can verify the module's behavior in two ways:
+
+### 1. Debug Log
+...
+### 2. Configuration
+
+すべての設定は **管理画面 → モジュール → Similar Items → 設定** にあります。
+
+#### 基本設定
+
+- **現在のサイトを範囲に含める**: （推奨：オン）推奨対象を現在のサイト内のアイテムに限定します。
+- **アイテムセットで種まき**: （推奨：オン）共通のアイテムセットに属するアイテムを候補の初期プールとして使用します。他のシグナルが少ない場合の有効なフォールバックです。
+- **デバッグログ**: （既定：オフ）有効にすると、詳細な診断情報が `logs/application.log` に書き込まれます。
+- **同一タイトルの扱い**: 同じベースタイトルの候補しか見つからない場合の挙動を制御します。
+    - `許可`（既定）：同一シリーズであっても、スコアが最も高いアイテムを表示します。
+    - `除外`：多様性を最大化するため、同一ベースタイトルのアイテムを非表示にします。これにより候補が0件になった場合は、代わりにランダムなアイテム群が表示されます。
+- **微揺らぎ**: （既定：オフ）有効にすると、最終的なリストが上位スコアの少し広いプールからサンプリングされるようになり、リロードごとに順序や顔ぶれがわずかに変化します。
+
+#### マッピング
+
+モジュールの概念を、お使いの語彙のプロパティに紐付けます。
+
+| 概念                  | 目的                                                       |
+| --------------------- | ---------------------------------------------------------- |
+| **請求記号**          | 棚シーディングや分類近接で使用します。                     |
+| **分類記号**          | 分類ベースの近接シグナルで使用。請求記号で代替可。         |
+| **書誌ID (BibID)**    | 書誌レコード（例：叢書）を識別。ペナルティ判定で使用。     |
+| **NCID**              | 関連書誌（例：異なる版）を示す強力なシグナル。             |
+| **著者ID**            | 典拠コントロールされた著者識別子。                         |
+| **権威化された名称**  | 著者IDがない場合の著者マッチングの代替。                   |
+| **件名**              | 共通の件名を持つアイテムをマッチングします。               |
+| **所在** (任意)       | デバッグ表示用。                                           |
+| **発行年** (任意)     | 「発行年近接」ブーストで使用します。                       |
+| **資料種別** (任意)   | 「資料種別一致」ブーストで使用します。                     |
+| **綴じ方向** (任意)   | デバッグ表示用。                                           |
+
+#### 棚シーディング
+
+物理的に近くに配架されている資料を発見しやすくする機能です。
+
+- **棚シーディングを有効にする**: （既定：オフ）有効にすると、請求記号の接頭辞が似ている（＝同じ「棚」にある）アイテムを候補プールに加えます。
+- **動作の仕組み**:
+    1.  まず、正規化された請求記号に対して高精度な「前方一致」検索を試みます。
+    2.  それで十分な結果が得られない場合、より広範な「like」検索にフォールバックすることがあります。
+    3.  全角文字を半角に正規化（例：「２１０」→「210」）し、一致率を向上させます。
+    4.  最終的な後段フィルタで、スコアリングには厳密に棚が一致したもののみを使用します。
+- **診断**: `デバッグログ` がオンの場合、棚シーディングの詳細な統計情報（例：`scanned`, `exact`, `added`, `mismatched`）がログに出力され、棚ベースの候補がなぜ少ないかの診断に役立ちます。
+
+#### タイトル正規化
+
+- **タイトル・巻の区切り文字**: ベースタイトルと巻数情報を区切る文字や文字列を定義します（例：` , `, ` - `, ` : `）。これにより、モジュールが同じシリーズに属するアイテムを正しく識別できます。
+
+### 3. 設定の指針：ウェイトとセレンディピティ
+
+このセクションでは、望ましい推奨の挙動を実現するために、スコアリングアルゴリズムを調整するための指針を提供します。
+
+#### 推奨ウェイト（バランスと多様性重視）
+
+これらの既定値は、主題的な関連性とセレンディピティ（偶然の発見）のバランスが取れた出発点として適しています。
+
+- **コアシグナル**:
+    - `NCID`: 6
+    - `著者ID`: 5
+    - `件名`: 5
+    - `権威化された名称`: 3
+    - `アイテムセット`: 2
+- **近接とブースト**:
+    - `分野バケット`: 2
+    - `棚`: 1
+    - `分類近接`: 1 (閾値: 5)
+    - `資料種別の一致`: 2
+    - `発行年の近接`: 1 (閾値: 5年)
+- **書誌ID**:
+    - `BibIDウェイト`: 0
+    - `同一BibIDペナルティ`: 150
+
+#### ウェイト配分の考え方
+
+- **強力なシグナル (NCID, 著者ID, 件名)**: `NCID` (6) は、完全な重複を避けつつ異なる版や刷りを結びつけるため、最も高く重み付けされています。`著者ID` (5) と `件名` (5) は、著者と主題の強い関連性を提供します。
+- **代替シグナル (権威化された名称, アイテムセット)**: `権威化された名称` (3) はより弱い著者シグナルであり、`アイテムセット` (2) は、他のメタデータが少ない場合に有用な、キュレーションされた文脈を提供します。
+- **「棚ブラウジング」シグナル (分野, 棚, 分類)**: これらは意図的に低く（1〜2）重み付けされており、主題的なシグナルを圧倒することなく、物理的な「棚ブラウジング」の風味とセレンディピティを加えます。
+- **軽いブースト (資料種別, 発行年)**: 同じ種類や近い年代のアイテムをそっと後押しし、微妙な関連性を加えます。
+- **BibID (ウェイト0 + ペナルティ)**: 同じシリーズのアイテム（例：雑誌の各号）は多数存在しがちです。ウェイトを0にし、強いペナルティ（150）を適用することで、より多様な結果のためのスペースを確保しつつ、他に良い一致がない場合には表示されるようにします。
+
+#### 調整のヒント
+
+- **著者中心の結果にしたい場合**: `著者ID` のウェイトを6か7に上げます。
+- **主題によるマッチングを強化したい場合**: 件名付与の品質が高い場合は、`件名` のウェイトを6か7に上げます。
+- **「棚ブラウジング」感を強めたい場合**: `棚` または `分類近接` を2にそっと上げてみてください。ただし、結果が均質になりすぎないか監視が必要です。
+
+#### セレンディピティと多様性の制御
+
+これらの設定は、結果が同じシリーズのアイテムに占領されるのを防ぐために連携して機能します。
+
+- **同一BibIDの降格 (スイッチ)**: これが多様性のためのマスタースイッチです。**オン**の場合：
+    - 現在のアイテムと同じBibIDを共有するアイテムに `同一BibIDペナルティ` が適用されます。
+    - `同一ベースタイトルのペナルティ` も自動的に適用されます。
+- **オフ**の場合：両方のペナルティが無効になります。これは、テストや、シリーズ関係を直接優先したい場合に便利です。
+- **最終段階の多様化**: すべてのスコアリングが完了した後、モジュールは最終的な並べ替えを行います。まず *異なる* ベースタイトルのアイテムを優先的に表示することで、結果の多様性を大幅に向上させます。
+
+---
+
+## テストとデバッグ
+
+モジュールの動作は2つの方法で確認できます。
+
+### 1. デバッグログ
+
 
 ## Testing and Debugging
 
