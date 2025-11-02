@@ -642,7 +642,7 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
                   // @translate
-          'label' => '重み: 分類記号（スコア加算）',
+          'label' => '重み: 分類近接（スコア加算）',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_class_proximity',
@@ -680,20 +680,6 @@ class ConfigForm extends Form {
         ],
       ])
       ->add([
-        'name' => 'similaritems_issued_proximity_threshold',
-        'type' => NumberElement::class,
-        'options' => [
-                  // @translate
-          'label' => '閾値: 出版年近接 (年)',
-        ],
-        'attributes' => [
-          'id' => 'similaritems_issued_proximity_threshold',
-          'min' => 0,
-          'step' => 1,
-          'value' => 5,
-        ],
-      ])
-      ->add([
         'name' => 'similaritems_class_proximity_threshold',
         'type' => NumberElement::class,
         'options' => [
@@ -702,6 +688,20 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_class_proximity_threshold',
+          'min' => 0,
+          'step' => 1,
+          'value' => 5,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_issued_proximity_threshold',
+        'type' => NumberElement::class,
+        'options' => [
+                  // @translate
+          'label' => '閾値: 出版年近接 (年)',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_issued_proximity_threshold',
           'min' => 0,
           'step' => 1,
           'value' => 5,
