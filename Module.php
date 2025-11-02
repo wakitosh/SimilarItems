@@ -97,7 +97,16 @@ class Module extends AbstractModule {
     ]);
 
     $form->prepare();
-    return $renderer->formCollection($form);
+
+    // Add admin-only inline styles scoped to this module's config page.
+    // Fieldset: top margin 20px (first only 0), bottom margin 0.
+    $renderer->headStyle()->appendStyle(
+      '#similaritems-config fieldset { margin-top: 20px; margin-bottom: 0; }' .
+      '#similaritems-config fieldset:first-of-type { margin-top: 0; }'
+    );
+
+    // Wrap markup in a scoped container to avoid leaking styles globally.
+    return '<div id="similaritems-config">' . $renderer->formCollection($form) . '</div>';
   }
 
   /**

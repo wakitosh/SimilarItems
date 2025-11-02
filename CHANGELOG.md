@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2025-11-02
+
+### EN
+
+#### Added
+- Full Japanese localization of the admin settings UI with clear section headings.
+- Visible section descriptions in the settings form via helper elements compatible with Omeka's renderer.
+
+#### Changed
+- Terminology unified across UI and docs:
+  - “Seeding/Boost/Bonus” → “候補拡大/スコア加算”.
+  - English docs aligned to “Candidate Expansion” and “Scoring”.
+- Settings reorganized into clearer groups:
+  - Basic, Candidate Expansion, Light Jitter, Property Mappings, Weights & Thresholds, Serendipity, Title Rules, Domain Bucket (JSON).
+- Moved switches/weights to appropriate sections:
+  - “Use item sets for similarity assessment” moved under Candidate Expansion.
+  - “Weight: Item Set Match” moved under Weights & Thresholds.
+- Page-scoped CSS for the settings page to improve fieldset spacing (no global style impact).
+- README updated (English/Japanese) to match the current settings and terminology.
+
+#### Fixed
+- Resolved a Laminas DomainException by ensuring helper elements include minimal labels.
+- Minor formatting and lint fixes in form definition and module class.
+
+#### Notes
+- Shelf scoring (weight) is independent of the shelf-based candidate expansion switch.
+- “Class proximity” is a scoring-only signal and does not affect candidate selection.
+- No breaking changes to public APIs; existing configuration keys are preserved.
+
+### 日本語
+
+#### 追加
+- 管理画面の設定UIを日本語化（セクション見出しを含む）。
+- Omeka のレンダラ互換のヘルパー要素で、見出し直下のセクション説明を表示。
+
+#### 変更
+- 用語をUIとドキュメントで統一：
+  - “Seeding/Boost/Bonus” → “候補拡大/スコア加算”。
+  - 英語ドキュメントは “Candidate Expansion / Scoring” に整合。
+- 設定を分かりやすいグループへ再編：
+  - 基本設定／候補拡大／微揺らぎ／プロパティ対応付け／ウェイトと閾値／セレンディピティ／タイトルルール／分野バケット（JSON）。
+- スイッチ・重みの配置を適正化：
+  - 「アイテムセットを類似判定に使用」を「候補拡大」へ移動。
+  - 「重み: アイテムセット一致」を「ウェイトと閾値」へ移動。
+- 設定ページ限定のCSSで fieldset の余白を調整（グローバル影響なし）。
+- README（英／日）を現行設定と用語に合わせて更新。
+
+#### 修正
+- ラベル無し要素で発生していた Laminas の DomainException を、最小限のラベル付与で解消。
+- フォーム定義およびモジュールクラスの体裁・Lint の軽微な修正。
+
+#### ノート
+- 棚のスコア加算（weight）は、棚の候補拡大スイッチと独立して適用されます。
+- 「分類近接」は候補選択には使わず、スコア加算のみのシグナルです。
+- 破壊的変更はありません（既存の設定キーは維持）。
+
 ## [0.2.3] - 2025-11-01
 
 ### Added
