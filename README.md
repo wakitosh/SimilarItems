@@ -37,6 +37,7 @@ All settings are located in **Admin → Modules → Similar Items → Configure*
     - `Allow` (Default): Shows the highest-scoring items, even if they are from the same series.
     - `Exclude`: Hides same-title items to maximize diversity. If this results in zero candidates, the block will be filled with a random selection of items instead.
 - **Light jitter**: (Default: Off) If enabled, the final list is sampled from a slightly larger pool of top-scoring items, causing the order and selection to vary subtly on each page reload.
+- **Candidate pool multiplier**: Defines how large the candidate pool for jittering should be, as a multiple of the display limit. For example, with a limit of 6 and a multiplier of 1.5, the final 6 items will be randomly selected from the top 9 candidates (6 * 1.5).
 
 #### Mappings
 
@@ -243,6 +244,7 @@ MIT
     - `許可`（既定）：同一シリーズであっても、スコアが最も高いアイテムを表示します。
     - `除外`：多様性を最大化するため、同一ベースタイトルのアイテムを非表示にします。これにより候補が0件になった場合は、代わりにランダムなアイテム群が表示されます。
 - **微揺らぎ**: （既定：オフ）有効にすると、最終的なリストが上位スコアの少し広いプールからサンプリングされるようになり、リロードごとに順序や顔ぶれがわずかに変化します。
+- **候補プール倍率**: 微揺らぎで使用する候補プールのサイズを、表示件数に対する倍率で定義します。例えば、表示件数が6件で倍率が1.5の場合、上位9件（6 * 1.5）の候補からランダムに6件が選ばれます。
 
 #### マッピング
 
