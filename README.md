@@ -1,235 +1,278 @@
-## SimilarItems (Omeka S module)
+# SimilarItems (Omeka S Module)
 
-This module registers a Resource Page Block Layout named `similarItems` so it appears in Admin → Sites → [site] → Configure resource pages. Rendering is async and theme-driven. The module provides global settings that control the similarity logic.
+This module provides a "Similar Items" page block for Omeka S, designed to display contextually relevant recommendations on item pages. It uses a configurable, weighted scoring engine and renders results asynchronously for a smooth user experience.
 
----
+The display is controlled by the active theme, while all recommendation logic is managed through this module's global settings.
 
-## For library staff (how to use)
+## Features
 
-Installation
-1. Place this folder under `modules/SimilarItems` and activate it in Admin → Modules.
-2. In Admin → Sites → [your site] → Configure resource pages, add the block “Similar items.”
-
-Settings (Admin → Modules → Similar Items → Configure)
-- Scope to site: On
-- Use Item Sets seeding: On
-- Item Set weight: 2
-- Debug log: Off (turn On temporarily for testing; logs go to `logs/application.log`)
-- Shelf seeding (optional): Off by default. When On, the helper seeds candidates by call-number prefix (same “shelf”), so Shelf weight can surface more neighbors even without other matches. Limit is configurable. The helper prefers a “starts-with” filter and falls back to a broad LIKE only if needed, and normalizes full‑width digits/letters/spaces (e.g., “２１０” → “210”) to improve matching.
-- Same-title handling when no alternatives exist: Allow (default) or Exclude
-- Light jitter (reload-level variation): Off by default. When enabled, results are sampled from a slightly larger top pool so the list varies subtly on each reload without losing relevance.
-
-Mappings (advanced)
-- Call number: `dcndl:callNumber` / Class number: `dc:subject`
-- Bib ID: `tsukubada:bibid` / NCID: `dcndl:sourceIdentifier`
-- Author ID: `tsukubada:authorId` / Authorized name: `tsukubada:authorizedName`
-- Subject: your subject term
-- (Optional) Location, Issued, Material type, Viewing direction
-
-Recommended weights (balanced, diverse)
-- Bib ID: 0; NCID: 6; Author ID: 5; Authorized name: 3; Subject: 5
-- Domain bucket: 2; Shelf: 1; Class proximity: 1; Threshold: 5
-- Item Sets: 2
-
-Why these weights (rationale)
-- NCID (6): A strong bibliographic signal that often links near‑editions/printings without collapsing to the exact same volume. It pulls truly related records while avoiding “duplicates.”
-- Author ID (5): An authority‑based exact link across a creator’s works. Strong, but slightly below NCID to keep topical balance and prevent author‑only clusters.
-- Authorized name (3): Weaker than Author ID because of name variants/homonyms; used as a fallback when IDs are missing.
-- Subject (5): High topical affinity but can be broad/noisy depending on cataloging practice. Balanced with NCID/Author to avoid overly general lists.
-- Domain bucket (2), Shelf (1), Class proximity (1): Light “stack browsing” flavor. These signals add serendipity via physical/notation proximity but are kept low to avoid homogenizing the list.
-- Item Sets (2): Curated group membership is useful especially when mappings are sparse; a modest weight prevents one set from dominating results.
-- Bib ID (0) + penalty: Series/volume siblings are plentiful. With a strong penalty for same BibID (and same base title), they won’t flood the top while still appearing when alternatives are scarce.
-
-Diversity and thresholds
-- Class proximity threshold (≈5) allows near neighbors in classification without drifting too far.
-- Final “diversification” stage prefers different base titles first; the above weights cooperate by preventing any single signal from overwhelming variety.
-
-Tuning tips
-- More author‑centric lists: raise Author ID (and possibly Authorized name) by +1–2.
-- Strong, well‑curated subjects: raise Subject to 6–7; consider lowering Shelf/Class if lists look too homogeneous.
-- Stack‑browsing feel: gently raise Shelf to 2 or Class proximity to 2, but monitor variety.
-
-Serendipity
-- Demote same Bib ID (switch): when On, items sharing the same Bib ID as the current item receive a strong penalty. When Off, that penalty is not applied.
-- Same Bib ID penalty (value): the penalty magnitude applied when the switch above is On. Typical: 100–200.
-- Same base title penalty: applied only when “Demote same Bib ID” is On (aligned in strength, min 100). When Off, base‑title penalty is disabled to avoid offsetting positive Bib ID tests.
-- Same‑title handling: Allow keeps score order; Exclude drops same‑base‑title items and promotes diversity. If Exclude removes all candidates, the module fetches a random set (site‑scoped if enabled) so the UI still shows entries.
-
-Title–volume separators (one per line)
-- Default: ` , `; you may add `，` or `、` or ` - `. Minor spacing/variant differences are handled.
-
-Title display
-- Max display title length: controlled by theme setting (e.g., `similar_items_title_max_length` in the active theme). The module's `similaritems.title_max_length` is still read as a fallback for backward compatibility.
-
-What you should see
-- A good mix of “related but not identical” items. Series volumes (same base title/Bib ID) are pushed down, and, if alternatives exist, different titles are prioritized. If no alternatives exist at all, the module will show volumes later in the list.
-
-Testing (two options)
-1) Turn on Debug log and open an item page. The helper logs signals, queries, and final counts to `logs/application.log`.
-2) Call the async endpoint with `debug=1`:
-   `/similar-items/recommend?id={ITEM_ID}&limit=12&site={SITE_SLUG}&debug=1`
-   → JSON contains `html` and `debug` arrays (id, title, url, score, base_title, signals, values) and `debug_meta`.
-   - `values` includes the actual property values behind signals per result: `{ properties: { term: [values...] }, buckets: [...], shelf, class_number }`.
-   - `debug_meta` includes request context like `site_param`, `limit`, and `cur_buckets` (the current item's bucket keys).
-   - When Shelf seeding is enabled and Debug log is On, logs include seeding diagnostics such as: `scanned`, `exact`, `dups`, `added`, `mismatched`, `no_call`, and sometimes `mismatch_samples` to help diagnose non‑matches.
-   - Debug `values.properties` also includes optional fields when mapped (Location / Issued / Material type / Viewing direction) for verification.
+- **Configurable Scoring Engine**: Fine-tune recommendation relevance using multiple weighted signals.
+- **Async Loading**: Recommendations are loaded via a JSON API after the main page content, preventing slow page loads.
+- **Advanced Serendipity Control**: Promote diversity by penalizing items from the same series (BibID) and prioritizing different titles.
+- **Smart Seeding**: Expands the candidate pool using item sets and call number proximity ("shelf seeding") to surface relevant items even with sparse metadata.
+- **Title Normalization**: Intelligently groups items by their base title, ignoring volume numbers and separators (e.g., "Title, Vol. 1" and "Title, Vol. 2" are treated as having the same base title).
+- **Light Jitter**: Subtly varies results on each page reload to increase discovery, without sacrificing top relevance.
+- **Rich Diagnostics**: A debug mode provides detailed logs and a structured JSON payload, showing exactly how each recommendation was scored.
 
 ---
 
-## For developers (how it works)
+## Installation and Configuration
 
-Signals and scoring
-- Equality queries: NCID / Author ID / Authorized name / Subject
-- Seeding: Item Sets (fallback for sparse mappings)
-- Proximity: Domain bucket / Shelf / Class (threshold)
- - Light boosts (optional):
-   - Material type equality: small nudge when both items share the same material type (default +2).
-   - Issued proximity: small nudge when years are within a threshold (default ±5 years, weight +1). Year is parsed from the mapped Issued property.
-   - Class proximity is a light “boost” for nearby classification, not a hard filter. Typical weight 1–2 with a threshold around 5 (adjust per collection).
-   - If the mapped Class property is present but non‑numeric (e.g., a subject string), the helper falls back to deriving a numeric class from the call number when possible.
-- Penalties: Same base title / Same Bib ID (configurable)
+### 1. Installation
 
-Final-stage diversification
-- After scoring and sorting, results are reordered to prefer different base titles first, then fill remaining, and show same-series items last if needed. This improves variety even when physical arrangement (shelf/class) is strong.
+1.  Place the module folder into your Omeka S `modules` directory as `SimilarItems`.
+2.  In the Omeka S admin dashboard, go to **Modules** and activate "Similar Items".
+3.  Go to **Sites** → [Your Site] → **Configure resource pages**. On the Item page, add the "Similar items" block to your desired region.
 
-Async endpoint
-- `GET /similar-items/recommend?id=...&limit=...&site=...` returns `{ html }`
-- Add `debug=1` to also get `{ debug: [...] }` with structured rows including `signals` and `values` (per-signal property values and proximity context).
+### 2. Configuration
 
-Thumbnails
-- Prefer IIIF `/square/240,/0/default.jpg` from media `info.json`, falling back to Omeka `thumbnailUrl('square'|'medium')`. If the IIIF server rejects upscaling, the client falls back to `/square/max/0/default.jpg` automatically.
+All settings are located in **Admin → Modules → Similar Items → Configure**.
 
-Jitter behavior (when enabled)
-- Sorting: score ties are randomized per reload before falling back to modified date.
-- Selection: when candidates exceed the display limit, a slightly larger top pool is sampled with score-based weights so lineups vary while keeping relevance.
-- If the number of candidates equals the limit, the composition is fixed, but the order among equal-score items still changes per reload.
+#### Basic Settings
 
-Key files
-- `src/View/Helper/SimilarItems.php` — scoring, penalties, diversification
-- `src/Controller/RecommendController.php` — async JSON (+debug)
-- `view/similar-items/partial/list.phtml` — HTML list
-- Theme: `themes/*/view/common/resource-page-blocks/similar-items.phtml` — loader and strings
+- **Scope to current site**: (Recommended: On) Restricts recommendations to items within the current site.
+- **Use Item Sets for seeding**: (Recommended: On) Uses items from shared item sets as an initial pool of candidates. A good fallback when other signals are sparse.
+- **Debug log**: (Default: Off) When enabled, detailed diagnostic information is written to `logs/application.log`.
+- **Same-title handling**: Controls behavior when only same-title candidates are found.
+    - `Allow` (Default): Shows the highest-scoring items, even if they are from the same series.
+    - `Exclude`: Hides same-title items to maximize diversity. If this results in zero candidates, the block will be filled with a random selection of items instead.
+- **Light jitter**: (Default: Off) If enabled, the final list is sampled from a slightly larger pool of top-scoring items, causing the order and selection to vary subtly on each page reload.
 
-Defaults
-- See `Module.php` for install/form defaults and setting keys `similaritems.*`.
+#### Mappings
 
-License: MIT
+Map the module's concepts to your vocabulary's properties.
+
+| Concept                 | Recommended Property        | Purpose                                                              |
+| ----------------------- | --------------------------- | -------------------------------------------------------------------- |
+| **Call number**         | `dcndl:callNumber`          | Used for shelf seeding and class proximity.                          |
+| **Class number**        | `dc:subject`                | Used for class-based proximity signals. Falls back to call number.   |
+| **Bibliographic ID**    | `tsukubada:bibid`           | Identifies a bibliographic record (e.g., a book series). Used for penalties. |
+| **NCID**                | `dcndl:sourceIdentifier`    | A strong signal for related works (e.g., different editions).        |
+| **Author ID**           | `tsukubada:authorId`        | An authority-controlled identifier for a creator.                    |
+| **Authorized name**     | `tsukubada:authorizedName`  | A fallback for author matching when IDs are unavailable.             |
+| **Subject**             | (Your subject property)     | Matches items with shared subjects.                                  |
+| **Location** (Optional) | (Your location property)    | For debug display.                                                   |
+| **Issued** (Optional)   | `dcterms:issued`            | Used for the "Issued proximity" boost.                               |
+| **Material** (Optional) | (Your material property)    | Used for the "Material type equality" boost.                         |
+| **Viewing** (Optional)  | `bibo:viewingDirection`     | For debug display.                                                   |
+
+#### Weights and Penalties
+
+These settings control the scoring algorithm. Higher weights have more influence.
+
+- **Signal Weights**:
+    - Recommended defaults: NCID: 6, Author ID: 5, Subject: 5, Authorized name: 3, Domain bucket: 2, Item Sets: 2, Shelf: 1, Class proximity: 1.
+    - **Light Boosts (Optional)**:
+        - `Material type equality`: A small bonus (default: +2) if the material type is the same.
+        - `Issued proximity`: A small bonus (default: +1) if the publication years are within a certain threshold (default: ±5 years).
+
+- **Penalties (for Serendipity)**:
+    - `Demote same Bib ID`: (Switch) When on, applies a strong penalty to items sharing the same Bib ID as the current item.
+    - `Same Bib ID penalty`: (Value) The score to subtract when the above switch is on (e.g., 150).
+    - `Same base title penalty`: Automatically applied when "Demote same Bib ID" is on. This prevents items from the same series/set from dominating the results.
+
+#### Shelf Seeding
+
+This feature helps discover physically co-located items.
+
+- **Enable Shelf seeding**: (Default: Off) When enabled, the module seeds the candidate pool with items that have a similar call number prefix (i.e., are on the same "shelf").
+- **How it works**:
+    1.  It first attempts a "starts-with" search on the normalized call number for precision.
+    2.  If that yields few results, it can fall back to a broader "like" search.
+    3.  It normalizes full-width characters to half-width (e.g., "２１０" → "210") to improve match rates.
+    4.  A final post-filter ensures only exact shelf matches are used for scoring.
+- **Diagnostics**: When `Debug log` is on, detailed shelf seeding statistics are logged (e.g., `scanned`, `exact`, `added`, `mismatched`), helping to diagnose why few or no shelf-based candidates may appear.
+
+#### Title Normalization
+
+- **Title–volume separators**: Define characters or strings used to separate a base title from volume information (e.g., ` , `, ` - `, ` : `). This helps the module correctly identify items belonging to the same series.
+
+---
+
+## Testing and Debugging
+
+You can verify the module's behavior in two ways:
+
+### 1. Debug Log
+
+Enable `Debug log` in the module settings. All scoring, query, and diagnostic information for each request will be logged to `logs/application.log`. This is the best way to inspect the shelf-seeding process.
+
+### 2. Async Endpoint with `debug=1`
+
+Call the recommendation endpoint directly in your browser with the `debug=1` parameter.
+
+**URL Format:**
+`/similar-items/recommend?id={ITEM_ID}&limit=12&site={SITE_SLUG}&debug=1`
+
+This returns a JSON object containing the rendered `html` and a `debug` payload.
+
+- **`debug`**: An array of recommended items, each with:
+    - `id`, `title`, `url`, `score`, `base_title`.
+    - `signals`: An array of signals that contributed to the score (e.g., `['ncid', 6]`).
+    - `values`: The underlying property values that triggered the signals, providing full transparency. Includes `properties`, `buckets`, `shelf`, and `class_number`.
+- **`debug_meta`**: Context for the request, including the current item's bucket keys (`cur_buckets`).
+
+---
+
+## Theme Integration
+
+The module is responsible for the "what" (the logic), while the theme is responsible for the "how" (the presentation).
+
+- **Rendering Partial**: The module uses a simple partial (`view/similar-items/partial/list.phtml`) to render the list of items.
+- **Theme Override**: A theme should provide its own `view/common/resource-page-blocks/similar-items.phtml`. This file is responsible for:
+    - The loading container and any placeholder/spinner UI.
+    - The JavaScript that calls the `/similar-items/recommend` endpoint and injects the returned HTML.
+    - Localized strings for the block title or other UI elements.
+- **Thumbnails**: The module attempts to use IIIF thumbnails (`/square/240,/0/default.jpg`) and falls back to standard Omeka thumbnails. The client-side script can implement a further fallback (e.g., to `/square/max/0/default.jpg`) if an image fails to load.
+- **Title Length**: The maximum length of item titles is controlled by the theme via a theme setting (e.g., `similar_items_title_max_length`).
+
+## Key Files
+
+- `src/View/Helper/SimilarItems.php`: The core logic for scoring, seeding, and diversification.
+- `src/Controller/RecommendController.php`: The async JSON endpoint.
+- `Module.php`: Defines configuration keys and default values.
+
+## License
+
+MIT
 
 ============================================================
 
-## SimilarItems（Omeka S モジュール）
+# SimilarItems (Omeka S モジュール)
 
-このモジュールは、管理画面 → サイト →［サイト名］→ リソースページの構成に表示される `similarItems` というブロックレイアウトを登録します。描画は非同期でテーマ側が担当し、類似度ロジックはモジュールのグローバル設定で制御できます。
+このモジュールは、アイテムページに関連性の高い推奨資料を表示するための「類似アイテム」ページブロックを提供します。重み付けを柔軟に設定できるスコアリングエンジンを搭載し、利用者の操作を妨げない非同期描画を採用しています。
 
----
+表示（UI）はアクティブなテーマが担当し、推奨ロジックの制御はすべてこのモジュールのグローバル設定で行います。
 
-## 図書館スタッフ向け（使い方）
+## 機能
 
-インストール
-1. このフォルダを `modules/SimilarItems` に配置し、管理画面 → モジュール で有効化します。
-2. 管理画面 → サイト →［対象サイト］→ リソースページの構成で「Similar items」ブロックを追加します。
-
-設定（管理画面 → モジュール → Similar Items → 設定）
-- サイトを範囲に含める：オン
-- アイテムセットで種まき：オン
-- アイテムセット重み：2
-- デバッグログ：オフ（テスト時のみオン。出力先は `logs/application.log`）
-- 棚シーディング（任意）：既定オフ。オンにすると、請求記号の接頭一致（同じ「棚」）で候補プールを拡張し、棚の重みだけでも近い資料が上位に出やすくなります。上限件数は設定可能です。検索は「前方一致（starts‑with）」を優先し、必要時のみ LIKE にフォールバックします。また、全角の数字・英字・空白を半角に正規化（例：「２１０」→「210」）して一致率を高めます。
-- 代替候補が無いときの同一タイトルの扱い：許可（既定）/ 除外
-- 微揺らぎ（リロード毎にわずかに変動）：既定オフ。オンにすると上位候補のやや広いプールから重み付きで抽出し、関連性を保ったまま表示が微妙に入れ替わります。
-
-マッピング（上級者向け）
-- 請求記号：`dcndl:callNumber` ／ 分類記号：`dc:subject`
-- BibID：`tsukubada:bibid` ／ NCID：`dcndl:sourceIdentifier`
-- 著者ID：`tsukubada:authorId` ／ 権限定名：`tsukubada:authorizedName`
-- 件名：使用している件名の語彙
-- （任意）所在、発行年、資料種別、綴じ方向
-
-推奨ウェイト（バランス良く多様性重視）
-- BibID：0、NCID：6、著者ID：5、権限定名：3、件名：5
-- 分野バケット：2、棚：1、分類近接：1、閾値：5
-- アイテムセット：2
-
-なぜこの配分か（背景・理由）
-- NCID（6）: 同一巻を避けつつ、版や刷の近い書誌をうまく引き寄せる強い信号。重複に落ちず「本当に関連が強い」領域を押し上げます。
-- 著者ID（5）: 権威IDによる厳密なリンク。著者偏重になりすぎないように NCID よりわずかに低く設定し、主題とのバランスを取っています。
-- 権限定名（3）: ID 不在時の代替。表記揺れや同名異人の影響があるため、ID より弱めに設定。
-- 件名（5）: 主題的な近さを強く反映。ただし目録実務により広すぎたりノイズが混ざる場合があるため、NCID/著者とのバランスで 5 に。
-- 分野バケット（2）・棚（1）・分類近接（1）: 「棚での近さ」によるセレンディピティを少量付与。均質化を避けるため弱めにとどめています。
-- アイテムセット（2）: キュレーションされた集合の近さは有用（特にマッピングが疎な場合）が、支配的にならない程度に控えめ。
-- BibID（0）＋強いペナルティ: 同一シリーズ（巻違い）が多数出やすいため、上位を独占しないよう強く抑制。代替が無いときは後段で拾います。
-
-多様性と閾値
-- 分類近接の閾値（≈5）は「近すぎず遠すぎない」範囲に調整。
-- 最終段の「多様化」により、まず異なるベースタイトルを優先。上記ウェイトは単一の信号が多様性を壊さないよう配慮しています。
-
-調整の指針
-- 著者中心に寄せたい: 著者ID（必要に応じて権限定名も）を +1〜2。
-- 件名付与の品質が高い: 件名を 6〜7 に引き上げ、均質化が見られる場合は棚／分類の重みを下げる。
-- 「棚ブラウジング」感を強めたい: 棚を 2、または分類近接を 2 へ。ただし一覧の多様性に注意して微調整。
-
-セレンディピティ（多様性）
-- 「同一BibIDの降格（スイッチ）」：オンのとき、現アイテムと同一BibIDの候補に強い減点を適用します。オフのとき、この減点は適用しません。
-- 「ペナルティ：同一BibID（値）」：上記スイッチがオンのときに適用する減点の大きさ（例：100〜200）。
-- 「同一ベースタイトルの減点」：同一BibIDの降格がオンのときのみ適用（強さはおおむね同程度、最低100）。オフのときは無効化し、BibIDの正の加点テストを相殺しないようにしています。
-- 「同一タイトルの扱い」：許可はスコア順を保持／除外は同一ベースタイトルを落として多様性を優先。除外で全て消えた場合は（サイト範囲がオンなら）サイト内から無作為に取得して表示します。
-
-タイトル・巻区切り（1 行に 1 つ）
-- 既定値は ` , `。必要に応じて `，` や `、`、` - ` を追加できます。空白や全角・半角の差はある程度吸収されます。
-
-タイトル表示
-- 表示タイトルの最大文字数は「テーマ側の設定」（例：アクティブテーマの `similar_items_title_max_length`）で制御します。モジュールの `similaritems.title_max_length` は互換目的のフォールバックとしてのみ参照します。
-
-期待される表示
-- 「同じではないが関連が強い」アイテムが混ざった一覧になります。シリーズ（同一ベースタイトル/BibID）は下位に回され、代替がある場合は異なるタイトルが優先されます。代替が全く無い場合は、シリーズ巻が後段に表示されます。
-
-テスト方法（2 通り）
-1) デバッグログをオンにしてアイテムページを開くと、シグナル・検索・最終件数が `logs/application.log` に出力されます。
-2) `debug=1` を付けて非同期エンドポイントを叩きます：
-   `/similar-items/recommend?id={ITEM_ID}&limit=12&site={SITE_SLUG}&debug=1`
-   → `html` と `debug`（id, title, url, score, base_title, signals, values）に加えて `debug_meta`（`site_param`、`limit`、`cur_buckets`）を含む JSON が返ります。
-   - `values` は各シグナルの根拠となるプロパティ値（`properties` の語彙→値配列）と、`buckets`・`shelf`・`class_number` などの近接コンテキストを含みます。
-   - 棚シーディング有効＋デバッグログONのときは、ログに `scanned`（走査）/`exact`（棚一致）/`dups`（重複）/`added`（新規追加）/`mismatched`（棚不一致）/`no_call`（請求記号なし）/`mismatch_samples`（不一致例の一部）などが出力され、原因の切り分けに役立ちます。
-   - `values.properties` にはマッピング済みなら（所在／発行年／資料種別／綴じ方向）も表示され、検証に使えます。
+- **設定可能なスコアリングエンジン**: 複数のシグナル（信号）に重みを付けて、推奨の関連性を細かく調整できます。
+- **非同期読み込み**: メインコンテンツの表示後にJSON API経由で推奨リストを読み込むため、ページの表示速度が低下しません。
+- **高度なセレンディピティ制御**: 同一シリーズ（BibID）のアイテムにペナルティを与え、異なるタイトルを優先することで、表示の多様性を高めます。
+- **スマートな種まき（Seeding）**: アイテムセットや請求記号の近さ（棚シーディング）を利用して候補の母集団を広げ、メタデータが少ない場合でも関連アイテムを発見します。
+- **タイトル正規化**: 巻数や区切り文字を無視してベースタイトルを賢く判定（例：「タイトル, 上巻」と「タイトル, 下巻」は同じベースタイトルとして扱われます）。
+- **微揺らぎ（Light Jitter）**: ページをリロードするたびに結果をわずかに変化させ、上位の関連性を損なうことなく新たな発見を促します。
+- **豊富な診断機能**: デバッグモードを有効にすると、各アイテムがどのようにスコアリングされたかを正確に示す詳細なログと構造化JSONが出力されます。
 
 ---
 
-## 開発者向け（仕組み）
+## インストールと設定
 
-シグナルとスコアリング
-- 等価一致：NCID／著者ID／権限定名／件名
-- 種まき：アイテムセット（マッピングが疎な場合のフォールバック）
-- 近接：分野バケット／棚／分類（閾値）
- - 軽いブースト（任意）：
-   - 資料種別の一致で少量の加点（既定 +2）。
-   - 出版年の近さ（±閾値、既定 5 年以内）で少量の加点（既定 +1）。出版年はマッピングした Issued から年を抽出して判定します。
-   - 分類近接は「近い分類をそっと押し上げる」ための軽いブーストであり、フィルタではありません。重みは 1〜2、閾値は 5 前後が目安です（コレクションに応じて調整）。
-   - マッピングした「分類」プロパティが存在しても内容が数値でない場合（例：件名文字列）、可能であれば請求記号から数値分類を導出して代替します。
-- ペナルティ：同一ベースタイトル／同一BibID（設定可能）
+### 1. インストール
 
-最終段の多様化
-- スコア付けとソート後、まず「異なるベースタイトル」を優先して 1 件ずつ採用し、次に残りを充填、最後に同一シリーズを追加します。棚・分類の近接が強い場合でも一覧の多様性が向上します。
+1.  モジュールフォルダをOmeka Sの `modules` ディレクトリに `SimilarItems` として配置します。
+2.  Omeka Sの管理画面で **モジュール** に移動し、「Similar Items」を有効化します。
+3.  **サイト** → [対象サイト] → **リソースページの構成** に移動し、アイテムページのお好みの領域に「Similar items」ブロックを追加します。
 
-非同期エンドポイント
-- `GET /similar-items/recommend?id=...&limit=...&site=...` は `{ html }` を返します。
-- `debug=1` を付けると `{ debug: [...] }` で構造化行（id, title, url, score, base_title, signals, values）も返します。`values` には各シグナルの元となった実値と近接コンテキストが入ります。
+### 2. 設定
 
-サムネイル
-- メディアの `info.json` から IIIF `/square/240,/0/default.jpg` を優先し、無い場合は Omeka の `thumbnailUrl('square'|'medium')` を使用します。サーバーが拡大を許可しない場合は、クライアント側で自動的に `/square/max/0/default.jpg` にフォールバックします。
+すべての設定は **管理画面 → モジュール → Similar Items → 設定** にあります。
 
-ジッターの挙動（有効時）
-- ソート: スコアが同点の要素は、modified の前に「リロード毎にランダム」な順序で並び替えます。
-- 選択: 候補が表示件数を超える場合は、上位のやや広いプールからスコア重み付きで抽出するため、関連性を保ったまま顔ぶれが変化します。
-- 候補数が表示件数と同数のときは、顔ぶれは固定ですが、同点帯の並びはリロード毎に入れ替わります。
+#### 基本設定
 
-主要ファイル
-- `src/View/Helper/SimilarItems.php` — スコア・ペナルティ・多様化
-- `src/Controller/RecommendController.php` — 非同期 JSON（+debug）
-- `view/similar-items/partial/list.phtml` — HTML リスト
-- テーマ：`themes/*/view/common/resource-page-blocks/similar-items.phtml` — ローダーと文言
+- **現在のサイトを範囲に含める**: （推奨：オン）推奨対象を現在のサイト内のアイテムに限定します。
+- **アイテムセットで種まき**: （推奨：オン）共通のアイテムセットに属するアイテムを候補の初期プールとして使用します。他のシグナルが少ない場合の有効なフォールバックです。
+- **デバッグログ**: （既定：オフ）有効にすると、詳細な診断情報が `logs/application.log` に書き込まれます。
+- **同一タイトルの扱い**: 同じベースタイトルの候補しか見つからない場合の挙動を制御します。
+    - `許可`（既定）：同一シリーズであっても、スコアが最も高いアイテムを表示します。
+    - `除外`：多様性を最大化するため、同一ベースタイトルのアイテムを非表示にします。これにより候補が0件になった場合は、代わりにランダムなアイテム群が表示されます。
+- **微揺らぎ**: （既定：オフ）有効にすると、最終的なリストが上位スコアの少し広いプールからサンプリングされるようになり、リロードごとに順序や顔ぶれがわずかに変化します。
 
-既定値
-- インストール/フォーム既定値と `similaritems.*` の設定キーは `Module.php` を参照してください。
+#### マッピング
 
-ライセンス：MIT
+モジュールの概念を、お使いの語彙のプロパティに紐付けます。
+
+| 概念                  | 推奨プロパティ              | 目的                                                       |
+| --------------------- | --------------------------- | ---------------------------------------------------------- |
+| **請求記号**          | `dcndl:callNumber`          | 棚シーディングや分類近接で使用します。                     |
+| **分類記号**          | `dc:subject`                | 分類ベースの近接シグナルで使用。請求記号で代替可。         |
+| **書誌ID (BibID)**    | `tsukubada:bibid`           | 書誌レコード（例：叢書）を識別。ペナルティ判定で使用。     |
+| **NCID**              | `dcndl:sourceIdentifier`    | 関連書誌（例：異なる版）を示す強力なシグナル。             |
+| **著者ID**            | `tsukubada:authorId`        | 典拠コントロールされた著者識別子。                         |
+| **権威化された名称**  | `tsukubada:authorizedName`  | 著者IDがない場合の著者マッチングの代替。                   |
+| **件名**              | (お使いの件名プロパティ)    | 共通の件名を持つアイテムをマッチングします。               |
+| **所在** (任意)       | (お使いの所在プロパティ)    | デバッグ表示用。                                           |
+| **発行年** (任意)     | `dcterms:issued`            | 「発行年近接」ブーストで使用します。                       |
+| **資料種別** (任意)   | (お使いの資料種別プロパティ)| 「資料種別一致」ブーストで使用します。                     |
+| **綴じ方向** (任意)   | `bibo:viewingDirection`     | デバッグ表示用。                                           |
+
+#### ウェイトとペナルティ
+
+スコアリングアルゴリズムを制御します。ウェイトが高いほど影響が強くなります。
+
+- **シグナルのウェイト**:
+    - 推奨既定値：NCID: 6, 著者ID: 5, 件名: 5, 権威化された名称: 3, 分野バケット: 2, アイテムセット: 2, 棚: 1, 分類近接: 1。
+    - **軽いブースト（任意）**:
+        - `資料種別の一致`: 資料種別が同じ場合に小さなボーナス（既定：+2）。
+        - `発行年の近接`: 出版年が一定の範囲内（既定：±5年）にある場合に小さなボーナス（既定：+1）。
+
+- **ペナルティ（セレンディピティのため）**:
+    - `同一BibIDの降格`: （スイッチ）オンのとき、現在のアイテムと同じBibIDを持つアイテムに強いペナルティを課します。
+    - `同一BibIDペナルティ`: （値）上記スイッチがオンのときに減算するスコア（例：150）。
+    - `同一ベースタイトルのペナルティ`: 「同一BibIDの降格」がオンのときに自動的に適用されます。これにより、同じシリーズの巻違いなどが結果を独占するのを防ぎます。
+
+#### 棚シーディング
+
+物理的に近くに配架されている資料を発見しやすくする機能です。
+
+- **棚シーディングを有効にする**: （既定：オフ）有効にすると、請求記号の接頭辞が似ている（＝同じ「棚」にある）アイテムを候補プールに加えます。
+- **動作の仕組み**:
+    1.  まず、正規化された請求記号に対して高精度な「前方一致」検索を試みます。
+    2.  それで十分な結果が得られない場合、より広範な「like」検索にフォールバックすることがあります。
+    3.  全角文字を半角に正規化（例：「２１０」→「210」）し、一致率を向上させます。
+    4.  最終的な後段フィルタで、スコアリングには厳密に棚が一致したもののみを使用します。
+- **診断**: `デバッグログ` がオンの場合、棚シーディングの詳細な統計情報（例：`scanned`, `exact`, `added`, `mismatched`）がログに出力され、棚ベースの候補がなぜ少ないかの診断に役立ちます。
+
+#### タイトル正規化
+
+- **タイトル・巻の区切り文字**: ベースタイトルと巻数情報を区切る文字や文字列を定義します（例：` , `, ` - `, ` : `）。これにより、モジュールが同じシリーズに属するアイテムを正しく識別できます。
+
+---
+
+## テストとデバッグ
+
+モジュールの動作は2つの方法で確認できます。
+
+### 1. デバッグログ
+
+モジュール設定で `デバッグログ` を有効にします。リクエストごとのスコアリング、クエリ、診断情報のすべてが `logs/application.log` に記録されます。棚シーディングのプロセスを調査するにはこの方法が最適です。
+
+### 2. `debug=1` 付き非同期エンドポイント
+
+ブラウザで直接推奨エンドポイントを呼び出します。
+
+**URLフォーマット:**
+`/similar-items/recommend?id={ITEM_ID}&limit=12&site={SITE_SLUG}&debug=1`
+
+これにより、描画された `html` と `debug` ペイロードを含むJSONオブジェクトが返されます。
+
+- **`debug`**: 推奨アイテムの配列。各アイテムには以下の情報が含まれます。
+    - `id`, `title`, `url`, `score`, `base_title`
+    - `signals`: スコアに貢献したシグナルの配列（例：`['ncid', 6]`）。
+    - `values`: シグナルの根拠となったプロパティの実際の値。完全な透明性を提供します。`properties`, `buckets`, `shelf`, `class_number` を含みます。
+- **`debug_meta`**: リクエストのコンテキスト情報。現在のアイテムのバケットキー（`cur_buckets`）など。
+
+---
+
+## テーマ連携
+
+このモジュールは「何を表示するか」（ロジック）を担当し、テーマは「どう表示するか」（プレゼンテーション）を担当します。
+
+- **描画パーシャル**: モジュールはアイテムリストを描画するためにシンプルなパーシャル（`view/similar-items/partial/list.phtml`）を使用します。
+- **テーマによる上書き**: テーマ側で `view/common/resource-page-blocks/similar-items.phtml` を用意すべきです。このファイルは以下を担当します。
+    - 読み込み中のコンテナや、プレースホルダ／スピナーなどのUI。
+    - `/similar-items/recommend` エンドポイントを呼び出し、返されたHTMLを挿入するJavaScript。
+    - ブロックタイトルなど、UI要素の多言語対応文字列。
+- **サムネイル**: モジュールはIIIFサムネイル（`/square/240,/0/default.jpg`）を優先し、なければOmekaの標準サムネイルにフォールバックします。画像読み込みに失敗した場合、クライアント側スクリプトでさらにフォールバック（例：`/square/max/0/default.jpg`へ）を実装できます。
+- **タイトル長**: アイテムタイトルの最大長は、テーマ設定（例：`similar_items_title_max_length`）によってテーマ側で制御します。
+
+## 主要ファイル
+
+- `src/View/Helper/SimilarItems.php`: スコアリング、種まき、多様化のコアロジック。
+- `src/Controller/RecommendController.php`: 非同期JSONエンドポイント。
+- `Module.php`: 設定キーと既定値を定義。
+
+## ライセンス
+
+MIT
 
