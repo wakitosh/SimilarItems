@@ -72,6 +72,39 @@ This feature helps discover physically co-located items.
 
 - **Title–volume separators**: Define characters or strings used to separate a base title from volume information (e.g., ` , `, ` - `, ` : `). This helps the module correctly identify items belonging to the same series.
 
+#### Domain Bucket Rules (JSON)
+
+This advanced setting allows you to create custom "domain buckets" to group items by broad subject areas, which can be more robust than relying on specific subject headings alone. Items belonging to the same bucket receive a score boost, helping to surface topically related materials.
+
+- **Purpose**: To create thematic groupings (e.g., "History," "Science," "Art") based on patterns in your classification or call numbers. This is especially useful when dealing with multiple classification schemes (like NDC, DDC, and local schemes) in a single collection.
+- **Format**: The setting takes a JSON object with two main keys: `fields` and `buckets`.
+    - `fields`: Maps short names (e.g., `call_number`) to the Omeka properties you want to test against. This avoids repeating long property names in the rules.
+    - `buckets`: An array of rule objects. Each object defines a single bucket:
+        - `key`: A unique identifier for the bucket (e.g., `history`).
+        - `labels`: A map of language codes to display names (e.g., `"ja": "歴史"`).
+        - `any` or `all`: Defines the logic for the conditions within. `any` matches if at least one condition is true (OR), while `all` requires every condition to be true (AND).
+        - **Conditions**: An array of rule conditions. Each condition is an object with:
+            - `field`: The short name of the property to test (defined in `fields`).
+            - `op`: The comparison operator. Supported operators are:
+                - `prefix`: Checks if the property value starts with the given string.
+                - `contains`: Checks if the property value contains the given string.
+                - `not_prefix`: Checks if the property value does *not* start with the given string.
+            - `value`: The string to compare against.
+
+**Example Rule**:
+This rule defines a "philosophy" bucket. An item is assigned to this bucket if its `call_number` property starts with "1" or "ロ".
+
+```json
+{
+  "key": "philosophy",
+  "labels": {"ja": "哲学"},
+  "any": [
+    {"field": "call_number", "op": "prefix", "value": "1"},
+    {"field": "call_number", "op": "prefix", "value": "ロ"}
+  ]
+}
+```
+
 ### 3. Configuration Guide: Weights and Serendipity
 
 This section provides guidance on tuning the scoring algorithm to achieve your desired recommendation behavior.
@@ -223,7 +256,7 @@ MIT
 | **NCID**              | 関連書誌（例：異なる版）を示す強力なシグナル。             |
 | **著者ID**            | 典拠コントロールされた著者識別子。                         |
 | **権威化された名称**  | 著者IDがない場合の著者マッチングの代替。                   |
-| **件名**              | 共通の件名を持つアイテムをマッチングします。               |
+| **主題**              | 共通の主題を持つアイテムをマッチングします。               |
 | **所在** (任意)       | デバッグ表示用。                                           |
 | **発行年** (任意)     | 「発行年近接」ブーストで使用します。                       |
 | **資料種別** (任意)   | 「資料種別一致」ブーストで使用します。                     |
@@ -259,6 +292,87 @@ MIT
 #### タイトル正規化
 
 - **タイトル・巻の区切り文字**: ベースタイトルと巻数情報を区切る文字や文字列を定義します（例：` , `, ` - `, ` : `）。これにより、モジュールが同じシリーズに属するアイテムを正しく識別できます。
+
+#### 分野バケットのルール（JSON）
+
+この高度な設定では、アイテムを大まかな主題分野でグループ化するためのカスタム「分野バケット」を作成できます。これは、特定の主題見出しだけに頼るよりも堅牢な場合があります。同じバケットに属するアイテムはスコアがブーストされ、主題的に関連する資料が推薦されやすくなります。
+
+- **目的**: 分類や請求記号のパターンに基づいて、テーマ別のグループ（例：「歴史」「科学」「芸術」）を作成します。これは、単一のコレクション内で複数の分類体系（NDC、DDC、独自体系など）を扱っている場合に特に便利です。
+- **書式**: この設定は、`fields`と`buckets`という2つの主要なキーを持つJSONオブジェクトを受け取ります。
+    - `fields`: 短い名前（例：`call_number`）を、ルールで使用したいOmekaプロパティにマッピングします。これにより、ルール内で長いプロパティ名を繰り返す必要がなくなります。
+    - `buckets`: ルールオブジェクトの配列。各オブジェクトが1つのバケットを定義します。
+        - `key`: バケットの一意な識別子（例：`history`）。
+        - `labels`: 言語コードと表示名のマップ（例：`"ja": "歴史"`）。
+        - `any`または`all`: 内部の条件の論理を定義します。`any`は少なくとも1つの条件が真であれば一致し（OR）、`all`はすべての条件が真である必要があります（AND）。
+        - **条件**: ルール条件の配列。各条件は以下のキーを持つオブジェクトです。
+            - `field`: テストするプロパティの短い名前（`fields`で定義）。
+            - `op`: 比較演算子。サポートされている演算子は次のとおりです。
+                - `prefix`: プロパティ値が指定された文字列で始まるかチェックします。
+                - `contains`: プロパティ値が指定された文字列を含むかチェックします。
+                - `not_prefix`: プロパティ値が指定された文字列で始まら *ない* かチェックします。
+            - `value`: 比較対象の文字列。
+
+**ルール例**:
+このルールは「哲学」バケットを定義します。アイテムの`call_number`プロパティが「1」または「ロ」で始まる場合、このバケットに割り当てられます。
+
+```json
+{
+  "key": "philosophy",
+  "labels": {"ja": "哲学"},
+  "any": [
+    {"field": "call_number", "op": "prefix", "value": "1"},
+    {"field": "call_number", "op": "prefix", "value": "ロ"}
+  ]
+}
+```
+
+### 3. 設定の指針：ウェイトとセレンディピティ
+
+このセクションでは、望ましい推奨の挙動を実現するために、スコアリングアルゴリズムを調整するための指針を提供します。
+
+#### 推奨ウェイト（バランスの取れた多様な設定）
+
+これらのデフォルト値は、トピカルな関連性とセレンディピティのバランスの取れたミックスを提供するための良い出発点です。
+
+- **コアシグナル**:
+    - `NCID`: 6
+    - `著者ID`: 5
+    - `主題`: 5
+    - `権威化された名称`: 3
+    - `アイテムセット`: 2
+- **近接 & ブースト**:
+    - `Domain bucket`: 2
+    - `Shelf`: 1
+    - `Class proximity`: 1 (Threshold: 5)
+    - `Material type equality`: 2
+    - `Issued proximity`: 1 (Threshold: 5 years)
+- **書誌ID**:
+    - `Bib ID weight`: 0
+    - `Same Bib ID penalty`: 150
+
+#### ウェイト設定の理論的背景
+
+- **強力なシグナル（NCID, Author ID, Subject）**: `NCID` (6) は、異なる版や印刷物をリンクするために最も高く設定されています。`Author ID` (5) と `Subject` (5) は、著者とトピックの強い親和性を提供します。
+- **フォールバックシグナル（Authorized name, Item Sets）**: `Authorized name` (3) は弱めの著者シグナルであり、`Item Sets` (2) は、他のメタデータが乏しいときに有用なキュレーションされたコンテキストを提供します。
+- **「スタックブラウジング」シグナル（Domain, Shelf, Class）**: これらは意図的に低く設定されており（1-2）、トピカルシグナルを圧倒することなく、物理的な「棚ブラウジング」のニュアンスとセレンディピティを加えます。
+- **軽いブースト（Material, Issued）**: これらは、同じタイプのアイテムや類似の時期に作成されたアイテムに対して微妙な関連性を追加します。
+- **Bib ID（0ウェイト + ペナルティ）**: 同じシリーズのアイテム（例：ジャーナルの巻号）はしばしば豊富に存在します。ウェイトを0に設定し、強いペナルティ（150）を適用することで、より多様な結果のために押し下げられますが、より良い一致が存在しない場合には依然として利用可能です。
+
+#### 調整のヒント
+
+- **著者中心の結果を増やすには**: `Author ID` のウェイトを6または7に増やします。
+- **トピックマッチングを強化するには**: 主題のカタログが強力な場合、`Subject` のウェイトを6または7に増やします。
+- **「スタックブラウジング」感を出すには**: `Shelf` または `Class proximity` を2に優しく増やします。結果があまりにも均質にならないように監視します。
+
+#### セレンディピティと多様性の制御
+
+これらの設定は、同じシリーズのアイテムによって結果が支配されるのを防ぐために連携して機能します。
+
+- **同一Bib IDの降格（スイッチ）**: これは多様性のためのマスタースイッチです。**オン**のとき：
+    - `Same Bib ID penalty` が、現在のアイテムのBib IDを共有するアイテムに適用されます。
+    - `Same base title penalty` も自動的に適用されます。
+- **オフのとき**: 両方のペナルティが無効になります。これはテストに便利な場合や、直接的なシリーズ関係を優先したい場合に役立ちます。
+- **最終段階の多様化**: すべてのスコアリングが完了した後、モジュールは最終的な再配置ステップを実行します。異なるベースタイトルを持つアイテムを優先的に表示するようにし、結果の多様性を大幅に向上させます。
 
 ---
 
