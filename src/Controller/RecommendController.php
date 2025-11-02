@@ -26,7 +26,12 @@ class RecommendController extends AbstractActionController {
     $similarHelper = $vh->get(SimilarItemsHelper::class);
 
     $id = (int) $this->params()->fromQuery('id', 0);
+    // Prefer explicit query param; otherwise fall back to route param when
+    // the endpoint is site-scoped.
     $siteSlug = (string) $this->params()->fromQuery('site', '');
+    if ($siteSlug === '') {
+      $siteSlug = (string) $this->params()->fromRoute('site-slug', '');
+    }
     // Prefer explicit query param; otherwise fall back to module setting.
     $limitParam = $this->params()->fromQuery('limit', NULL);
     if ($limitParam !== NULL) {

@@ -32,6 +32,20 @@ return [
           ],
         ],
       ],
+      // Site-aware endpoint so the public site's theme (and its view overrides)
+      // can be applied when rendering the partial. This mirrors the site URL
+      // structure and sets the __SITE__ flag so Omeka prepares the site/theme.
+      'similaritems-recommend-site' => [
+        'type' => 'Segment',
+        'options' => [
+          'route' => '/s/:site-slug/similar-items/recommend',
+          'defaults' => [
+            'controller' => RecommendController::class,
+            'action' => 'list',
+            '__SITE__' => TRUE,
+          ],
+        ],
+      ],
     ],
   ],
   'view_helpers' => [
