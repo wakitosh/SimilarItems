@@ -45,6 +45,11 @@ class RecommendController extends AbstractActionController {
       $limit = 6;
     }
     $debug = (int) $this->params()->fromQuery('debug', 0) === 1;
+    // Optional A/B controls via query parameters.
+    $tiebreak = (string) $this->params()->fromQuery('tiebreak', '');
+    // Item set influence tuning for trials.
+    $itemSetsWeightParam = $this->params()->fromQuery('item_sets_weight', NULL);
+    $itemSetsSeedOnly = (int) $this->params()->fromQuery('item_sets_seed_only', 0) === 1;
     if ($id <= 0) {
       return new JsonModel(['html' => '']);
     }
@@ -75,6 +80,16 @@ class RecommendController extends AbstractActionController {
       $opts = ['limit' => $limit];
       if ($siteIdOpt) {
         $opts['site_id'] = (int) $siteIdOpt;
+      }
+      if ($tiebreak !== '') {
+        // Accept: none|consensus|strength|identity (identity-first)
+        $opts['tiebreak'] = (string) $tiebreak;
+      }
+      if ($itemSetsWeightParam !== NULL) {
+        $opts['item_sets_weight'] = (int) $itemSetsWeightParam;
+      }
+      if ($itemSetsSeedOnly) {
+        $opts['item_sets_seed_only'] = TRUE;
       }
       $results = (array) $similarHelper->__invoke($item, $opts);
     }
@@ -140,6 +155,9 @@ class RecommendController extends AbstractActionController {
       catch (\Throwable $e) {
         $curBuckets = [];
       }
+      // Effective item set weight (respect trial override when present).
+      $settings = $services->get('Omeka\Settings');
+      $effItemSetsWeight = ($itemSetsWeightParam !== NULL) ? (int) $itemSetsWeightParam : (int) ($settings->get('similaritems.weight_item_sets') ?? 3);
       $debugOut = [];
       foreach ($results as $row) {
         $r = $row['resource'] ?? NULL;
@@ -175,6 +193,9 @@ class RecommendController extends AbstractActionController {
       $payload['debug_meta'] = [
         'site_param' => $siteSlug,
         'limit' => $limit,
+        'tiebreak' => ($tiebreak !== '' ? $tiebreak : NULL),
+        'item_sets_weight' => $effItemSetsWeight,
+        'item_sets_seed_only' => $itemSetsSeedOnly ? 1 : 0,
         'cur_buckets' => $curBuckets,
       ];
     }

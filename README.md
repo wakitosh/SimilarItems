@@ -36,6 +36,10 @@ Controls the module's fundamental behavior.
 - **Maximum number of results**: The maximum number of similar items to display in the page block.
 - **Debug log**: (Default: Off) When enabled, detailed diagnostic information is written to `logs/application.log`.
 - **Include debug JSON in payload**: (Default: Off) When enabled, the API response will include debug information.
+- **Tie-break policy for equal scores**: Defines how to order items when two candidates have the same total score.
+  - `None` (Default): Score only; keep ties as-is.
+  - `Prefer consensus`: Prefer the item supported by more distinct positive signals (e.g., Subject + Author + Shelf beats Author + Shelf).
+  - `Prefer strength`: Prefer the item with the single strongest matching signal (highest component weight).
 
 #### Candidate Expansion
 
@@ -208,6 +212,16 @@ This returns a JSON object containing the rendered `html` and a `debug` payload.
     - `values`: The underlying property values that triggered the signals, providing full transparency. Includes `properties`, `buckets`, `shelf`, and `class_number`.
 - **`debug_meta`**: Context for the request, including the current item's bucket keys (`cur_buckets`).
 
+### Per-request overrides (advanced)
+
+For A/B testing or diagnostics, you can temporarily override some settings via query parameters:
+
+- `tiebreak=none|consensus|strength|identity` — Override the tie-break policy for this request only.
+- `item_sets_weight=NUMBER` — Override the weight contributed by item-set matches (e.g., `0` disables the item-set score boost).
+- `item_sets_seed_only=1` — Use item sets for candidate expansion only; do not add any score for item-set matches.
+
+These overrides do not modify saved settings; they apply to the current request only.
+
 ---
 
 ## Theme Integration
@@ -272,6 +286,10 @@ MIT
 - **結果の最大表示件数**: ページブロックに表示する類似アイテムの最大件数です。
 - **デバッグログ**: （既定：オフ）有効にすると、詳細な診断情報が `logs/application.log` に書き込まれます。
 - **デバッグ用JSONをペイロードに含める**: （既定：オフ）有効にすると、API応答にデバッグ情報が含まれます。
+- **同点時の優先基準（タイブレーク）**: 合計スコアが同じ候補の並び替え規則を指定します。
+  - `なし`（既定）: スコアのみで決定し、同点はそのままにします。
+  - `一致シグナル数優先`: より多くの独立した肯定的シグナルで支持されている方を上位にします（例：主題＋著者＋棚 ＞ 著者＋棚）。
+  - `最大重み優先`: 単一の一致の強さ（最も大きい重み）を優先します。
 
 #### 候補拡大
 
@@ -444,6 +462,16 @@ MIT
     - `signals`: スコアに貢献したシグナルの配列（例：`['ncid', 6]`）。
     - `values`: シグナルの根拠となったプロパティの実際の値。完全な透明性を提供します。`properties`, `buckets`, `shelf`, `class_number` を含みます。
 - **`debug_meta`**: リクエストのコンテキスト情報。現在のアイテムのバケットキー（`cur_buckets`）など。
+
+### リクエスト単位の一時上書き（上級）
+
+A/Bテストや診断用途として、クエリパラメータで一部の設定を一時的に上書きできます。
+
+- `tiebreak=none|consensus|strength|identity` — このリクエストに限り、タイブレーク方針を上書きします。
+- `item_sets_weight=数値` — アイテムセット一致による加点の重みを上書きします（例：`0`でブーストを無効化）。
+- `item_sets_seed_only=1` — アイテムセットは候補拡大のみに用い、スコアは加点しません。
+
+これらの上書きは保存されている設定を変更せず、当該リクエストにのみ適用されます。
 
 ---
 

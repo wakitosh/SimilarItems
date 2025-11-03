@@ -58,7 +58,28 @@ class Module extends AbstractModule {
    * Render module configuration form (global settings, not per-site).
    */
   public function getConfigForm(PhpRenderer $renderer) {
-    $services = $this->getServiceLocator();
+    // Acquire the application container without using deprecated APIs.
+    // 1) Prefer the HelperPluginManager creation context (Laminas v3+)
+    // 2) Fallback to HPM->getServiceLocator() (suppressed deprecation),
+    // 3) Finally, try the module's service locator as a last resort.
+    $hpm = $renderer->getHelperPluginManager();
+    $services = NULL;
+    if (method_exists($hpm, 'getCreationContext')) {
+      $ctx = $hpm->getCreationContext();
+      if ($ctx) {
+        $services = $ctx;
+      }
+    }
+    if (!$services && method_exists($hpm, 'getServiceLocator')) {
+      // Suppress deprecation notice at runtime while preserving compatibility.
+      $services = @$hpm->getServiceLocator();
+    }
+    if (!$services && method_exists($this, 'getServiceLocator')) {
+      $services = $this->getServiceLocator();
+    }
+    if (!$services) {
+      throw new \RuntimeException('Cannot access application container to render SimilarItems config form.');
+    }
     $settings = $services->get('Omeka\Settings');
     $form = $services->get('FormElementManager')->get(ConfigForm::class);
 
@@ -69,6 +90,8 @@ class Module extends AbstractModule {
       'similaritems_limit' => (int) ($settings->get('similaritems.limit') ?? 6),
       'similaritems_weight_item_sets' => (int) ($settings->get('similaritems.weight_item_sets') ?? 2),
       'similaritems_debug_log' => (int) ($settings->get('similaritems.debug_log') ?? 0),
+      // Tie-break policy.
+      'similaritems_tiebreak_policy' => (string) ($settings->get('similaritems.tiebreak_policy') ?? 'none'),
       // Shelf seeding.
       'similaritems_use_shelf_seeding' => (int) ($settings->get('similaritems.use_shelf_seeding') ?? 0),
       'similaritems_shelf_seed_limit' => (int) ($settings->get('similaritems.shelf_seed_limit') ?? 50),
@@ -141,6 +164,8 @@ class Module extends AbstractModule {
       'similaritems.limit' => 6,
       'similaritems.weight_item_sets' => 2,
       'similaritems.debug_log' => 0,
+      // Tie-break policy default.
+      'similaritems.tiebreak_policy' => 'none',
       // Shelf seeding defaults.
       'similaritems.use_shelf_seeding' => 0,
       'similaritems.shelf_seed_limit' => 50,
@@ -216,6 +241,12 @@ class Module extends AbstractModule {
     $settings->set('similaritems.limit', max(1, $getInt('similaritems_limit', 6)));
     $settings->set('similaritems.weight_item_sets', max(0, $getInt('similaritems_weight_item_sets', 3)));
     $settings->set('similaritems.debug_log', $getInt('similaritems_debug_log', 0));
+    // Tie-break policy.
+    $tbPolicy = strtolower($getStr('similaritems_tiebreak_policy', 'none'));
+    if (!in_array($tbPolicy, ['none', 'consensus', 'strength', 'identity'], TRUE)) {
+      $tbPolicy = 'none';
+    }
+    $settings->set('similaritems.tiebreak_policy', $tbPolicy);
     // Shelf seeding.
     $settings->set('similaritems.use_shelf_seeding', $getInt('similaritems_use_shelf_seeding', 0));
     $settings->set('similaritems.shelf_seed_limit', max(0, $getInt('similaritems_shelf_seed_limit', 50)));

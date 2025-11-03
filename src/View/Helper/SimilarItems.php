@@ -104,7 +104,13 @@ class SimilarItems extends AbstractHelper {
 
     $scopeSite = (int) ($this->settings->get('similaritems.scope_site') ?? 1) === 1;
     $useItemSets = (int) ($this->settings->get('similaritems.use_item_sets') ?? 1) === 1;
+    // Item set scoring weight (can be overridden per-request).
     $weightItemSets = (int) ($this->settings->get('similaritems.weight_item_sets') ?? 3);
+    if (isset($options['item_sets_weight'])) {
+      $weightItemSets = (int) $options['item_sets_weight'];
+    }
+    $itemSetsSeedOnly = (bool) ($options['item_sets_seed_only'] ?? FALSE);
+    $applyItemSetsWeight = !$itemSetsSeedOnly && $weightItemSets > 0;
 
     // Mapping terms.
     $mapCall = (string) ($this->settings->get('similaritems.map.call_number') ?? '');
@@ -441,7 +447,7 @@ class SimilarItems extends AbstractHelper {
         if (!isset($candidates[$id])) {
           $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
         }
-        if ($weightItemSets > 0) {
+        if ($applyItemSetsWeight) {
           $candidates[$id]['score'] += $weightItemSets;
           $candidates[$id]['signals'][] = ['item_sets', $weightItemSets];
         }
@@ -568,7 +574,7 @@ class SimilarItems extends AbstractHelper {
           // Ignore.
         }
       }
-      if ($useItemSets && $weightItemSets > 0 && $curItemSetIds) {
+      if ($useItemSets && $applyItemSetsWeight && $curItemSetIds) {
         $share = FALSE;
         if (method_exists($it, 'itemSets')) {
           foreach ($it->itemSets() as $set) {
@@ -667,6 +673,73 @@ class SimilarItems extends AbstractHelper {
     }
     unset($entry);
 
+    // Precompute tie-break metadata per candidate.
+    // Includes: unique positive signal types, max positive component,
+    // and tier presence flags.
+    $canonicalOf = function (string $label) use ($mapNcid, $mapAuthorId, $mapAuthName, $mapSubject): string {
+      if (strpos($label, 'prop:') === 0) {
+        $term = substr($label, 5);
+        if ($term === $mapNcid) {
+          return 'ncid';
+        }
+        if ($term === $mapAuthorId) {
+          return 'author_id';
+        }
+        if ($term === $mapAuthName) {
+          return 'authorized_name';
+        }
+        if ($term === $mapSubject) {
+          return 'subject';
+        }
+        return 'prop';
+      }
+      return $label;
+    };
+    foreach ($candidates as &$tb) {
+      $uniq = [];
+      $maxPos = 0.0;
+      $t1 = 0;
+      $t2 = 0;
+      $t3 = 0;
+      $t4 = 0;
+      if (isset($tb['signals']) && is_array($tb['signals'])) {
+        foreach ($tb['signals'] as $sigEntry) {
+          $lab = isset($sigEntry[0]) ? (string) $sigEntry[0] : '';
+          $w = isset($sigEntry[1]) ? (float) $sigEntry[1] : 0.0;
+          if ($w <= 0.0) {
+            continue;
+          }
+          $canon = $canonicalOf($lab);
+          $uniq[$canon] = TRUE;
+          if ($w > $maxPos) {
+            $maxPos = $w;
+          }
+          // Tier flags.
+          if ($canon === 'ncid' || $canon === 'author_id' || $canon === 'authorized_name') {
+            $t1 = 1;
+          }
+          elseif ($canon === 'subject' || $canon === 'bucket') {
+            $t2 = 1;
+          }
+          elseif ($canon === 'shelf' || $canon === 'class_proximity') {
+            $t3 = 1;
+          }
+          elseif ($canon === 'material_type' || $canon === 'issued_proximity' || $canon === 'item_sets') {
+            $t4 = 1;
+          }
+        }
+      }
+      $tb['__tb'] = [
+        'uniq' => (int) count($uniq),
+        'max' => (float) $maxPos,
+        't1' => $t1,
+        't2' => $t2,
+        't3' => $t3,
+        't4' => $t4,
+      ];
+    }
+    unset($tb);
+
     // Sort by score desc. If jitter is enabled, break ties randomly; otherwise
     // fall back to modified desc for stability.
     $jitterOn = ((int) ($this->settings->get('similaritems.jitter.enable') ?? 0) === 1);
@@ -676,10 +749,74 @@ class SimilarItems extends AbstractHelper {
       }
       unset($e);
     }
-    usort($candidates, function ($a, $b) use ($jitterOn) {
+    // Tie-break policy: none | consensus | strength | identity.
+    $tiebreak = 'none';
+    if (isset($options['tiebreak'])) {
+      $tiebreak = strtolower((string) $options['tiebreak']);
+    }
+    else {
+      $tiebreak = strtolower((string) ($this->settings->get('similaritems.tiebreak_policy') ?? 'none'));
+    }
+    if (!in_array($tiebreak, ['none', 'consensus', 'strength', 'identity'], TRUE)) {
+      $tiebreak = 'none';
+    }
+    usort($candidates, function ($a, $b) use ($jitterOn, $tiebreak) {
       $sa = $a['score'] <=> $b['score'];
       if ($sa !== 0) {
         return -$sa;
+      }
+      // Apply tie-break policy on equal scores.
+      if ($tiebreak !== 'none') {
+        $ta = isset($a['__tb']) ? (array) $a['__tb'] : [];
+        $tb = isset($b['__tb']) ? (array) $b['__tb'] : [];
+        $ua = isset($ta['uniq']) ? (int) $ta['uniq'] : 0;
+        $ub = isset($tb['uniq']) ? (int) $tb['uniq'] : 0;
+        $ma = isset($ta['max']) ? (float) $ta['max'] : 0.0;
+        $mb = isset($tb['max']) ? (float) $tb['max'] : 0.0;
+        if ($tiebreak === 'consensus') {
+          if ($ua !== $ub) {
+            return ($ua > $ub) ? -1 : 1;
+          }
+          if ($ma !== $mb) {
+            return ($ma > $mb) ? -1 : 1;
+          }
+        }
+        elseif ($tiebreak === 'strength') {
+          if ($ma !== $mb) {
+            return ($ma > $mb) ? -1 : 1;
+          }
+          if ($ua !== $ub) {
+            return ($ua > $ub) ? -1 : 1;
+          }
+        }
+        elseif ($tiebreak === 'identity') {
+          $t1a = isset($ta['t1']) ? (int) $ta['t1'] : 0;
+          $t1b = isset($tb['t1']) ? (int) $tb['t1'] : 0;
+          if ($t1a !== $t1b) {
+            return ($t1a > $t1b) ? -1 : 1;
+          }
+          $t2a = isset($ta['t2']) ? (int) $ta['t2'] : 0;
+          $t2b = isset($tb['t2']) ? (int) $tb['t2'] : 0;
+          if ($t2a !== $t2b) {
+            return ($t2a > $t2b) ? -1 : 1;
+          }
+          $t3a = isset($ta['t3']) ? (int) $ta['t3'] : 0;
+          $t3b = isset($tb['t3']) ? (int) $tb['t3'] : 0;
+          if ($t3a !== $t3b) {
+            return ($t3a > $t3b) ? -1 : 1;
+          }
+          $t4a = isset($ta['t4']) ? (int) $ta['t4'] : 0;
+          $t4b = isset($tb['t4']) ? (int) $tb['t4'] : 0;
+          if ($t4a !== $t4b) {
+            return ($t4a > $t4b) ? -1 : 1;
+          }
+          if ($ua !== $ub) {
+            return ($ua > $ub) ? -1 : 1;
+          }
+          if ($ma !== $mb) {
+            return ($ma > $mb) ? -1 : 1;
+          }
+        }
       }
       if ($jitterOn) {
         $ra = isset($a['__rand']) ? (float) $a['__rand'] : 0.0;

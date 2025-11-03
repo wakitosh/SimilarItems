@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2025-11-03
+
+### EN
+
+#### Added
+- Tie-break policy setting in the admin UI (Basic settings): choose how to order equal-score candidates.
+  - Score only (no extra tie-breaking)
+  - Prefer more matching signals (consensus)
+  - Prefer strongest match (max weight)
+- The helper reads this setting as the default policy, still allowing per-request override via `tiebreak` query parameter.
+
+#### Fixed
+- Admin config form now retrieves the application container robustly (creation context preferred), avoiding deprecated plugin manager access and preventing null errors on some environments.
+
+### 日本語
+
+#### 追加
+- 同点時の優先基準を設定画面（基本設定）に追加：同点候補の並び順を選べます。
+  - スコアのみ（同点はそのまま）
+  - 一致シグナル数優先（根拠が多い方を上位）
+  - 最大重み優先（最も強い一致を上位）
+- 既定は設定値を使用し、必要に応じてリクエストの `tiebreak` パラメータで一時的に切替可能です。
+
+#### 修正
+- 設定フォームのサービス取得を堅牢化（creation context を優先）。プラグインマネージャ経由の非推奨アクセスを避け、環境によって発生していた null エラーを防止しました。
+
 ## [0.3.1] - 2025-11-03
 
 ### EN

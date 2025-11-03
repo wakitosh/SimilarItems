@@ -44,6 +44,24 @@ class ConfigForm extends Form {
         ],
       ])
       ->add([
+        'name' => 'similaritems_tiebreak_policy',
+        'type' => SelectElement::class,
+        'options' => [
+                  // @translate
+          'label' => '同点時の優先基準',
+                  // @translate
+          'info' => 'スコアが同点のときの並び順を決めます。微揺らぎ有効時は最終的にランダム化が入ります。',
+          'value_options' => [
+            'none' => 'スコアのみ（同点はそのまま）',
+            'consensus' => '一致シグナル数優先（根拠が多い方を上位）',
+            'strength' => '最大重み優先（最も強い一致を上位）',
+          ],
+        ],
+        'attributes' => [
+          'id' => 'similaritems_tiebreak_policy',
+        ],
+      ])
+      ->add([
         'name' => 'similaritems_scope_site',
         'type' => CheckboxElement::class,
         'options' => [
