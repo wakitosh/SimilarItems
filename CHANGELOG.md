@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2025-11-03
+
+### EN
+
+#### Fixed
+- Public access for recommendations: allow anonymous users to call the async endpoint by registering ACL permissions for `RecommendController::list`. This resolves `PermissionDeniedException` when logged out.
+
+#### Added
+- LICENSE file (MIT) at the module root for clarity and packaging.
+
+### 日本語
+
+#### 修正
+- 推薦APIの公開アクセス: ACL により匿名ユーザでも `RecommendController::list` にアクセス可能とし、ログアウト時の `PermissionDeniedException` を解消しました。
+
+#### 追加
+- モジュール直下に LICENSE（MIT）ファイルを追加しました。
+
 ## [0.3.0] - 2025-11-02
 
 ### EN

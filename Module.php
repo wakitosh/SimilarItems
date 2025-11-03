@@ -7,6 +7,8 @@ namespace SimilarItems;
 use Omeka\Module\AbstractModule;
 use Laminas\View\Renderer\PhpRenderer;
 use Laminas\Mvc\Controller\AbstractController;
+use Laminas\Mvc\MvcEvent;
+use SimilarItems\Controller\RecommendController as RecommendControllerAlias;
 use SimilarItems\Form\ConfigForm;
 use Laminas\ServiceManager\ServiceLocatorInterface;
 
@@ -20,6 +22,23 @@ class Module extends AbstractModule {
    */
   public function getConfig(): array {
     return include __DIR__ . '/config/module.config.php';
+  }
+
+  /**
+   * Register ACL so the recommend endpoint is publicly accessible.
+   */
+  public function onBootstrap(MvcEvent $event): void {
+    $services = $event->getApplication()->getServiceManager();
+    /** @var \Omeka\Permissions\Acl $acl */
+    $acl = $services->get('Omeka\Acl');
+
+    // Allow all roles (including anonymous visitors) to access the list action
+    // on the recommend controller. This enables public sites to fetch
+    // recommendations without requiring login.
+    $acl->allow(NULL, [RecommendControllerAlias::class], ['list']);
+
+    // Also allow controller alias resource.
+    $acl->allow(NULL, ['SimilarItems\\Controller\\RecommendController'], ['list']);
   }
 
   /**
