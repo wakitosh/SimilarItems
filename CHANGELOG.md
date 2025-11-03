@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
   - Prefer more matching signals (consensus)
   - Prefer strongest match (max weight)
 - The helper reads this setting as the default policy, still allowing per-request override via `tiebreak` query parameter.
+ - New per-request override: `jitter=0` disables light jitter for the current request (useful for A/B tests and deterministic comparisons). `jitter=1` can force-enable it.
 
 #### Fixed
 - Admin config form now retrieves the application container robustly (creation context preferred), avoiding deprecated plugin manager access and preventing null errors on some environments.
@@ -24,6 +25,7 @@ All notable changes to this project will be documented in this file.
   - 一致シグナル数優先（根拠が多い方を上位）
   - 最大重み優先（最も強い一致を上位）
 - 既定は設定値を使用し、必要に応じてリクエストの `tiebreak` パラメータで一時的に切替可能です。
+ - リクエスト単位の上書きに `jitter=0` を追加：当該リクエストの微揺らぎを無効化（A/Bテストや厳密比較に有用）。`jitter=1` で強制有効化。
 
 #### 修正
 - 設定フォームのサービス取得を堅牢化（creation context を優先）。プラグインマネージャ経由の非推奨アクセスを避け、環境によって発生していた null エラーを防止しました。

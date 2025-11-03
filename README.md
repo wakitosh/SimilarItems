@@ -219,6 +219,7 @@ For A/B testing or diagnostics, you can temporarily override some settings via q
 - `tiebreak=none|consensus|strength|identity` — Override the tie-break policy for this request only.
 - `item_sets_weight=NUMBER` — Override the weight contributed by item-set matches (e.g., `0` disables the item-set score boost).
 - `item_sets_seed_only=1` — Use item sets for candidate expansion only; do not add any score for item-set matches.
+- `jitter=0` — Disable light jitter for this request (forces deterministic ordering after normal tie-break rules). Use `jitter=1` to force-enable.
 
 These overrides do not modify saved settings; they apply to the current request only.
 
@@ -470,6 +471,7 @@ A/Bテストや診断用途として、クエリパラメータで一部の設�
 - `tiebreak=none|consensus|strength|identity` — このリクエストに限り、タイブレーク方針を上書きします。
 - `item_sets_weight=数値` — アイテムセット一致による加点の重みを上書きします（例：`0`でブーストを無効化）。
 - `item_sets_seed_only=1` — アイテムセットは候補拡大のみに用い、スコアは加点しません。
+- `jitter=0` — このリクエストに限り、微揺らぎ（ジッター）を無効化します（通常のタイブレーク規則の後は決定的な順序になります）。`jitter=1` で強制的に有効化。
 
 これらの上書きは保存されている設定を変更せず、当該リクエストにのみ適用されます。
 
