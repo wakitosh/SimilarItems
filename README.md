@@ -6,10 +6,11 @@ The display is controlled by the active theme, while all recommendation logic is
 
 ## Features
 
-- **Configurable Scoring Engine**: Fine-tune recommendation relevance using multiple weighted signals.
+- **Configurable Scoring Engine**: Fine-tune recommendation relevance using multiple weighted signals (Author ID, Authorized name, Subject, Series title, Publisher, Domain buckets, Item sets, etc.).
 - **Async Loading**: Recommendations are loaded via a JSON API after the main page content, preventing slow page loads.
-- **Advanced Serendipity Control**: Promote diversity by penalizing items from the same series (BibID) and prioritizing different titles.
-- **Smart Candidate Expansion**: Expands the candidate pool using item sets and call number proximity ("shelf proximity") to surface relevant items even with sparse metadata.
+- **Advanced Serendipity Control**: Promote diversity by penalizing items from the same series (BibID) and same base title, with final-stage diversification by base title.
+- **Smart Candidate Expansion**: Expands the candidate pool using item sets and mapped properties (Author/Subject/Series/Publisher), with an internal hard cap to keep performance predictable.
+- **Multi-match Bonus (Optional)**: When enabled, multi-valued properties add extra score based on how many distinct values match between the seed item and each candidate, with a configurable decay rate.
 - **Title Normalization**: Intelligently groups items by their base title, ignoring volume numbers and separators (e.g., "Title, Vol. 1" and "Title, Vol. 2" are treated as having the same base title).
 - **Light Jitter**: Subtly varies results on each page reload to increase discovery, without sacrificing top relevance.
 - **Rich Diagnostics**: A debug mode provides detailed logs and a structured JSON payload, showing exactly how each recommendation was scored.
@@ -45,8 +46,7 @@ Controls the module's fundamental behavior.
 
 These settings broaden the pool of potential candidates for similarity assessment, helping to find relevant items even when metadata is sparse.
 
-- **Use shelf information for similarity assessment**: (Recommended: On) Adds items with similar call numbers (i.e., physically co-located items) to the candidate pool.
-- **Use item sets for similarity assessment**: (Recommended: On) Adds items from shared item sets to the candidate pool.
+- **Use item sets for similarity assessment**: Adds items from shared item sets to the candidate pool.
 
 #### Light Jitter
 
@@ -64,7 +64,7 @@ Connects the concepts used by the module (e.g., Call Number, Author ID) to the p
 
 - **Candidate Selection + Scoring**:
   - When a property value matches, the item is selected as a candidate *and* its score is increased. These are the primary signals for relevance.
-  - Properties: `NCID`, `Author ID`, `Authorized name (weak)`, `Subject`.
+  - Properties (typical): `Author ID`, `Authorized name (weak)`, `Subject`, `Series title`, `Publisher`.
 
 - **Candidate Expansion + Shelf Scoring**:
   - Maps the `Call number` property. If "Use shelf information" is on, this property is used to expand the candidate pool. A score bonus is always applied to candidates on the same shelf.
@@ -146,10 +146,11 @@ This section provides guidance on tuning the scoring algorithm to achieve your d
 These defaults provide a good starting point for a balanced mix of topical relevance and serendipity.
 
 - **Core Signals (Candidate Selection + Scoring)**:
-  - `NCID`: 6
-  - `Author ID`: 5
+  - `Author ID`: 6
   - `Subject`: 5
-  - `Authorized name (weak)`: 3
+  - `Authorized name (weak)`: 4
+  - `Series title`: 3
+  - `Publisher`: 2
   - `Item Set Match`: 2
 - **Proximity & Equality (Scoring Only)**:
   - `Domain bucket`: 2
@@ -164,11 +165,13 @@ These defaults provide a good starting point for a balanced mix of topical relev
 
 #### Rationale Behind the Weights
 
-- **Strong Signals (NCID, Author ID, Subject)**: `NCID` (6) is weighted highest as it links different editions or printings without being an exact duplicate. `Author ID` (5) and `Subject` (5) provide strong creator and topic affinity.
+- **Strong Signals (Author ID, Subject)**: `Author ID` and `Subject` are the primary drivers of creator/topic affinity.
 - **Fallback Signals (Authorized name (weak), Item Set Match)**: `Authorized name (weak)` (3) is a weaker author signal, while `Item Set Match` (2) provides a curated context, useful when other metadata is sparse.
 - **"Stack-Browsing" Signals (Domain, Shelf Match, Class)**: These are intentionally weighted low (1-2) to add a flavor of physical "shelf browsing" and serendipity without overpowering the topical signals.
 - **Light Boosts (Material, Issued)**: These provide a gentle nudge towards items of the same type or from a similar time period, adding subtle relevance.
 - **Bib ID (0 weight + penalty)**: Items from the same series (e.g., volumes of a journal) are often plentiful. By setting the weight to 0 and applying a strong penalty (150), they are pushed down the list, making room for more diverse results while still being available if no better matches exist.
+
+> Note: NCID is no longer used as a similarity signal in 0.4.0 and later; it has been removed from the settings UI.
 
 #### Tuning Tips
 
@@ -257,10 +260,11 @@ MIT
 
 ## 機能
 
-- **設定可能なスコアリングエンジン**: 複数のシグナル（信号）に重みを付けて、推奨の関連性を細かく調整できます。
+- **設定可能なスコアリングエンジン**: 著者ID・典拠形著者名・主題・シリーズタイトル・出版者・分野バケット・アイテムセットなど複数のシグナルに重みを付けて、推奨の関連性を細かく調整できます。
 - **非同期読み込み**: メインコンテンツの表示後にJSON API経由で推奨リストを読み込むため、ページの表示速度が低下しません。
-- **高度なセレンディピティ制御**: 同一シリーズ（BibID）のアイテムにペナルティを与え、異なるタイトルを優先することで、表示の多様性を高めます。
-- **スマートな候補拡張**: アイテムセットや請求記号の近さ（棚近接性）を利用して候補の母集団を広げ、メタデータが少ない場合でも関連アイテムを発見します。
+- **高度なセレンディピティ制御**: 同一シリーズ（BibID）および同一ベースタイトルのアイテムにペナルティを与え、最終段階でベースタイトルの多様性を優先することで、表示のバラエティを高めます。
+- **スマートな候補拡張**: アイテムセットや、著者・主題・シリーズ・出版者などマッピングされたプロパティを使って候補の母集団を広げつつ、内部的な候補数上限によりパフォーマンスを一定に保ちます。
+- **一致回数ボーナス（オプション）**: 有効化すると、多値プロパティについて「いくつの値が一致したか」に応じて追加スコアを与えます（減衰率は設定可能）。
 - **タイトル正規化**: 巻数や区切り文字を無視してベースタイトルを賢く判定（例：「タイトル, 上巻」と「タイトル, 下巻」は同じベースタイトルとして扱われます）。
 - **微揺らぎ（Light Jitter）**: ページをリロードするたびに結果をわずかに変化させ、上位の関連性を損なうことなく新たな発見を促します。
 - **豊富な診断機能**: デバッグモードを有効にすると、各アイテムがどのようにスコアリングされたかを正確に示す詳細なログと構造化JSONが出力されます。
@@ -296,8 +300,7 @@ MIT
 
 類似アイテムを探す際の母集団（候補）を広げるための設定です。メタデータが少ない場合でも関連アイテムを見つけやすくします。
 
-- **棚情報を類似判定に使用**: （推奨：オン）請求記号が似ているアイテム（物理的に近くに配架されている資料）を候補に加えます。
-- **アイテムセットを類似判定に使用**: （推奨：オン）共通のアイテムセットに属するアイテムを候補に加えます。
+- **アイテムセットを類似判定に使用**: 共通のアイテムセットに属するアイテムを候補に加えます。
 
 #### 微揺らぎ
 
@@ -315,7 +318,7 @@ MIT
 
 - **候補に追加＋スコア加算**:
   - ここで指定されたプロパティの値が一致した場合、そのアイテムは類似候補として選ばれ、さらにスコアが加算されます。関連性を見つけるための最も基本的なシグナルです。
-  - 対象: `NCID`, `著者ID`, `著者名典拠形（弱）`, `主題`
+  - 代表的な対象: `著者ID`, `著者名典拠形（弱）`, `主題`, `シリーズタイトル`, `出版者`
 
 - **候補拡大＋棚のスコア加算**:
   - `請求記号`を紐付けます。「棚情報を類似判定に使用」がオンの場合、ここで指定したプロパティを使って候補を拡大します。また、棚が一致する候補には常にスコアが加算されます。
@@ -336,7 +339,7 @@ MIT
 スコアリングの重みと、近接判定の閾値を設定します。ウェイトの数値が大きいほど、そのシグナルが最終スコアに与える影響が強くなります。
 
 - **重み**:
-  - 各プロパティ（`NCID`, `著者ID`など）や概念（`棚記号`, `分類近接`など）の一致・近接が検出されたときに加算されるスコアの基本値です。
+  - 各プロパティ（`著者ID` など）や概念（`棚記号`, `分類近接` など）の一致・近接が検出されたときに加算されるスコアの基本値です。
 - **閾値**:
   - `分類近接の閾値`: この数値以内の分類番号を持つアイテムを「近い」と見なします。
   - `出版年近接の閾値`: この年数以内の出版年を持つアイテムを「近い」と見なします。
@@ -350,6 +353,28 @@ MIT
 - **ペナルティの値**:
   - `同一書誌へのペナルティ`: 上記スイッチがオンのときに減算するスコア。
   - `同一タイトルへのペナルティ`: 上記スイッチがオンのときに減算するスコア。
+
+#### 一致回数ボーナス（Multi-match）
+
+複数値を持つプロパティ（例：主題が複数付与されている場合）について、「いくつ値が一致したか」に応じて追加スコアを与える仕組みです。
+
+- **対象となるプロパティの例**:
+  - `著者ID`
+  - `著者名典拠形（弱）`
+  - `主題`
+  - `シリーズタイトル`
+  - `出版者`
+- **動作イメージ**:
+  - まず、通常の一致に対して基本ウェイト（例：`主題` 5点）を加算します。
+  - そのうえで、同じプロパティの別の値がさらに一致した場合に「ボーナス分」を追加します。
+  - ボーナスは一致した値の個数に比例して増えますが、後ろの一致ほど控えめになるように減衰率を掛けて計算されます。
+- **減衰率（decay）のイメージ**:
+  - 減衰率を 0 に設定すると、「1つ一致したときの重み」と同じだけを常に加算します（値の数だけフラットに足していく挙動）。
+  - 減衰率を 0.2 など 0 より大きな値にすると、2つ目以降の一致は徐々に小さなボーナスになります。
+  - 減衰率を大きくするほど「2つ目以降の一致の増分」は小さくなり、「最初の一致」の重みが相対的に重要になります。
+- **使いどころの例**:
+  - 主題が多く付与されている資料同士で、「たくさんの主題が重なっているもの」をより高く評価したい場合。
+  - シリーズタイトルや出版者などが複数値になりうる環境で、「1つだけ偶然一致したもの」よりも「複数の値が一致したもの」を優先したい場合。
 
 #### タイトルルール
 
@@ -398,11 +423,12 @@ MIT
 これらのデフォルト値は、トピカルな関連性とセレンディピティのバランスの取れたミックスを提供するための良い出発点です。
 
 - **コアシグナル（候補に追加＋スコア加算）**:
-    - `NCID`: 6
-    - `著者ID`: 5
-    - `主題`: 5
-    - `著者名典拠形（弱）`: 3
-    - `アイテムセット一致`: 2
+  - `著者ID`: 6
+  - `主題`: 5
+  - `著者名典拠形（弱）`: 4
+  - `シリーズタイトル`: 3
+  - `出版者`: 2
+  - `アイテムセット一致`: 2
 - **近接・一致系（スコア加算のみ）**:
     - `分野バケット`: 2
     - `棚一致`: 1
@@ -416,11 +442,13 @@ MIT
 
 #### ウェイト設定の理論的背景
 
-- **強力なシグナル（NCID, 著者ID, 主題）**: `NCID` (6) は、異なる版や印刷物をリンクするため最も高く設定されています。`著者ID` (5) と `主題` (5) は、著者とトピックの強い親和性を提供します。
-- **フォールバックシグナル（著者名典拠形, アイテムセット）**: `著者名典拠形` (3) は弱めの著者シグナルであり、`アイテムセット` (2) は、他のメタデータが乏しいときに有用なキュレーションされたコンテキストを提供します。
-- **「書架散策」的シグナル（分野, 棚, 分類）**: これらは意図的に低く設定されており（1-2）、主題シグナルを圧倒することなく、物理的な「棚ブラウジング」のニュアンスとセレンディピティを加えます。
+- **強力なシグナル（著者ID, 主題）**: `著者ID` と `主題` が著者・トピックの主要なシグナルです。
+- **フォールバックシグナル（著者名典拠形, アイテムセット）**: `著者名典拠形` は弱めの著者シグナルであり、`アイテムセット` は、他のメタデータが乏しいときに有用なキュレーションされたコンテキストを提供します。
+- **「書架散策」的シグナル（分野, 棚, 分類）**: これらは意図的に低く設定されており（1–2）、主題シグナルを圧倒することなく、物理的な「棚ブラウジング」のニュアンスとセレンディピティを加えます。
 - **軽いブースト（資料種別, 出版年）**: これらは、同じタイプのアイテムや類似の時期に作成されたアイテムに対して微妙な関連性を追加します。
 - **書誌ID（0ウェイト + ペナルティ）**: 同じシリーズのアイテム（例：ジャーナルの巻号）はしばしば豊富に存在します。ウェイトを0に設定し、強いペナルティを適用することで、より多様な結果のために押し下げられますが、より良い一致が存在しない場合には依然として利用可能です。
+
+> 注: NCID は 0.4.0 以降、類似度シグナルとしては使用しておらず、設定画面からも削除されています。
 
 #### 調整のヒント
 
@@ -460,7 +488,7 @@ MIT
 
 - **`debug`**: 推奨アイテムの配列。各アイテムには以下の情報が含まれます。
     - `id`, `title`, `url`, `score`, `base_title`
-    - `signals`: スコアに貢献したシグナルの配列（例：`['ncid', 6]`）。
+    - `signals`: スコアに貢献したシグナルの配列。
     - `values`: シグナルの根拠となったプロパティの実際の値。完全な透明性を提供します。`properties`, `buckets`, `shelf`, `class_number` を含みます。
 - **`debug_meta`**: リクエストのコンテキスト情報。現在のアイテムのバケットキー（`cur_buckets`）など。
 

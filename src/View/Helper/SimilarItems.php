@@ -116,7 +116,6 @@ class SimilarItems extends AbstractHelper {
     $mapCall = (string) ($this->settings->get('similaritems.map.call_number') ?? '');
     $mapClass = (string) ($this->settings->get('similaritems.map.class_number') ?? '');
     $mapBib = (string) ($this->settings->get('similaritems.map.bibid') ?? '');
-    $mapNcid = (string) ($this->settings->get('similaritems.map.ncid') ?? '');
     $mapAuthorId = (string) ($this->settings->get('similaritems.map.author_id') ?? '');
     $mapAuthName = (string) ($this->settings->get('similaritems.map.authorized_name') ?? '');
     $mapSubject = (string) ($this->settings->get('similaritems.map.subject') ?? '');
@@ -126,24 +125,36 @@ class SimilarItems extends AbstractHelper {
     $mapMaterial = (string) ($this->settings->get('similaritems.map.material_type') ?? '');
     $mapViewing = (string) ($this->settings->get('similaritems.map.viewing_direction') ?? '');
 
+    $mapSeries = (string) ($this->settings->get('similaritems.map.series_title') ?? '');
+    $mapPublisher = (string) ($this->settings->get('similaritems.map.publisher') ?? '');
+
     // Weights.
     $wBib = (int) ($this->settings->get('similaritems.weight.bibid') ?? 0);
-    $wNcid = (int) ($this->settings->get('similaritems.weight.ncid') ?? 8);
     $wAuthorId = (int) ($this->settings->get('similaritems.weight.author_id') ?? 6);
     $wAuthName = (int) ($this->settings->get('similaritems.weight.authorized_name') ?? 4);
     $wSubject = (int) ($this->settings->get('similaritems.weight.subject') ?? 4);
     $wBucket = (int) ($this->settings->get('similaritems.weight.domain_bucket') ?? 3);
     $wShelf = (int) ($this->settings->get('similaritems.weight.call_shelf') ?? 2);
+    $wSeries = (int) ($this->settings->get('similaritems.weight.series_title') ?? 3);
+    $wPublisher = (int) ($this->settings->get('similaritems.weight.publisher') ?? 2);
     $wClassProx = (int) ($this->settings->get('similaritems.weight.class_proximity') ?? 1);
+    $wClassExact = (int) ($this->settings->get('similaritems.weight.class_exact') ?? 2);
     $classThresh = (int) ($this->settings->get('similaritems.class_proximity_threshold') ?? 5);
     // Optional small boosts.
     $wMaterial = (int) ($this->settings->get('similaritems.weight.material_type') ?? 2);
     $wIssuedProx = (int) ($this->settings->get('similaritems.weight.issued_proximity') ?? 1);
     $issuedThresh = (int) ($this->settings->get('similaritems.issued_proximity_threshold') ?? 5);
+    $wPubPlace = (int) ($this->settings->get('similaritems.weight.publication_place') ?? 1);
+
+    $multiMatchOn = ((int) ($this->settings->get('similaritems.multi_match.enable') ?? 0) === 1);
+    $multiDecay = (float) (string) ($this->settings->get('similaritems.multi_match.decay') ?? '0.2');
+    if (!is_finite($multiDecay) || $multiDecay < 0.0) {
+      $multiDecay = 0.0;
+    }
     // Optional: seed by shelf (call-number prefix) to broaden candidates.
     $useShelfSeeding = (int) ($this->settings->get('similaritems.use_shelf_seeding') ?? 0) === 1;
     $shelfSeedLimit = (int) ($this->settings->get('similaritems.shelf_seed_limit') ?? 50);
-    $log('weights: bib=' . $wBib . ' ncid=' . $wNcid . ' author_id=' . $wAuthorId . ' auth_name=' . $wAuthName . ' subject=' . $wSubject . ' bucket=' . $wBucket . ' shelf=' . $wShelf . ' class_prox=' . $wClassProx . ' class_thresh=' . $classThresh . ' material=' . $wMaterial . ' issued_prox=' . $wIssuedProx . ' issued_thresh=' . $issuedThresh);
+    $log('weights: bib=' . $wBib . ' author_id=' . $wAuthorId . ' auth_name=' . $wAuthName . ' subject=' . $wSubject . ' bucket=' . $wBucket . ' shelf=' . $wShelf . ' series=' . $wSeries . ' publisher=' . $wPublisher . ' class_exact=' . $wClassExact . ' class_prox=' . $wClassProx . ' class_thresh=' . $classThresh . ' material=' . $wMaterial . ' issued_prox=' . $wIssuedProx . ' issued_thresh=' . $issuedThresh . ' pub_place=' . $wPubPlace . ' multi_match=' . ($multiMatchOn ? '1' : '0') . ' multi_decay=' . $multiDecay);
 
     // Serendipity options: demote same-bibid (series/巻違い) aggressively.
     $demoteSameBib = (int) ($this->settings->get('similaritems.serendipity.demote_same_bibid') ?? 1) === 1;
@@ -155,7 +166,6 @@ class SimilarItems extends AbstractHelper {
     // Gather current item signals.
     $sig = [
       'bibid' => $mapBib ? $this->firstString($resource, $mapBib) : NULL,
-      'ncid' => $mapNcid ? $this->firstString($resource, $mapNcid) : NULL,
       'author_id' => $mapAuthorId ? $this->firstString($resource, $mapAuthorId) : NULL,
       'auth_name' => $mapAuthName ? $this->firstString($resource, $mapAuthName) : NULL,
       'call' => $mapCall ? $this->firstString($resource, $mapCall) : NULL,
@@ -164,12 +174,13 @@ class SimilarItems extends AbstractHelper {
       'location' => $mapLocation ? $this->firstString($resource, $mapLocation) : NULL,
       'issued' => $mapIssued ? $this->firstString($resource, $mapIssued) : NULL,
       'material' => $mapMaterial ? $this->firstString($resource, $mapMaterial) : NULL,
+      'series' => $mapSeries ? $this->firstStrings($resource, $mapSeries) : [],
+      'publisher' => $mapPublisher ? $this->firstStrings($resource, $mapPublisher) : [],
       'viewing' => $mapViewing ? $this->firstString($resource, $mapViewing) : NULL,
     ];
 
     $log('item ' . (int) $resource->id() . ' signals: ' . json_encode([
       'bibid' => $sig['bibid'],
-      'ncid' => $sig['ncid'],
       'author_id' => $sig['author_id'],
       'auth_name' => $sig['auth_name'],
       'call' => $sig['call'],
@@ -192,6 +203,7 @@ class SimilarItems extends AbstractHelper {
     $log('scopeSite=' . ($scopeSite ? '1' : '0') . ' siteId=' . ($siteId ? (int) $siteId : 0));
 
     $candidates = [];
+    $maxCandidates = 1000;
 
     // Resolve property term to numeric id when possible
     // (Omeka API prefers ids). Cache within this request.
@@ -252,6 +264,9 @@ class SimilarItems extends AbstractHelper {
           if (!isset($candidates[$id])) {
             $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
           }
+          if (count($candidates) >= $maxCandidates) {
+            break 2;
+          }
         }
         // If nothing added via API query (e.g., due to site filters), try
         // fetching via the Item Set representation directly.
@@ -265,6 +280,9 @@ class SimilarItems extends AbstractHelper {
               $id = $it->id();
               if (!isset($candidates[$id])) {
                 $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
+              }
+              if (count($candidates) >= $maxCandidates) {
+                break 2;
               }
             }
           }
@@ -294,13 +312,16 @@ class SimilarItems extends AbstractHelper {
           if (!isset($candidates[$id])) {
             $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
           }
+          if (count($candidates) >= $maxCandidates) {
+            break 2;
+          }
         }
       }
       $log('fallback seeded candidates from item sets: ' . count($candidates));
     }
 
     // Helper to add results from a property equality search.
-    $addByProp = function (string $term, ?string $value, int $weight) use ($api, $siteId, $resource, &$candidates, $propId, $log) {
+    $addByProp = function (string $term, ?string $value, int $weight) use ($api, $siteId, $resource, &$candidates, $propId, $log, $maxCandidates) {
       if (!$term || $value === NULL || $value === '') {
         return;
       }
@@ -328,6 +349,9 @@ class SimilarItems extends AbstractHelper {
         if (!isset($candidates[$id])) {
           $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
         }
+        if (count($candidates) >= $maxCandidates) {
+          break;
+        }
         $candidates[$id]['score'] += $weight;
         $candidates[$id]['signals'][] = ["prop:$term", $weight];
         $added++;
@@ -338,12 +362,23 @@ class SimilarItems extends AbstractHelper {
     if (!$demoteSameBib) {
       $addByProp($mapBib, $sig['bibid'], $wBib);
     }
-    $addByProp($mapNcid, $sig['ncid'], $wNcid);
     $addByProp($mapAuthorId, $sig['author_id'], $wAuthorId);
     $addByProp($mapAuthName, $sig['auth_name'], $wAuthName);
     if ($mapSubject && $wSubject > 0 && !empty($sig['subject'])) {
       foreach ($sig['subject'] as $sv) {
         $addByProp($mapSubject, $sv, $wSubject);
+      }
+    }
+
+    if ($mapSeries && $wSeries !== 0 && !empty($sig['series'])) {
+      foreach (array_unique($sig['series']) as $sv) {
+        $addByProp($mapSeries, $sv, $wSeries);
+      }
+    }
+
+    if ($mapPublisher && $wPublisher !== 0 && !empty($sig['publisher'])) {
+      foreach (array_unique($sig['publisher']) as $sv) {
+        $addByProp($mapPublisher, $sv, $wPublisher);
       }
     }
 
@@ -451,6 +486,9 @@ class SimilarItems extends AbstractHelper {
           $candidates[$id]['score'] += $weightItemSets;
           $candidates[$id]['signals'][] = ['item_sets', $weightItemSets];
         }
+        if (count($candidates) >= $maxCandidates) {
+          break;
+        }
       }
       $log('last-chance fallback added: ' . count($candidates));
     }
@@ -475,6 +513,37 @@ class SimilarItems extends AbstractHelper {
 
     // Post-process candidates with bucket/shelf/class proximity and
     // item sets. Also compute candidate base titles for diversification.
+    // Optional multi-match bonus helper (set-based, shared across signals).
+    $bonusMultiMatch = function (array $seedVals, array $candVals, int $weight) use ($multiMatchOn, $multiDecay): float {
+      if (!$multiMatchOn) {
+        return 0.0;
+      }
+      if ($weight === 0) {
+        return 0.0;
+      }
+      if (empty($seedVals) || empty($candVals)) {
+        return 0.0;
+      }
+      $s = array_unique(array_filter(array_map('strval', $seedVals), static function ($v): bool {
+        return $v !== '';
+      }));
+      $c = array_unique(array_filter(array_map('strval', $candVals), static function ($v): bool {
+        return $v !== '';
+      }));
+      if (empty($s) || empty($c)) {
+        return 0.0;
+      }
+      $n = count(array_intersect($s, $c));
+      if ($n <= 0) {
+        return 0.0;
+      }
+      if ($n === 1) {
+        return (float) $weight;
+      }
+      $extra = ($n - 1) * ($weight * $multiDecay);
+      return (float) $weight + (float) $extra;
+    };
+
     foreach ($candidates as &$entry) {
       /** @var \Omeka\Api\Representation\AbstractResourceEntityRepresentation $it */
       $it = $entry['resource'];
@@ -539,6 +608,12 @@ class SimilarItems extends AbstractHelper {
           $entry['signals'][] = ['class_proximity', $wClassProx];
         }
       }
+
+      // Classification exact-match bonus (same normalized numeric part).
+      if ($wClassExact !== 0 && $curClassNum !== NULL && $candClassNum !== NULL && $curClassNum === $candClassNum) {
+        $entry['score'] += $wClassExact;
+        $entry['signals'][] = ['class_exact', $wClassExact];
+      }
       // Material type equality (light boost).
       if ($wMaterial > 0 && $mapMaterial) {
         try {
@@ -553,6 +628,24 @@ class SimilarItems extends AbstractHelper {
           }
         }
         catch (\Throwable $e) {
+          // Ignore.
+        }
+      }
+      // Publication place equality boost.
+      if ($wPubPlace !== 0 && $mapLocation) {
+        try {
+          $curLoc = isset($sig['location']) ? (string) ($sig['location'] ?? '') : '';
+          $candLoc = (string) ($this->firstString($it, $mapLocation) ?? '');
+          if ($curLoc !== '' && $candLoc !== '') {
+            $a = mb_strtolower(trim($curLoc));
+            $b = mb_strtolower(trim($candLoc));
+            if ($a === $b) {
+              $entry['score'] += $wPubPlace;
+              $entry['signals'][] = ['publication_place', $wPubPlace];
+            }
+          }
+        }
+        catch (hrowable $e) {
           // Ignore.
         }
       }
@@ -590,6 +683,60 @@ class SimilarItems extends AbstractHelper {
         }
       }
 
+      // Multi-match bonuses for multi-valued signals (set-based).
+      if ($multiMatchOn) {
+        // Author IDs.
+        if ($mapAuthorId && $wAuthorId !== 0 && $sig['author_id']) {
+          $seedVals = [$sig['author_id']];
+          $candVals = $this->firstStrings($it, $mapAuthorId);
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wAuthorId) - (float) $wAuthorId;
+          if ($delta !== 0.0) {
+            $entry['score'] += $delta;
+            $entry['signals'][] = ['author_id_multi', $delta];
+          }
+        }
+        // Authorized names.
+        if ($mapAuthName && $wAuthName !== 0 && $sig['auth_name']) {
+          $seedVals = [$sig['auth_name']];
+          $candVals = $this->firstStrings($it, $mapAuthName);
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wAuthName) - (float) $wAuthName;
+          if ($delta !== 0.0) {
+            $entry['score'] += $delta;
+            $entry['signals'][] = ['authorized_name_multi', $delta];
+          }
+        }
+        // Subjects.
+        if ($mapSubject && $wSubject !== 0 && !empty($sig['subject'])) {
+          $seedVals = $sig['subject'];
+          $candVals = $this->firstStrings($it, $mapSubject);
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wSubject) - (float) $wSubject;
+          if ($delta !== 0.0) {
+            $entry['score'] += $delta;
+            $entry['signals'][] = ['subject_multi', $delta];
+          }
+        }
+        // Series titles.
+        if ($mapSeries && $wSeries !== 0 && !empty($sig['series'])) {
+          $seedVals = $sig['series'];
+          $candVals = $this->firstStrings($it, $mapSeries);
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wSeries) - (float) $wSeries;
+          if ($delta !== 0.0) {
+            $entry['score'] += $delta;
+            $entry['signals'][] = ['series_multi', $delta];
+          }
+        }
+        // Publishers (future-proof for multi-valued data).
+        if ($mapPublisher && $wPublisher !== 0 && !empty($sig['publisher'])) {
+          $seedVals = $sig['publisher'];
+          $candVals = $this->firstStrings($it, $mapPublisher);
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wPublisher) - (float) $wPublisher;
+          if ($delta !== 0.0) {
+            $entry['score'] += $delta;
+            $entry['signals'][] = ['publisher_multi', $delta];
+          }
+        }
+      }
+
       // Debug values: include actual property values that relate to signals.
       // This is used only when the controller requests debug output.
       $propVals = [];
@@ -598,12 +745,6 @@ class SimilarItems extends AbstractHelper {
           $vals = $this->firstStrings($it, $mapBib);
           if (!empty($vals)) {
             $propVals[$mapBib] = $vals;
-          }
-        }
-        if ($mapNcid) {
-          $vals = $this->firstStrings($it, $mapNcid);
-          if (!empty($vals)) {
-            $propVals[$mapNcid] = $vals;
           }
         }
         if ($mapAuthorId) {
@@ -676,12 +817,9 @@ class SimilarItems extends AbstractHelper {
     // Precompute tie-break metadata per candidate.
     // Includes: unique positive signal types, max positive component,
     // and tier presence flags.
-    $canonicalOf = function (string $label) use ($mapNcid, $mapAuthorId, $mapAuthName, $mapSubject): string {
+    $canonicalOf = function (string $label) use ($mapAuthorId, $mapAuthName, $mapSubject): string {
       if (strpos($label, 'prop:') === 0) {
         $term = substr($label, 5);
-        if ($term === $mapNcid) {
-          return 'ncid';
-        }
         if ($term === $mapAuthorId) {
           return 'author_id';
         }

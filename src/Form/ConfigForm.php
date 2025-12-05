@@ -140,10 +140,11 @@ class ConfigForm extends Form {
                   // @translate
           'label' => '棚情報を類似判定に使用（候補拡大）',
                   // @translate
-          'info' => '候補を追加する設定です。請求記号の先頭一致で同じ棚のアイテムを候補に加えます。なお、同一棚のスコア加算は「重み: 棚記号」で独立して制御されます。',
+          'info' => '※現行バージョンではこの設定は無効です（将来的に分野バケット等に統合予定）。',
         ],
         'attributes' => [
           'id' => 'similaritems_use_shelf_seeding',
+          'style' => 'display:none;',
         ],
       ])
       ->add([
@@ -261,22 +262,6 @@ class ConfigForm extends Form {
         ],
       ])
       ->add([
-        'name' => 'similaritems_map_ncid',
-        'type' => PropertySelectElement::class,
-        'options' => [
-          'label' => 'プロパティ対応付け: NCID（候補に追加＋スコア加算）',
-          'info' => '同一NCIDのアイテムを候補に追加し、重みに応じてスコアを加算します。',
-          'empty_option' => '',
-          'term_as_value' => TRUE,
-          'use_hidden_element' => TRUE,
-        ],
-        'attributes' => [
-          'id' => 'similaritems_map_ncid',
-          'class' => 'chosen-select',
-          'data-placeholder' => 'NCIDのプロパティを選択…',
-        ],
-      ])
-      ->add([
         'name' => 'similaritems_map_author_id',
         'type' => PropertySelectElement::class,
         'options' => [
@@ -322,6 +307,38 @@ class ConfigForm extends Form {
           'id' => 'similaritems_map_subject',
           'class' => 'chosen-select',
           'data-placeholder' => '主題のプロパティを選択… (例: dcterms:subject)',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_map_series_title',
+        'type' => PropertySelectElement::class,
+        'options' => [
+          'label' => 'プロパティ対応付け: シリーズタイトル（候補に追加＋スコア加算）',
+          'info' => '同一シリーズタイトルのアイテムを候補に追加し、重みに応じてスコアを加算します。',
+          'empty_option' => '',
+          'term_as_value' => TRUE,
+          'use_hidden_element' => TRUE,
+        ],
+        'attributes' => [
+          'id' => 'similaritems_map_series_title',
+          'class' => 'chosen-select',
+          'data-placeholder' => 'シリーズタイトルのプロパティを選択…',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_map_publisher',
+        'type' => PropertySelectElement::class,
+        'options' => [
+          'label' => 'プロパティ対応付け: 出版者（候補に追加＋スコア加算）',
+          'info' => '同一出版者のアイテムを候補に追加し、重みに応じてスコアを加算します。',
+          'empty_option' => '',
+          'term_as_value' => TRUE,
+          'use_hidden_element' => TRUE,
+        ],
+        'attributes' => [
+          'id' => 'similaritems_map_publisher',
+          'class' => 'chosen-select',
+          'data-placeholder' => '出版者のプロパティを選択…',
         ],
       ])
       ->add([
@@ -550,23 +567,10 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_bibid',
-          'min' => 0,
+          // Allow negative weights for penalty use.
+          'min' => NULL,
           'step' => 1,
           'value' => 10,
-        ],
-      ])
-      ->add([
-        'name' => 'similaritems_weight_ncid',
-        'type' => NumberElement::class,
-        'options' => [
-                  // @translate
-          'label' => '重み: NCID',
-        ],
-        'attributes' => [
-          'id' => 'similaritems_weight_ncid',
-          'min' => 0,
-          'step' => 1,
-          'value' => 8,
         ],
       ])
       ->add([
@@ -578,7 +582,7 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_author_id',
-          'min' => 0,
+          'min' => NULL,
           'step' => 1,
           'value' => 6,
         ],
@@ -592,7 +596,7 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_authorized_name',
-          'min' => 0,
+          'min' => NULL,
           'step' => 1,
           'value' => 4,
         ],
@@ -606,7 +610,7 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_subject',
-          'min' => 0,
+          'min' => NULL,
           'step' => 1,
           'value' => 4,
         ],
@@ -620,9 +624,35 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_domain_bucket',
-          'min' => 0,
+          'min' => NULL,
           'step' => 1,
           'value' => 3,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_weight_series_title',
+        'type' => NumberElement::class,
+        'options' => [
+          'label' => '重み: シリーズタイトル',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_weight_series_title',
+          'min' => NULL,
+          'step' => 1,
+          'value' => 3,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_weight_publisher',
+        'type' => NumberElement::class,
+        'options' => [
+          'label' => '重み: 出版者',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_weight_publisher',
+          'min' => NULL,
+          'step' => 1,
+          'value' => 2,
         ],
       ])
       ->add([
@@ -634,7 +664,7 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_item_sets',
-          'min' => 0,
+          'min' => NULL,
           'step' => 1,
           'value' => 3,
         ],
@@ -650,7 +680,7 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_call_shelf',
-          'min' => 0,
+          'min' => NULL,
           'step' => 1,
           'value' => 2,
         ],
@@ -664,9 +694,22 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_class_proximity',
-          'min' => 0,
+          'min' => NULL,
           'step' => 1,
           'value' => 1,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_weight_class_exact',
+        'type' => NumberElement::class,
+        'options' => [
+          'label' => '重み: 分類記号（完全一致）',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_weight_class_exact',
+          'min' => NULL,
+          'step' => 1,
+          'value' => 2,
         ],
       ])
       ->add([
@@ -678,7 +721,7 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_material_type',
-          'min' => 0,
+          'min' => NULL,
           'step' => 1,
           'value' => 2,
         ],
@@ -692,7 +735,20 @@ class ConfigForm extends Form {
         ],
         'attributes' => [
           'id' => 'similaritems_weight_issued_proximity',
-          'min' => 0,
+          'min' => NULL,
+          'step' => 1,
+          'value' => 1,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_weight_publication_place',
+        'type' => NumberElement::class,
+        'options' => [
+          'label' => '重み: 出版地（スコア加算）',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_weight_publication_place',
+          'min' => NULL,
           'step' => 1,
           'value' => 1,
         ],
@@ -837,6 +893,44 @@ class ConfigForm extends Form {
         ],
       ]);
 
+    // ==============================
+    // Multi-match bonus (global)
+    // ==============================
+    $this
+      ->add([
+        'type' => Fieldset::class,
+        'name' => 'similaritems_group_multi_match',
+        'options' => [
+          'label' => '一致回数加点',
+          'info' => '著者・主題・シリーズなど多値プロパティで、一致回数に応じて減衰付きでスコアを加点します。',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_multi_match_enable',
+        'type' => CheckboxElement::class,
+        'options' => [
+          'label' => '一致回数加点を有効にする',
+          'info' => '有効にすると、多値プロパティで一致した件数に応じてスコアを加点します。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_multi_match_enable',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_multi_match_decay',
+        'type' => NumberElement::class,
+        'options' => [
+          'label' => '一致回数加点の減衰率',
+          'info' => '2件目以降の一致に対して、基礎重みに対する割合で加点します（例: 0.2）。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_multi_match_decay',
+          'min' => 0,
+          'step' => 0.05,
+          'value' => 0.2,
+        ],
+      ]);
+
     // Domain bucket rules (JSON)
     $this
       ->add([
@@ -891,6 +985,9 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_group_serendipity_info', 'required' => FALSE])
       ->add(['name' => 'similaritems_group_title_rules_info', 'required' => FALSE])
       ->add(['name' => 'similaritems_group_bucket_rules_info', 'required' => FALSE])
+      ->add(['name' => 'similaritems_group_multi_match', 'required' => FALSE])
+      ->add(['name' => 'similaritems_multi_match_enable', 'required' => FALSE])
+      ->add(['name' => 'similaritems_multi_match_decay', 'required' => FALSE])
       ->add(['name' => 'similaritems_scope_site', 'required' => FALSE])
       ->add(['name' => 'similaritems_use_item_sets', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_item_sets', 'required' => FALSE])
@@ -906,26 +1003,30 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_map_call_number', 'required' => FALSE])
       ->add(['name' => 'similaritems_map_class_number', 'required' => FALSE])
       ->add(['name' => 'similaritems_map_bibid', 'required' => FALSE])
-      ->add(['name' => 'similaritems_map_ncid', 'required' => FALSE])
       ->add(['name' => 'similaritems_map_author_id', 'required' => FALSE])
       ->add(['name' => 'similaritems_map_authorized_name', 'required' => FALSE])
       ->add(['name' => 'similaritems_map_location', 'required' => FALSE])
       ->add(['name' => 'similaritems_map_issued', 'required' => FALSE])
       ->add(['name' => 'similaritems_map_material_type', 'required' => FALSE])
       ->add(['name' => 'similaritems_map_viewing_direction', 'required' => FALSE])
-      ->add(['name' => 'similaritems_map_subject', 'required' => FALSE]);
+      ->add(['name' => 'similaritems_map_subject', 'required' => FALSE])
+      ->add(['name' => 'similaritems_map_series_title', 'required' => FALSE])
+      ->add(['name' => 'similaritems_map_publisher', 'required' => FALSE]);
 
     $inputFilter
       ->add(['name' => 'similaritems_weight_bibid', 'required' => FALSE])
-      ->add(['name' => 'similaritems_weight_ncid', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_author_id', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_authorized_name', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_subject', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_domain_bucket', 'required' => FALSE])
+      ->add(['name' => 'similaritems_weight_series_title', 'required' => FALSE])
+      ->add(['name' => 'similaritems_weight_publisher', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_call_shelf', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_class_proximity', 'required' => FALSE])
+      ->add(['name' => 'similaritems_weight_class_exact', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_material_type', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_issued_proximity', 'required' => FALSE])
+      ->add(['name' => 'similaritems_weight_publication_place', 'required' => FALSE])
       ->add(['name' => 'similaritems_issued_proximity_threshold', 'required' => FALSE])
       ->add(['name' => 'similaritems_class_proximity_threshold', 'required' => FALSE])
       ->add(['name' => 'similaritems_bucket_rules', 'required' => FALSE])

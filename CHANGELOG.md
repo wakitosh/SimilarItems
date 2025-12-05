@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2025-12-05
+
+### EN
+
+#### Added
+- New candidate signals for selection and scoring: Series title and Publisher can now be mapped and weighted like Author/Subject, broadening the pool of potential neighbors.
+- Optional multi-match bonus: when enabled, multi-valued properties (Author ID, Authorized name, Subject, Series, Publisher) add extra score based on the number of distinct matching values with a configurable decay factor.
+- Classification exact-match weight: in addition to class proximity, a separate weight applies when the normalized numeric part of the class matches exactly.
+- Publication place weight: when mapped, matching publication place contributes an optional score bonus.
+
+#### Changed
+- Hard cap on candidate pool size (default 1000) to keep performance stable even when many properties are used for candidate expansion.
+- NCID removed from candidate selection and scoring: mapping and weight fields have been dropped from the settings UI, and NCID is no longer used as a similarity signal.
+- Shelf-based candidate expansion UI is now hidden and effectively disabled; domain buckets and other signals are the primary tools for broadening the pool.
+- Weights now accept negative values for all signals, allowing explicit penalties via "Weights & Thresholds" in addition to dedicated same-bibid/title penalties.
+
+#### Fixed
+- Title normalization and matching logic updated to respect the new settings while keeping existing behavior (e.g., Japanese volume markers and separators) intact.
+
+### 日本語
+
+#### 追加
+- 候補選出＋スコア加算のシグナルに「シリーズタイトル」「出版者」を追加し、著者・主題と同様にマッピングと重み付けが可能になりました。メタデータが十分な資料では候補の幅が広がります。
+- 一致回数加点（オプション）を追加：有効にすると、著者ID／著者名典拠形／主題／シリーズタイトル／出版者など多値プロパティで、一致件数に応じて減衰付きで加点します（最初の一致は既存の重み、2件目以降は重み×減衰率）。
+- 分類記号の完全一致ウェイトを追加：従来の「分類近接」に加え、正規化した数値部分が完全一致した場合に別枠の重みを適用できます。
+- 出版地の一致ウェイトを追加：対応付けされた出版地プロパティが一致した場合に、任意の重みでスコアを加点できます。
+
+#### 変更
+- 候補プールの上限を導入（既定1000件）：複数のシグナルで候補を拡大した場合でも、一定数で打ち切ることで性能と応答時間を安定させます。
+- NCID を類似性シグナルから除去：設定画面からNCIDのマッピング／重みを削除し、候補選出やスコアリングには用いないようにしました。
+- 棚情報による候補拡大のUIを非表示化し、現行バージョンでは事実上無効化しました。分野バケットや他のプロパティを通じて候補を広げる設計に整理しています。
+- 「ウェイトと閾値」セクションのすべての重みで負の値を受け付けるようにし、同一書誌ID・同一タイトル以外の条件についても「一致時の減点」を設定できるようにしました。
+
+#### 修正
+- タイトル正規化ロジックを、設定可能な区切り文字と既存の日本語パターン（第N巻／巻之〜 等）の両方を尊重する形に整理し、従来の base title 抽出結果を崩さないようにしました。
+
 ## [0.3.2] - 2025-11-03
 
 ### EN
