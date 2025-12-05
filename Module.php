@@ -103,7 +103,6 @@ class Module extends AbstractModule {
       'similaritems_map_call_number' => (string) ($settings->get('similaritems.map.call_number') ?? 'dcndl:callNumber'),
       'similaritems_map_class_number' => (string) ($settings->get('similaritems.map.class_number') ?? 'dc:subject'),
       'similaritems_map_bibid' => (string) ($settings->get('similaritems.map.bibid') ?? 'tsukubada:bibid'),
-      'similaritems_map_ncid' => (string) ($settings->get('similaritems.map.ncid') ?? 'dcndl:sourceIdentifier'),
       'similaritems_map_author_id' => (string) ($settings->get('similaritems.map.author_id') ?? 'tsukubada:authorId'),
       'similaritems_map_authorized_name' => (string) ($settings->get('similaritems.map.authorized_name') ?? 'tsukubada:authorizedName'),
       'similaritems_map_location' => (string) ($settings->get('similaritems.map.location') ?? 'dcndl:location'),
@@ -111,18 +110,24 @@ class Module extends AbstractModule {
       'similaritems_map_material_type' => (string) ($settings->get('similaritems.map.material_type') ?? 'dcndl:materialType'),
       'similaritems_map_viewing_direction' => (string) ($settings->get('similaritems.map.viewing_direction') ?? 'tsukubada:viewingDirection'),
       'similaritems_map_subject' => (string) ($settings->get('similaritems.map.subject') ?? ''),
+      'similaritems_map_series_title' => (string) ($settings->get('similaritems.map.series_title') ?? ''),
+      'similaritems_map_publisher' => (string) ($settings->get('similaritems.map.publisher') ?? ''),
 
       // Weights (basic set).
       'similaritems_weight_bibid' => (int) ($settings->get('similaritems.weight.bibid') ?? 0),
-      'similaritems_weight_ncid' => (int) ($settings->get('similaritems.weight.ncid') ?? 6),
-      'similaritems_weight_author_id' => (int) ($settings->get('similaritems.weight.author_id') ?? 5),
-      'similaritems_weight_authorized_name' => (int) ($settings->get('similaritems.weight.authorized_name') ?? 3),
-      'similaritems_weight_subject' => (int) ($settings->get('similaritems.weight.subject') ?? 5),
-      'similaritems_weight_domain_bucket' => (int) ($settings->get('similaritems.weight.domain_bucket') ?? 2),
-      'similaritems_weight_call_shelf' => (int) ($settings->get('similaritems.weight.call_shelf') ?? 1),
+      'similaritems_weight_author_id' => (int) ($settings->get('similaritems.weight.author_id') ?? 6),
+      'similaritems_weight_authorized_name' => (int) ($settings->get('similaritems.weight.authorized_name') ?? 4),
+      'similaritems_weight_subject' => (int) ($settings->get('similaritems.weight.subject') ?? 4),
+      'similaritems_weight_domain_bucket' => (int) ($settings->get('similaritems.weight.domain_bucket') ?? 3),
+      'similaritems_weight_call_shelf' => (int) ($settings->get('similaritems.weight.call_shelf') ?? 2),
+      'similaritems_weight_series_title' => (int) ($settings->get('similaritems.weight.series_title') ?? 3),
+      'similaritems_weight_publisher' => (int) ($settings->get('similaritems.weight.publisher') ?? 2),
+      'similaritems_weight_item_sets' => (int) ($settings->get('similaritems.weight_item_sets') ?? 3),
       'similaritems_weight_class_proximity' => (int) ($settings->get('similaritems.weight.class_proximity') ?? 1),
+      'similaritems_weight_class_exact' => (int) ($settings->get('similaritems.weight.class_exact') ?? 2),
       'similaritems_weight_material_type' => (int) ($settings->get('similaritems.weight.material_type') ?? 2),
       'similaritems_weight_issued_proximity' => (int) ($settings->get('similaritems.weight.issued_proximity') ?? 1),
+      'similaritems_weight_publication_place' => (int) ($settings->get('similaritems.weight.publication_place') ?? 1),
       'similaritems_issued_proximity_threshold' => (int) ($settings->get('similaritems.issued_proximity_threshold') ?? 5),
       'similaritems_class_proximity_threshold' => (int) ($settings->get('similaritems.class_proximity_threshold') ?? 5),
 
@@ -136,6 +141,10 @@ class Module extends AbstractModule {
 
       // Title rules.
       'similaritems_title_volume_separators' => (string) ($settings->get('similaritems.title_volume_separators') ?? ' , '),
+
+      // Multi-match bonus (global).
+      'similaritems_multi_match_enable' => (int) ($settings->get('similaritems.multi_match.enable') ?? 0),
+      'similaritems_multi_match_decay' => (string) ($settings->get('similaritems.multi_match.decay') ?? '0.2'),
     ]);
 
     $form->prepare();
@@ -174,7 +183,6 @@ class Module extends AbstractModule {
       'similaritems.map.call_number' => 'dcndl:callNumber',
       'similaritems.map.class_number' => 'dc:subject',
       'similaritems.map.bibid' => 'tsukubada:bibid',
-      'similaritems.map.ncid' => 'dcndl:sourceIdentifier',
       'similaritems.map.author_id' => 'tsukubada:authorId',
       'similaritems.map.authorized_name' => 'tsukubada:authorizedName',
       'similaritems.map.location' => 'dcndl:location',
@@ -182,18 +190,24 @@ class Module extends AbstractModule {
       'similaritems.map.material_type' => 'dcndl:materialType',
       'similaritems.map.viewing_direction' => 'tsukubada:viewingDirection',
       'similaritems.map.subject' => '',
+      'similaritems.map.series_title' => '',
+      'similaritems.map.publisher' => '',
 
       // Weights (basic set) defaults.
       'similaritems.weight.bibid' => 0,
-      'similaritems.weight.ncid' => 6,
-      'similaritems.weight.author_id' => 5,
-      'similaritems.weight.authorized_name' => 3,
-      'similaritems.weight.subject' => 5,
-      'similaritems.weight.domain_bucket' => 2,
-      'similaritems.weight.call_shelf' => 1,
+      'similaritems.weight.author_id' => 6,
+      'similaritems.weight.authorized_name' => 4,
+      'similaritems.weight.subject' => 4,
+      'similaritems.weight.domain_bucket' => 3,
+      'similaritems.weight.call_shelf' => 2,
+      'similaritems.weight.series_title' => 3,
+      'similaritems.weight.publisher' => 2,
+      'similaritems.weight.item_sets' => 3,
       'similaritems.weight.class_proximity' => 1,
+      'similaritems.weight.class_exact' => 2,
       'similaritems.weight.material_type' => 2,
       'similaritems.weight.issued_proximity' => 1,
+      'similaritems.weight.publication_place' => 1,
       'similaritems.class_proximity_threshold' => 5,
       'similaritems.issued_proximity_threshold' => 5,
 
@@ -211,6 +225,10 @@ class Module extends AbstractModule {
       // Jitter defaults.
       'similaritems.jitter.enable' => 0,
       'similaritems.jitter.pool_multiplier' => '1.5',
+
+      // Multi-match defaults.
+      'similaritems.multi_match.enable' => 0,
+      'similaritems.multi_match.decay' => '0.2',
     ];
 
     foreach ($defaults as $key => $value) {
@@ -264,7 +282,6 @@ class Module extends AbstractModule {
     $settings->set('similaritems.map.call_number', $getStr('similaritems_map_call_number', ''));
     $settings->set('similaritems.map.class_number', $getStr('similaritems_map_class_number', ''));
     $settings->set('similaritems.map.bibid', $getStr('similaritems_map_bibid', ''));
-    $settings->set('similaritems.map.ncid', $getStr('similaritems_map_ncid', ''));
     $settings->set('similaritems.map.author_id', $getStr('similaritems_map_author_id', ''));
     $settings->set('similaritems.map.authorized_name', $getStr('similaritems_map_authorized_name', ''));
     $settings->set('similaritems.map.location', $getStr('similaritems_map_location', ''));
@@ -272,19 +289,25 @@ class Module extends AbstractModule {
     $settings->set('similaritems.map.material_type', $getStr('similaritems_map_material_type', ''));
     $settings->set('similaritems.map.viewing_direction', $getStr('similaritems_map_viewing_direction', ''));
     $settings->set('similaritems.map.subject', $getStr('similaritems_map_subject', ''));
+    $settings->set('similaritems.map.series_title', $getStr('similaritems_map_series_title', ''));
+    $settings->set('similaritems.map.publisher', $getStr('similaritems_map_publisher', ''));
 
     // Save weights (basic set).
-    $settings->set('similaritems.weight.bibid', max(0, $getInt('similaritems_weight_bibid', 10)));
-    $settings->set('similaritems.weight.ncid', max(0, $getInt('similaritems_weight_ncid', 8)));
-    $settings->set('similaritems.weight.author_id', max(0, $getInt('similaritems_weight_author_id', 6)));
-    $settings->set('similaritems.weight.authorized_name', max(0, $getInt('similaritems_weight_authorized_name', 4)));
-    $settings->set('similaritems.weight.domain_bucket', max(0, $getInt('similaritems_weight_domain_bucket', 3)));
-    $settings->set('similaritems.weight.call_shelf', max(0, $getInt('similaritems_weight_call_shelf', 2)));
-    $settings->set('similaritems.weight.class_proximity', max(0, $getInt('similaritems_weight_class_proximity', 1)));
+    $settings->set('similaritems.weight.bibid', $getInt('similaritems_weight_bibid', 10));
+    $settings->set('similaritems.weight.author_id', $getInt('similaritems_weight_author_id', 6));
+    $settings->set('similaritems.weight.authorized_name', $getInt('similaritems_weight_authorized_name', 4));
+    $settings->set('similaritems.weight.domain_bucket', $getInt('similaritems_weight_domain_bucket', 3));
+    $settings->set('similaritems.weight.call_shelf', $getInt('similaritems_weight_call_shelf', 2));
+    $settings->set('similaritems.weight.series_title', $getInt('similaritems_weight_series_title', 3));
+    $settings->set('similaritems.weight.publisher', $getInt('similaritems_weight_publisher', 2));
+    $settings->set('similaritems.weight.item_sets', $getInt('similaritems_weight_item_sets', 3));
+    $settings->set('similaritems.weight.class_proximity', $getInt('similaritems_weight_class_proximity', 1));
+    $settings->set('similaritems.weight.class_exact', $getInt('similaritems_weight_class_exact', 2));
     $settings->set('similaritems.class_proximity_threshold', max(0, $getInt('similaritems_class_proximity_threshold', 5)));
-    $settings->set('similaritems.weight.subject', max(0, $getInt('similaritems_weight_subject', 4)));
-    $settings->set('similaritems.weight.material_type', max(0, $getInt('similaritems_weight_material_type', 2)));
-    $settings->set('similaritems.weight.issued_proximity', max(0, $getInt('similaritems_weight_issued_proximity', 1)));
+    $settings->set('similaritems.weight.subject', $getInt('similaritems_weight_subject', 4));
+    $settings->set('similaritems.weight.material_type', $getInt('similaritems_weight_material_type', 2));
+    $settings->set('similaritems.weight.issued_proximity', $getInt('similaritems_weight_issued_proximity', 1));
+    $settings->set('similaritems.weight.publication_place', $getInt('similaritems_weight_publication_place', 1));
     $settings->set('similaritems.issued_proximity_threshold', max(0, $getInt('similaritems_issued_proximity_threshold', 5)));
 
     // Save bucket rules JSON (no validation here; UI can include a test tool).
@@ -297,6 +320,15 @@ class Module extends AbstractModule {
 
     // Title rules.
     $settings->set('similaritems.title_volume_separators', $getStr('similaritems_title_volume_separators', ' , '));
+
+    // Multi-match bonus.
+    $settings->set('similaritems.multi_match.enable', $getInt('similaritems_multi_match_enable', 0));
+    $decayRaw = $getStr('similaritems_multi_match_decay', '0.2');
+    $decay = (float) $decayRaw;
+    if (!is_finite($decay) || $decay < 0.0) {
+      $decay = 0.0;
+    }
+    $settings->set('similaritems.multi_match.decay', (string) $decay);
 
     $controller->messenger()->addSuccess('SimilarItems settings were saved.');
     return TRUE;

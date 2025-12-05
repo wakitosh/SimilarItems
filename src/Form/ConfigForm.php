@@ -620,7 +620,7 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
                   // @translate
-          'label' => '重み: 分野バケット（スコア加算）',
+          'label' => '重み: 分野バケット',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_domain_bucket',
@@ -659,8 +659,8 @@ class ConfigForm extends Form {
         'name' => 'similaritems_weight_item_sets',
         'type' => NumberElement::class,
         'options' => [
-          'label' => '重み: アイテムセット（スコア加算）',
-          'info' => '候補に入ったアイテムが現在のアイテムと同じアイテムセットに属する場合のスコア加算。',
+          'label' => '重み: アイテムセット',
+          'info' => '候補に入ったアイテムが現在のアイテムと同じアイテムセットに属する場合にスコアを加算します。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_item_sets',
@@ -674,7 +674,7 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
                   // @translate
-          'label' => '重み: 棚記号（スコア加算）',
+          'label' => '重み: 棚記号',
                   // @translate
           'info' => '候補拡大の有無とは独立です。棚情報の候補拡大がオフでも、同一棚ならスコア加算されます。',
         ],
@@ -690,7 +690,7 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
                   // @translate
-          'label' => '重み: 分類近接（スコア加算）',
+          'label' => '重み: 分類近接',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_class_proximity',
@@ -717,7 +717,7 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
                   // @translate
-          'label' => '重み: 資料種別（スコア加算）',
+          'label' => '重み: 資料種別',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_material_type',
@@ -731,7 +731,7 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
                   // @translate
-          'label' => '重み: 出版年（スコア加算）',
+          'label' => '重み: 出版年',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_issued_proximity',
@@ -744,7 +744,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_weight_publication_place',
         'type' => NumberElement::class,
         'options' => [
-          'label' => '重み: 出版地（スコア加算）',
+          'label' => '重み: 出版地',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_publication_place',
