@@ -71,7 +71,7 @@ Connects the concepts used by the module (e.g., Call Number, Author ID) to the p
 
 - **Proximity & Equality (Scoring Only)**:
   - These properties are not used for initial candidate selection. They only add to the score if a candidate meets a proximity or equality condition.
-  - Properties: `Class number`, `Issued`, `Material type`.
+  - Properties: `Class number`, `Issued`, `Material type`, `Publication place`.
 
 - **Penalty-focused**:
   - Maps the `Bibliographic ID` property. Primarily used to apply a penalty to items from the same bibliographic record, pushing them down in the results.
@@ -156,7 +156,9 @@ These defaults provide a good starting point for a balanced mix of topical relev
   - `Domain bucket`: 2
   - `Shelf Match`: 1
   - `Class proximity`: 1 (Threshold: 5)
+  - `Class exact match`: 2
   - `Material type equality`: 2
+  - `Publication place equality`: 1
   - `Issued proximity`: 1 (Threshold: 5 years)
 - **Penalties**:
   - `Bibliographic ID`: 0 (Used for penalty, not scoring)
@@ -169,6 +171,8 @@ These defaults provide a good starting point for a balanced mix of topical relev
 - **Fallback Signals (Authorized name (weak), Item Set Match)**: `Authorized name (weak)` (3) is a weaker author signal, while `Item Set Match` (2) provides a curated context, useful when other metadata is sparse.
 - **"Stack-Browsing" Signals (Domain, Shelf Match, Class)**: These are intentionally weighted low (1-2) to add a flavor of physical "shelf browsing" and serendipity without overpowering the topical signals.
 - **Light Boosts (Material, Issued)**: These provide a gentle nudge towards items of the same type or from a similar time period, adding subtle relevance.
+- **Exact vs. Close in Classification**: Use `Class exact match` to slightly favor items in exactly the same class number, while `Class proximity` keeps near-by classes in scope to preserve a shelf-browsing feel.
+- **Publication Place Equality**: A small bonus for items sharing the same place of publication, useful when regional affinity is meaningful but should not dominate topical similarity.
 - **Bib ID (0 weight + penalty)**: Items from the same series (e.g., volumes of a journal) are often plentiful. By setting the weight to 0 and applying a strong penalty (150), they are pushed down the list, making room for more diverse results while still being available if no better matches exist.
 
 > Note: NCID is no longer used as a similarity signal in 0.4.0 and later; it has been removed from the settings UI.
@@ -325,7 +329,7 @@ MIT
 
 - **近接・一致系（スコア加算のみ）**:
   - ここで指定されたプロパティは、候補を探すためには使われません。候補の中から条件（近接や一致）を満たすものを見つけてスコアを加算するためだけに使われます。
-  - 対象: `分類記号`, `出版年`, `資料種別`
+  - 対象: `分類記号`, `出版年`, `資料種別`, `出版地`
 
 - **ペナルティ中心**:
   - `書誌ID`を紐付けます。主に、同一書誌のアイテムにペナルティを与えて表示順位を下げるために使われます。
@@ -430,11 +434,13 @@ MIT
   - `出版者`: 2
   - `アイテムセット一致`: 2
 - **近接・一致系（スコア加算のみ）**:
-    - `分野バケット`: 2
-    - `棚一致`: 1
-    - `分類近接`: 1 (閾値: 5)
-    - `資料種別一致`: 2
-    - `出版年近接`: 1 (閾値: 5年)
+  - `分野バケット`: 2
+  - `棚一致`: 1
+  - `分類近接`: 1 (閾値: 5)
+  - `分類完全一致ボーナス`: 2
+  - `資料種別一致`: 2
+  - `出版地一致`: 1
+  - `出版年近接`: 1 (閾値: 5年)
 - **ペナルティ**:
     - `書誌ID`: 0 （スコア加算はせず、ペナルティにのみ使用）
     - `同一書誌へのペナルティ`: 150
@@ -445,7 +451,8 @@ MIT
 - **強力なシグナル（著者ID, 主題）**: `著者ID` と `主題` が著者・トピックの主要なシグナルです。
 - **フォールバックシグナル（著者名典拠形, アイテムセット）**: `著者名典拠形` は弱めの著者シグナルであり、`アイテムセット` は、他のメタデータが乏しいときに有用なキュレーションされたコンテキストを提供します。
 - **「書架散策」的シグナル（分野, 棚, 分類）**: これらは意図的に低く設定されており（1–2）、主題シグナルを圧倒することなく、物理的な「棚ブラウジング」のニュアンスとセレンディピティを加えます。
-- **軽いブースト（資料種別, 出版年）**: これらは、同じタイプのアイテムや類似の時期に作成されたアイテムに対して微妙な関連性を追加します。
+- **完全一致と「近さ」の使い分け（分類）**: 分類番号がぴったり一致する場合に少しだけ優先したいときは「分類完全一致ボーナス」を使い、周辺の分類を含めて幅広く拾いたいときは「分類近接」の閾値を活用します。
+- **軽いブースト（資料種別, 出版年, 出版地）**: 同じタイプのアイテムや類似の時期／同じ地域で出版されたアイテムに対して微妙な関連性を追加します。ただし、主題や著者シグナルを上書きしない程度の控えめな値にしておくのが無難です。
 - **書誌ID（0ウェイト + ペナルティ）**: 同じシリーズのアイテム（例：ジャーナルの巻号）はしばしば豊富に存在します。ウェイトを0に設定し、強いペナルティを適用することで、より多様な結果のために押し下げられますが、より良い一致が存在しない場合には依然として利用可能です。
 
 > 注: NCID は 0.4.0 以降、類似度シグナルとしては使用しておらず、設定画面からも削除されています。
