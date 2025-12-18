@@ -88,13 +88,9 @@ class Module extends AbstractModule {
       'similaritems_scope_site' => (int) ($settings->get('similaritems.scope_site') ?? 1),
       'similaritems_use_item_sets' => (int) ($settings->get('similaritems.use_item_sets') ?? 1),
       'similaritems_limit' => (int) ($settings->get('similaritems.limit') ?? 6),
-      'similaritems_weight_item_sets' => (int) ($settings->get('similaritems.weight_item_sets') ?? 2),
       'similaritems_debug_log' => (int) ($settings->get('similaritems.debug_log') ?? 0),
       // Tie-break policy.
       'similaritems_tiebreak_policy' => (string) ($settings->get('similaritems.tiebreak_policy') ?? 'none'),
-      // Shelf seeding.
-      'similaritems_use_shelf_seeding' => (int) ($settings->get('similaritems.use_shelf_seeding') ?? 0),
-      'similaritems_shelf_seed_limit' => (int) ($settings->get('similaritems.shelf_seed_limit') ?? 50),
       // Jitter.
       'similaritems_jitter_enable' => (int) ($settings->get('similaritems.jitter.enable') ?? 0),
       'similaritems_jitter_pool_multiplier' => (string) ($settings->get('similaritems.jitter.pool_multiplier') ?? '1.5'),
@@ -137,6 +133,7 @@ class Module extends AbstractModule {
       // Serendipity options.
       'similaritems_serendipity_demote_same_bibid' => (int) ($settings->get('similaritems.serendipity.demote_same_bibid') ?? 1),
       'similaritems_same_bibid_penalty' => (int) ($settings->get('similaritems.serendipity.same_bibid_penalty') ?? 150),
+      'similaritems_same_title_penalty' => (int) ($settings->get('similaritems.serendipity.same_title_penalty') ?? 150),
       'similaritems_serendipity_same_title_mode' => (string) ($settings->get('similaritems.serendipity.same_title_mode') ?? 'allow'),
 
       // Title rules.
@@ -171,13 +168,10 @@ class Module extends AbstractModule {
       'similaritems.scope_site' => 1,
       'similaritems.use_item_sets' => 1,
       'similaritems.limit' => 6,
-      'similaritems.weight_item_sets' => 2,
+      'similaritems.weight_item_sets' => 3,
       'similaritems.debug_log' => 0,
       // Tie-break policy default.
       'similaritems.tiebreak_policy' => 'none',
-      // Shelf seeding defaults.
-      'similaritems.use_shelf_seeding' => 0,
-      'similaritems.shelf_seed_limit' => 50,
 
       // Property mapping defaults.
       'similaritems.map.call_number' => 'dcndl:callNumber',
@@ -202,7 +196,6 @@ class Module extends AbstractModule {
       'similaritems.weight.call_shelf' => 2,
       'similaritems.weight.series_title' => 3,
       'similaritems.weight.publisher' => 2,
-      'similaritems.weight.item_sets' => 3,
       'similaritems.weight.class_proximity' => 1,
       'similaritems.weight.class_exact' => 2,
       'similaritems.weight.material_type' => 2,
@@ -217,6 +210,7 @@ class Module extends AbstractModule {
       // Serendipity defaults.
       'similaritems.serendipity.demote_same_bibid' => 1,
       'similaritems.serendipity.same_bibid_penalty' => 150,
+      'similaritems.serendipity.same_title_penalty' => 150,
       'similaritems.serendipity.same_title_mode' => 'allow',
 
       // Title rules defaults.
@@ -257,7 +251,7 @@ class Module extends AbstractModule {
     $settings->set('similaritems.scope_site', $getInt('similaritems_scope_site', 1));
     $settings->set('similaritems.use_item_sets', $getInt('similaritems_use_item_sets', 1));
     $settings->set('similaritems.limit', max(1, $getInt('similaritems_limit', 6)));
-    $settings->set('similaritems.weight_item_sets', max(0, $getInt('similaritems_weight_item_sets', 3)));
+    $settings->set('similaritems.weight_item_sets', $getInt('similaritems_weight_item_sets', 3));
     $settings->set('similaritems.debug_log', $getInt('similaritems_debug_log', 0));
     // Tie-break policy.
     $tbPolicy = strtolower($getStr('similaritems_tiebreak_policy', 'none'));
@@ -265,9 +259,6 @@ class Module extends AbstractModule {
       $tbPolicy = 'none';
     }
     $settings->set('similaritems.tiebreak_policy', $tbPolicy);
-    // Shelf seeding.
-    $settings->set('similaritems.use_shelf_seeding', $getInt('similaritems_use_shelf_seeding', 0));
-    $settings->set('similaritems.shelf_seed_limit', max(0, $getInt('similaritems_shelf_seed_limit', 50)));
     // Jitter.
     $settings->set('similaritems.jitter.enable', $getInt('similaritems_jitter_enable', 0));
     $poolMulRaw = $getStr('similaritems_jitter_pool_multiplier', '1.5');
@@ -300,7 +291,6 @@ class Module extends AbstractModule {
     $settings->set('similaritems.weight.call_shelf', $getInt('similaritems_weight_call_shelf', 2));
     $settings->set('similaritems.weight.series_title', $getInt('similaritems_weight_series_title', 3));
     $settings->set('similaritems.weight.publisher', $getInt('similaritems_weight_publisher', 2));
-    $settings->set('similaritems.weight.item_sets', $getInt('similaritems_weight_item_sets', 3));
     $settings->set('similaritems.weight.class_proximity', $getInt('similaritems_weight_class_proximity', 1));
     $settings->set('similaritems.weight.class_exact', $getInt('similaritems_weight_class_exact', 2));
     $settings->set('similaritems.class_proximity_threshold', max(0, $getInt('similaritems_class_proximity_threshold', 5)));
@@ -316,7 +306,12 @@ class Module extends AbstractModule {
     // Serendipity options.
     $settings->set('similaritems.serendipity.demote_same_bibid', $getInt('similaritems_serendipity_demote_same_bibid', 1));
     $settings->set('similaritems.serendipity.same_bibid_penalty', max(0, $getInt('similaritems_same_bibid_penalty', 100)));
-    $settings->set('similaritems.serendipity.same_title_mode', $getStr('similaritems_serendipity_same_title_mode', 'allow'));
+    $settings->set('similaritems.serendipity.same_title_penalty', max(0, $getInt('similaritems_same_title_penalty', 150)));
+    $sameTitleMode = $getStr('similaritems_serendipity_same_title_mode', 'allow');
+    if (!in_array($sameTitleMode, ['allow', 'exclude', 'exclude_no_fallback'], TRUE)) {
+      $sameTitleMode = 'allow';
+    }
+    $settings->set('similaritems.serendipity.same_title_mode', $sameTitleMode);
 
     // Title rules.
     $settings->set('similaritems.title_volume_separators', $getStr('similaritems_title_volume_separators', ' , '));
@@ -361,39 +356,7 @@ class Module extends AbstractModule {
        {"field": "call_number", "op": "prefix", "value": "ヨ"},
        {"field": "call_number", "op": "prefix", "value": "タ"},
        {"field": "call_number", "op": "prefix", "value": "ネ"},
-       {"field": "call_number", "op": "prefix", "value": "H"},
-       {"field": "call_number", "op": "prefix", "value": "J"},
-       {"field": "call_number", "op": "prefix", "value": "K"},
-       {"field": "call_number", "op": "contains", "value": "雑文書"},
-       {"field": "call_number", "op": "contains", "value": "昌平坂"},
-       {"field": "call_number", "op": "contains", "value": "石清水"},
-       {"field": "call_number", "op": "contains", "value": "大徳寺"},
-       {"field": "call_number", "op": "contains", "value": "長福寺"},
-       {"field": "call_number", "op": "contains", "value": "北野社"}
-     ]},
-    {"key": "documents", "labels": {"ja": "文書類"},
-     "any": [
-       {"field": "call_number", "op": "prefix", "value": "2"},
-       {"field": "call_number", "op": "prefix", "value": "ヨ"},
-       {"field": "call_number", "op": "prefix", "value": "タ"},
-       {"field": "call_number", "op": "prefix", "value": "ネ"},
-       {"field": "call_number", "op": "prefix", "value": "H"},
-       {"field": "call_number", "op": "prefix", "value": "J"},
-       {"field": "call_number", "op": "prefix", "value": "K"},
-       {"field": "call_number", "op": "contains", "value": "雑文書"},
-       {"field": "call_number", "op": "contains", "value": "昌平坂"},
-       {"field": "call_number", "op": "contains", "value": "石清水"},
-       {"field": "call_number", "op": "contains", "value": "大徳寺"},
-       {"field": "call_number", "op": "contains", "value": "長福寺"},
-       {"field": "call_number", "op": "contains", "value": "北野社"},
-       {"field": "call_number", "op": "contains", "value": "東亜研"}
-     ]},
-    {"key": "maps", "labels": {"ja": "地図"},
-     "any": [
-       {"field": "call_number", "op": "prefix", "value": "2"},
-       {"field": "call_number", "op": "prefix", "value": "ヨ"},
-       {"field": "call_number", "op": "prefix", "value": "タ"},
-       {"field": "call_number", "op": "prefix", "value": "ネ"},
+       {"field": "call_number", "op": "prefix", "value": "東亜研"},
        {"field": "call_number", "op": "prefix", "value": "H"},
        {"field": "call_number", "op": "prefix", "value": "J"},
        {"field": "call_number", "op": "prefix", "value": "K"},
@@ -406,15 +369,15 @@ class Module extends AbstractModule {
      ]},
     {"key": "social_sciences", "labels": {"ja": "社会科学"},
      "any": [
-       {"field": "class_number", "op": "prefix", "value": "30"},
-       {"field": "class_number", "op": "prefix", "value": "31"},
-       {"field": "class_number", "op": "prefix", "value": "32"},
-       {"field": "class_number", "op": "prefix", "value": "33"},
-       {"field": "class_number", "op": "prefix", "value": "34"},
-       {"field": "class_number", "op": "prefix", "value": "35"},
-       {"field": "class_number", "op": "prefix", "value": "36"},
-       {"field": "class_number", "op": "prefix", "value": "38"},
-       {"field": "class_number", "op": "prefix", "value": "39"},
+       {"field": "call_number", "op": "prefix", "value": "30"},
+       {"field": "call_number", "op": "prefix", "value": "31"},
+       {"field": "call_number", "op": "prefix", "value": "32"},
+       {"field": "call_number", "op": "prefix", "value": "33"},
+       {"field": "call_number", "op": "prefix", "value": "34"},
+       {"field": "call_number", "op": "prefix", "value": "35"},
+       {"field": "call_number", "op": "prefix", "value": "36"},
+       {"field": "call_number", "op": "prefix", "value": "38"},
+       {"field": "call_number", "op": "prefix", "value": "39"},
        {"field": "call_number", "op": "prefix", "value": "ム"},
        {"field": "call_number", "op": "prefix", "value": "ウ"},
        {"field": "call_number", "op": "prefix", "value": "オ"},
@@ -430,15 +393,7 @@ class Module extends AbstractModule {
      ]},
     {"key": "education", "labels": {"ja": "教育"},
      "any": [
-       {"field": "class_number", "op": "prefix", "value": "37"},
-       {"field": "call_number", "op": "prefix", "value": "ホ"},
-       {"field": "call_number", "op": "prefix", "value": "ヘ"},
-       {"field": "call_number", "op": "prefix", "value": "ル185"},
-       {"field": "call_number", "op": "prefix", "value": "D"}
-     ]},
-    {"key": "textbook", "labels": {"ja": "教科書"},
-     "any": [
-       {"field": "class_number", "op": "prefix", "value": "37"},
+       {"field": "call_number", "op": "prefix", "value": "37"},
        {"field": "call_number", "op": "prefix", "value": "ホ"},
        {"field": "call_number", "op": "prefix", "value": "ヘ"},
        {"field": "call_number", "op": "prefix", "value": "ル185"},

@@ -56,7 +56,8 @@ Introduces intentional randomness to the results to promote serendipity (acciden
 - **Candidate pool multiplier**: Defines the size of the candidate pool for jittering, as a multiple of the display limit. For example, with a limit of 6 and a multiplier of 1.5, the final 6 items will be randomly selected from the top 9 candidates (6 * 1.5).
 - **Handling for same-title-only cases**: Controls behavior when only candidates with the same base title are found.
     - `Allow` (Default): Shows the highest-scoring items, even if they are from the same series.
-    - `Exclude`: Hides same-title items to maximize diversity. If this results in zero candidates, the block will be filled with a random selection of items instead.
+  - `Exclude`: Hides same-title items to maximize diversity. If this results in zero candidates, the block will be filled with a random selection of items instead.
+  - `Exclude (no fallback)`: Hides same-title items. If this results in zero candidates, the block will remain empty (useful for debugging and evaluation).
 
 #### Property Mappings
 
@@ -66,8 +67,8 @@ Connects the concepts used by the module (e.g., Call Number, Author ID) to the p
   - When a property value matches, the item is selected as a candidate *and* its score is increased. These are the primary signals for relevance.
   - Properties (typical): `Author ID`, `Authorized name (weak)`, `Subject`, `Series title`, `Publisher`.
 
-- **Candidate Expansion + Shelf Scoring**:
-  - Maps the `Call number` property. If "Use shelf information" is on, this property is used to expand the candidate pool. A score bonus is always applied to candidates on the same shelf.
+- **Shelf Scoring (Scoring Only)**:
+  - Maps the `Call number` property. It is not used for candidate expansion. A score bonus is applied to candidates on the same shelf.
 
 - **Proximity & Equality (Scoring Only)**:
   - These properties are not used for initial candidate selection. They only add to the score if a candidate meets a proximity or equality condition.
@@ -85,7 +86,7 @@ Connects the concepts used by the module (e.g., Call Number, Author ID) to the p
 Configures the scoring weights and proximity thresholds. Higher weights give a signal more influence over the final score.
 
 - **Weights**:
-  - The base score added when a match or proximity is detected for each property (e.g., `NCID`, `Author ID`) or concept (e.g., `Shelf`, `Class proximity`).
+  - The base score added when a match or proximity is detected for each property (e.g., `Author ID`) or concept (e.g., `Shelf`, `Class proximity`).
 - **Thresholds**:
   - `Class proximity threshold`: Items with class numbers within this range are considered "close."
   - `Issued proximity threshold`: Items with publication years within this range are considered "close."
@@ -94,11 +95,11 @@ Configures the scoring weights and proximity thresholds. Higher weights give a s
 
 Settings designed to increase the diversity of results and promote discovery by penalizing items that are "too similar."
 
-- **Demote same bibliographic record**: (Recommended: On) Applies a penalty to items sharing the same bibliographic ID (e.g., volumes of a series) to prevent them from dominating the results.
-- **Demote same title**: (Recommended: On) Applies a penalty to items sharing the same base title.
+- **Demote same bibliographic record**: (Recommended: On) Master switch for diversity. When enabled, applies a penalty to items sharing the same bibliographic ID (e.g., volumes of a series).
+- **Same base-title handling**: Controls whether same-base-title candidates are allowed, or excluded (with random fallback if none remain).
 - **Penalty Values**:
-  - `Penalty for same bibliographic record`: The score to subtract when the above switch is on.
-  - `Penalty for same title`: The score to subtract when the above switch is on.
+  - `Penalty for same bibliographic record`: The score to subtract from candidates sharing the current item's Bib ID.
+  - `Penalty for same base title`: The score to subtract from candidates sharing the current item's normalized base title.
 
 #### Title Rules
 
@@ -147,14 +148,14 @@ These defaults provide a good starting point for a balanced mix of topical relev
 
 - **Core Signals (Candidate Selection + Scoring)**:
   - `Author ID`: 6
-  - `Subject`: 5
+  - `Subject`: 4
   - `Authorized name (weak)`: 4
   - `Series title`: 3
   - `Publisher`: 2
-  - `Item Set Match`: 2
+  - `Item set match`: 3
 - **Proximity & Equality (Scoring Only)**:
-  - `Domain bucket`: 2
-  - `Shelf Match`: 1
+  - `Domain bucket`: 3
+  - `Shelf match`: 2
   - `Class proximity`: 1 (Threshold: 5)
   - `Class exact match`: 2
   - `Material type equality`: 2
@@ -189,9 +190,8 @@ These settings work together to prevent results from being dominated by items fr
 
 - **Demote same bibliographic record (Switch)**: This is the master switch for diversity. When **On**:
   - The `Penalty for same bibliographic record` is applied to any item sharing the current item's Bib ID.
-- **Demote same title (Switch)**: When **On**:
-  - The `Penalty for same title` is applied to any item sharing the current item's base title.
-- **When Off**: Both penalties are disabled. This can be useful for testing or if you want to prioritize direct series relationships.
+  - The `Penalty for same base title` is also applied.
+- **When Off**: These penalties are disabled. This can be useful for testing or if you want to prioritize direct series relationships.
 - **Final-Stage Diversification**: After all scoring is complete, the module performs a final reordering step. It prioritizes showing items with *different* base titles first, which significantly enhances the variety of the results.
 
 ---
@@ -202,7 +202,7 @@ You can verify the module's behavior in two ways:
 
 ### 1. Debug Log
 
-Enable `Debug log` in the module settings. All scoring, query, and diagnostic information for each request will be logged to `logs/application.log`. This is the best way to inspect the shelf-seeding process.
+Enable `Debug log` in the module settings. All scoring, query, and diagnostic information for each request will be logged to `logs/application.log`.
 
 ### 2. Async Endpoint with `debug=1`
 
@@ -215,9 +215,10 @@ This returns a JSON object containing the rendered `html` and a `debug` payload.
 
 - **`debug`**: An array of recommended items, each with:
     - `id`, `title`, `url`, `score`, `base_title`.
-    - `signals`: An array of signals that contributed to the score (e.g., `['ncid', 6]`).
-    - `values`: The underlying property values that triggered the signals, providing full transparency. Includes `properties`, `buckets`, `shelf`, and `class_number`.
-- **`debug_meta`**: Context for the request, including the current item's bucket keys (`cur_buckets`).
+    - `signals`: An array of signals that contributed to the score (e.g., `['shelf', 2]`).
+  - `values`: The underlying property values that triggered the signals, providing full transparency. Includes `properties`, `buckets`, `shelf`, `class_prefix`, and `class_number`.
+- **`debug_meta`**: Context for the request (e.g., settings and request-scoped options).
+- **`debug_seed`**: Seed item information for debugging, including the current item's bucket keys (`cur_buckets`).
 
 ### Per-request overrides (advanced)
 
@@ -314,7 +315,8 @@ MIT
 - **候補プール倍率**: 微揺らぎで使用する候補プールのサイズを、表示件数に対する倍率で定義します。例えば、表示件数が6件で倍率が1.5の場合、上位9件（6 * 1.5）の候補からランダムに6件が選ばれます。
 - **同一タイトルしかない場合の処理**: 同じベースタイトルの候補しか見つからない場合の挙動を制御します。
     - `許可`（既定）：同一シリーズであっても、スコアが最も高いアイテムを表示します。
-    - `除外`：多様性を最大化するため、同一ベースタイトルのアイテムを非表示にします。これにより候補が0件になった場合は、代わりにランダムなアイテム群が表示されます。
+  - `除外`：多様性を最大化するため、同一ベースタイトルのアイテムを非表示にします。これにより候補が0件になった場合は、代わりにランダムなアイテム群が表示されます。
+  - `完全除外（候補がなければそのまま）`：同一ベースタイトルのアイテムを非表示にします。候補が0件になった場合は、ランダム表示を行わず、そのまま0件になります（デバッグ・検証用途）。
 
 #### プロパティ対応付け
 
@@ -324,8 +326,8 @@ MIT
   - ここで指定されたプロパティの値が一致した場合、そのアイテムは類似候補として選ばれ、さらにスコアが加算されます。関連性を見つけるための最も基本的なシグナルです。
   - 代表的な対象: `著者ID`, `著者名典拠形（弱）`, `主題`, `シリーズタイトル`, `出版者`
 
-- **候補拡大＋棚のスコア加算**:
-  - `請求記号`を紐付けます。「棚情報を類似判定に使用」がオンの場合、ここで指定したプロパティを使って候補を拡大します。また、棚が一致する候補には常にスコアが加算されます。
+- **棚のスコア加算**:
+  - `請求記号`を紐付けます。候補拡大には使用しませんが、棚が一致する候補には常にスコアが加算されます。
 
 - **近接・一致系（スコア加算のみ）**:
   - ここで指定されたプロパティは、候補を探すためには使われません。候補の中から条件（近接や一致）を満たすものを見つけてスコアを加算するためだけに使われます。
@@ -352,11 +354,11 @@ MIT
 
 結果の多様性を高め、偶然の発見を促すための設定です。主にペナルティを利用して、似すぎているアイテムの表示順位を下げます。
 
-- **同一書誌を抑制**: （推奨：オン）同じ書誌IDを持つアイテム（例: 全集の各巻）にペナルティを課し、結果が単調になるのを防ぎます。
-- **同一タイトルを抑制**: （推奨：オン）同じベースタイトルを持つアイテムにペナルティを課します。
+- **同一書誌を抑制**: （推奨：オン）多様性のためのマスタースイッチです。オンのとき、同じ書誌ID（例: 全集の各巻）を持つ候補にペナルティを課します。
+- **同一ベースタイトルの扱い**: 同一ベースタイトルの候補を許可するか、完全除外するかを制御します（除外で0件になった場合はランダム表示）。
 - **ペナルティの値**:
-  - `同一書誌へのペナルティ`: 上記スイッチがオンのときに減算するスコア。
-  - `同一タイトルへのペナルティ`: 上記スイッチがオンのときに減算するスコア。
+  - `同一書誌へのペナルティ`: 現在のアイテムと書誌IDが同じ候補から減算するスコア。
+  - `同一ベースタイトルへのペナルティ`: 現在のアイテムとベースタイトルが同じ候補から減算するスコア。
 
 #### 一致回数ボーナス（Multi-match）
 
@@ -428,14 +430,14 @@ MIT
 
 - **コアシグナル（候補に追加＋スコア加算）**:
   - `著者ID`: 6
-  - `主題`: 5
+  - `主題`: 4
   - `著者名典拠形（弱）`: 4
   - `シリーズタイトル`: 3
   - `出版者`: 2
-  - `アイテムセット一致`: 2
+  - `アイテムセット一致`: 3
 - **近接・一致系（スコア加算のみ）**:
-  - `分野バケット`: 2
-  - `棚一致`: 1
+  - `分野バケット`: 3
+  - `棚一致`: 2
   - `分類近接`: 1 (閾値: 5)
   - `分類完全一致ボーナス`: 2
   - `資料種別一致`: 2
@@ -469,9 +471,8 @@ MIT
 
 - **同一書誌を抑制（スイッチ）**: これは多様性のためのマスタースイッチです。**オン**のとき：
     - `同一書誌へのペナルティ` が、現在のアイテムの書誌IDを共有するアイテムに適用されます。
-- **同一タイトルを抑制（スイッチ）**: **オン**のとき：
-    - `同一タイトルへのペナルティ` が、現在のアイテムのベースタイトルを共有するアイテムに適用されます。
-- **オフのとき**: 両方のペナルティが無効になります。これはテストに便利な場合や、直接的なシリーズ関係を優先したい場合に役立ちます。
+- **オンのとき**: `同一ベースタイトルへのペナルティ` も併せて適用されます。
+- **オフのとき**: これらのペナルティが無効になります。これはテストに便利な場合や、直接的なシリーズ関係を優先したい場合に役立ちます。
 - **最終段階の多様化**: すべてのスコアリングが完了した後、モジュールは最終的な再配置ステップを実行します。異なるベースタイトルを持つアイテムを優先的に表示するようにし、結果の多様性を大幅に向上させます。
 
 ---
@@ -482,7 +483,7 @@ MIT
 
 ### 1. デバッグログ
 
-モジュール設定で `デバッグログ` を有効にします。リクエストごとのスコアリング、クエリ、診断情報のすべてが `logs/application.log` に記録されます。棚シーディングのプロセスを調査するにはこの方法が最適です。
+モジュール設定で `デバッグログ` を有効にします。リクエストごとのスコアリング、クエリ、診断情報のすべてが `logs/application.log` に記録されます。
 
 ### 2. `debug=1` 付き非同期エンドポイント
 
@@ -496,8 +497,8 @@ MIT
 - **`debug`**: 推奨アイテムの配列。各アイテムには以下の情報が含まれます。
     - `id`, `title`, `url`, `score`, `base_title`
     - `signals`: スコアに貢献したシグナルの配列。
-    - `values`: シグナルの根拠となったプロパティの実際の値。完全な透明性を提供します。`properties`, `buckets`, `shelf`, `class_number` を含みます。
-- **`debug_meta`**: リクエストのコンテキスト情報。現在のアイテムのバケットキー（`cur_buckets`）など。
+  - `values`: シグナルの根拠となったプロパティの実際の値。完全な透明性を提供します。`properties`, `buckets`, `shelf`, `class_prefix`, `class_number` を含みます。
+- **`debug_seed`**: デバッグのためのシード（対象）アイテム情報。現在のアイテムのバケットキー（`cur_buckets`）などを含みます。
 
 ### リクエスト単位の一時上書き（上級）
 

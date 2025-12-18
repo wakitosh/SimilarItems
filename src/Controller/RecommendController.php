@@ -148,12 +148,12 @@ class RecommendController extends AbstractActionController {
 
     $payload = ['html' => (string) $html];
     if ($debug) {
-      // Compute current item's buckets for debug visibility.
+      // Include seed item details for debugging (id/title/base title/properties).
       try {
-        $curBuckets = (array) $similarHelper->computeBucketsForResource($item);
+        $payload['debug_seed'] = $similarHelper->computeDebugSeedForResource($item);
       }
       catch (\Throwable $e) {
-        $curBuckets = [];
+        $payload['debug_seed'] = NULL;
       }
       // Effective item set weight (respect trial override when present).
       $settings = $services->get('Omeka\Settings');
@@ -196,7 +196,6 @@ class RecommendController extends AbstractActionController {
         'tiebreak' => ($tiebreak !== '' ? $tiebreak : NULL),
         'item_sets_weight' => $effItemSetsWeight,
         'item_sets_seed_only' => $itemSetsSeedOnly ? 1 : 0,
-        'cur_buckets' => $curBuckets,
       ];
     }
 

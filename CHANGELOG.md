@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2025-12-18
+
+### EN
+
+#### Changed
+- Default domain bucket rules updated: numeric prefixes are now evaluated on `call_number` (instead of `class_number`), and the History bucket includes a `call_number` prefix rule for "東亜研".
+- Classification proximity/exact scoring now requires matching non-numeric class prefixes before comparing numeric parts (prevents unintended boosts based on digits alone).
+- Debug payload now includes `class_prefix` in both seed and candidate `values` for easier verification.
+
+#### Fixed
+- Multi-match bonus calculation adjusted to add bonus only for 2nd+ distinct matches and avoid double-counting with the base property weight.
+- Multi-match for Author ID and Authorized name now considers all seed values (not only the first), so 2+ overlaps correctly receive a bonus.
+
+### 日本語
+
+#### 変更
+- 分野バケットの既定ルールを更新：数字プレフィックスの判定対象を `class_number` ではなく `call_number` に変更し、「歴史」バケットに `call_number` が「東亜研」で始まる条件を追加しました。
+- 分類近接／分類完全一致の加点に「文字プレフィックス一致」を前提条件として追加し、数字だけが近いケースで意図せず加点されるのを防ぎます。
+- デバッグ出力の `values` に `class_prefix` を追加し、判定の検証がしやすくなりました。
+
+#### 修正
+- multi-match（一致回数加点）の計算を「2件目以降のボーナスのみ」に整理し、基本ウェイトとの二重カウントを防止しました。
+- 著者ID／典拠形著者名の multi-match がシード側の先頭1件のみで評価されていた問題を修正し、2件以上一致した場合に正しくボーナスが加点されるようにしました。
+
 ## [0.4.0] - 2025-12-05
 
 ### EN

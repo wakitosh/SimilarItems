@@ -101,7 +101,7 @@ class ConfigForm extends Form {
       ]);
 
     // ==============================
-    // Shelf seeding (optional)
+    // Candidate expansion (optional)
     // ==============================
     $this
       ->add([
@@ -110,7 +110,7 @@ class ConfigForm extends Form {
         'options' => [
           // @translate
           'label' => '候補拡大',
-          'info' => '請求記号（棚）や共有アイテムセットから候補を追加します。棚のスコア加算は別設定（重み: 棚記号）で制御されます。',
+          'info' => '共有アイテムセットから候補を追加します。加点は「重み: アイテムセット」で制御されます。',
         ],
       ])
       ->add([
@@ -118,7 +118,7 @@ class ConfigForm extends Form {
         'type' => 'text',
         'options' => [
           'label' => ' ',
-          'info' => '請求記号（棚）や共有アイテムセットから候補を追加します。棚のスコア加算は別設定（重み: 棚記号）で制御されます。',
+          'info' => '共有アイテムセットから候補を追加します。加点は「重み: アイテムセット」で制御されます。',
         ],
         'attributes' => [
           'id' => 'similaritems_group_shelf_seed_info',
@@ -130,35 +130,7 @@ class ConfigForm extends Form {
         'type' => 'checkbox',
         'options' => [
           'label' => 'アイテムセットを類似判定に使用（候補拡大）',
-          'info' => '候補を追加する設定です。共有アイテムセットに属するアイテムを候補に加えます。スコア加算量は「重み: アイテムセット一致」で制御されます。',
-        ],
-      ])
-      ->add([
-        'name' => 'similaritems_use_shelf_seeding',
-        'type' => 'checkbox',
-        'options' => [
-                  // @translate
-          'label' => '棚情報を類似判定に使用（候補拡大）',
-                  // @translate
-          'info' => '※現行バージョンではこの設定は無効です（将来的に分野バケット等に統合予定）。',
-        ],
-        'attributes' => [
-          'id' => 'similaritems_use_shelf_seeding',
-          'style' => 'display:none;',
-        ],
-      ])
-      ->add([
-        'name' => 'similaritems_shelf_seed_limit',
-        'type' => NumberElement::class,
-        'options' => [
-                  // @translate
-          'label' => '棚情報で追加する最大候補数（候補拡大の上限）',
-        ],
-        'attributes' => [
-          'id' => 'similaritems_shelf_seed_limit',
-          'min' => 1,
-          'step' => 1,
-          'value' => 50,
+          'info' => '候補を追加する設定です。共有アイテムセットに属するアイテムを候補に加えます。スコア加算量は「重み: アイテムセット」で制御されます。',
         ],
       ]);
 
@@ -345,8 +317,8 @@ class ConfigForm extends Form {
         'type' => Fieldset::class,
         'name' => 'similaritems_group_mapping_shelf',
         'options' => [
-          'label' => '候補拡大＋棚のスコア加算',
-          'info' => '請求記号を使って棚単位で候補を拡大し、同一棚には「重み: 棚記号」によるスコア加算を行います。',
+          'label' => '棚のスコア加算',
+          'info' => '請求記号が同一棚の候補に対して、「重み: 棚記号」によるスコア加算を行います。',
         ],
       ])
       ->add([
@@ -354,7 +326,7 @@ class ConfigForm extends Form {
         'type' => 'text',
         'options' => [
           'label' => ' ',
-          'info' => '請求記号を使って棚単位で候補を拡大し、同一棚には「重み: 棚記号」によるスコア加算を行います。',
+          'info' => '請求記号が同一棚の候補に対して、「重み: 棚記号」によるスコア加算を行います。',
         ],
         'attributes' => [
           'id' => 'similaritems_group_mapping_shelf_info',
@@ -365,8 +337,8 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_call_number',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 請求記号（候補拡大＋棚ボーナス）',
-          'info' => '「棚情報を類似判定に使用」がオンのとき候補拡大に使用。常に、同一棚の候補には「重み: 棚記号」によるスコア加算が入ります。',
+          'label' => 'プロパティ対応付け: 請求記号（棚のスコア加算）',
+          'info' => '候補拡大には使用しません。同一棚の候補には「重み: 棚記号」によるスコア加算が入ります。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -676,7 +648,7 @@ class ConfigForm extends Form {
                   // @translate
           'label' => '重み: 棚記号',
                   // @translate
-          'info' => '候補拡大の有無とは独立です。棚情報の候補拡大がオフでも、同一棚ならスコア加算されます。',
+          'info' => '候補が同一棚に属する場合にスコアを加算します（候補拡大には使用しません）。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_call_shelf',
@@ -813,7 +785,7 @@ class ConfigForm extends Form {
                   // @translate
           'label' => 'セレンディピティ: 同一書誌を抑制',
                   // @translate
-          'info' => '有効にすると、同じ書誌ID（巻違いなど）を持つアイテムのスコアを大幅に下げ、多様性を確保します。',
+          'info' => '有効にすると、同じ書誌ID（巻違いなど）を持つアイテムに「同一書誌へのペナルティ」を適用します。併せて「同一ベースタイトルへのペナルティ」も適用されます。無効にすると、これらのペナルティは適用されません（検証・チューニング用）。',
         ],
         'attributes' => [
           'id' => 'similaritems_serendipity_demote_same_bibid',
@@ -834,6 +806,20 @@ class ConfigForm extends Form {
         ],
       ])
       ->add([
+        'name' => 'similaritems_same_title_penalty',
+        'type' => NumberElement::class,
+        'options' => [
+                  // @translate
+          'label' => 'ペナルティ: 同一ベースタイトル',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_same_title_penalty',
+          'min' => 0,
+          'step' => 1,
+          'value' => 150,
+        ],
+      ])
+      ->add([
         'name' => 'similaritems_serendipity_same_title_mode',
         'type' => SelectElement::class,
         'options' => [
@@ -844,6 +830,8 @@ class ConfigForm extends Form {
             'allow' => '許可 (他に候補がなければ表示)',
                       // @translate
             'exclude' => '完全除外 (候補がなければランダム表示)',
+                      // @translate
+            'exclude_no_fallback' => '完全除外（候補がなければそのまま）',
           ],
         ],
         'attributes' => [
@@ -992,8 +980,6 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_use_item_sets', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_item_sets', 'required' => FALSE])
       ->add(['name' => 'similaritems_debug_log', 'required' => FALSE])
-      ->add(['name' => 'similaritems_use_shelf_seeding', 'required' => FALSE])
-      ->add(['name' => 'similaritems_shelf_seed_limit', 'required' => FALSE])
       ->add(['name' => 'similaritems_limit', 'required' => FALSE])
       ->add(['name' => 'similaritems_jitter_enable', 'required' => FALSE])
       ->add(['name' => 'similaritems_jitter_pool_multiplier', 'required' => FALSE]);
@@ -1032,6 +1018,7 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_bucket_rules', 'required' => FALSE])
       ->add(['name' => 'similaritems_serendipity_demote_same_bibid', 'required' => FALSE])
       ->add(['name' => 'similaritems_same_bibid_penalty', 'required' => FALSE])
+      ->add(['name' => 'similaritems_same_title_penalty', 'required' => FALSE])
       ->add(['name' => 'similaritems_serendipity_same_title_mode', 'required' => FALSE])
       ->add(['name' => 'similaritems_title_volume_separators', 'required' => FALSE]);
   }

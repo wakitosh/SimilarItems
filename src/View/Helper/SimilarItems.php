@@ -104,6 +104,7 @@ class SimilarItems extends AbstractHelper {
 
     $scopeSite = (int) ($this->settings->get('similaritems.scope_site') ?? 1) === 1;
     $useItemSets = (int) ($this->settings->get('similaritems.use_item_sets') ?? 1) === 1;
+
     // Item set scoring weight (can be overridden per-request).
     $weightItemSets = (int) ($this->settings->get('similaritems.weight_item_sets') ?? 3);
     if (isset($options['item_sets_weight'])) {
@@ -124,7 +125,6 @@ class SimilarItems extends AbstractHelper {
     $mapIssued = (string) ($this->settings->get('similaritems.map.issued') ?? '');
     $mapMaterial = (string) ($this->settings->get('similaritems.map.material_type') ?? '');
     $mapViewing = (string) ($this->settings->get('similaritems.map.viewing_direction') ?? '');
-
     $mapSeries = (string) ($this->settings->get('similaritems.map.series_title') ?? '');
     $mapPublisher = (string) ($this->settings->get('similaritems.map.publisher') ?? '');
 
@@ -151,23 +151,23 @@ class SimilarItems extends AbstractHelper {
     if (!is_finite($multiDecay) || $multiDecay < 0.0) {
       $multiDecay = 0.0;
     }
-    // Optional: seed by shelf (call-number prefix) to broaden candidates.
-    $useShelfSeeding = (int) ($this->settings->get('similaritems.use_shelf_seeding') ?? 0) === 1;
-    $shelfSeedLimit = (int) ($this->settings->get('similaritems.shelf_seed_limit') ?? 50);
     $log('weights: bib=' . $wBib . ' author_id=' . $wAuthorId . ' auth_name=' . $wAuthName . ' subject=' . $wSubject . ' bucket=' . $wBucket . ' shelf=' . $wShelf . ' series=' . $wSeries . ' publisher=' . $wPublisher . ' class_exact=' . $wClassExact . ' class_prox=' . $wClassProx . ' class_thresh=' . $classThresh . ' material=' . $wMaterial . ' issued_prox=' . $wIssuedProx . ' issued_thresh=' . $issuedThresh . ' pub_place=' . $wPubPlace . ' multi_match=' . ($multiMatchOn ? '1' : '0') . ' multi_decay=' . $multiDecay);
 
     // Serendipity options: demote same-bibid (series/巻違い) aggressively.
     $demoteSameBib = (int) ($this->settings->get('similaritems.serendipity.demote_same_bibid') ?? 1) === 1;
     $sameBibPenalty = (int) ($this->settings->get('similaritems.serendipity.same_bibid_penalty') ?? 100);
+    $sameTitlePenaltySetting = (int) ($this->settings->get('similaritems.serendipity.same_title_penalty') ?? 150);
     $sameTitleMode = (string) ($this->settings->get('similaritems.serendipity.same_title_mode') ?? 'allow');
-    $excludeSameTitle = ($sameTitleMode === 'exclude');
+    $excludeSameTitle = ($sameTitleMode === 'exclude' || $sameTitleMode === 'exclude_no_fallback');
+    $excludeSameTitleNoFallback = ($sameTitleMode === 'exclude_no_fallback');
     $log('serendipity: demote_same_bibid=' . ($demoteSameBib ? '1' : '0') . ' same_title_mode=' . $sameTitleMode);
 
     // Gather current item signals.
     $sig = [
       'bibid' => $mapBib ? $this->firstString($resource, $mapBib) : NULL,
-      'author_id' => $mapAuthorId ? $this->firstString($resource, $mapAuthorId) : NULL,
-      'auth_name' => $mapAuthName ? $this->firstString($resource, $mapAuthName) : NULL,
+      // Multi-valued: allow multi-match bonuses when 2+ values overlap.
+      'author_id' => $mapAuthorId ? $this->firstStrings($resource, $mapAuthorId) : [],
+      'auth_name' => $mapAuthName ? $this->firstStrings($resource, $mapAuthName) : [],
       'call' => $mapCall ? $this->firstString($resource, $mapCall) : NULL,
       'class' => $mapClass ? $this->firstString($resource, $mapClass) : NULL,
       'subject' => $mapSubject ? $this->firstStrings($resource, $mapSubject) : [],
@@ -181,8 +181,8 @@ class SimilarItems extends AbstractHelper {
 
     $log('item ' . (int) $resource->id() . ' signals: ' . json_encode([
       'bibid' => $sig['bibid'],
-      'author_id' => $sig['author_id'],
-      'auth_name' => $sig['auth_name'],
+      'author_id_count' => is_array($sig['author_id']) ? count($sig['author_id']) : 0,
+      'auth_name_count' => is_array($sig['auth_name']) ? count($sig['auth_name']) : 0,
       'call' => $sig['call'],
       'class' => $sig['class'],
       'subject_count' => is_array($sig['subject']) ? count($sig['subject']) : 0,
@@ -190,7 +190,7 @@ class SimilarItems extends AbstractHelper {
 
     $bucketRules = (string) ($this->settings->get('similaritems.bucket_rules') ?? '');
     $curBucketKeys = $this->evalBuckets($bucketRules, $sig['call'] ?? '', $sig['class'] ?? '');
-    [$curShelf, $curClassNum] = $this->parseCallAndClass($sig['call'] ?? '', $sig['class'] ?? '');
+    [$curShelf, $curClassNum, $curClassPrefix] = $this->parseCallAndClass($sig['call'] ?? '', $sig['class'] ?? '');
 
     $siteId = NULL;
     // Allow explicit site id in options (e.g., from controller via site slug).
@@ -205,8 +205,7 @@ class SimilarItems extends AbstractHelper {
     $candidates = [];
     $maxCandidates = 1000;
 
-    // Resolve property term to numeric id when possible
-    // (Omeka API prefers ids). Cache within this request.
+    // Resolve property term to numeric id when possible.
     $propId = function (string $term) use ($api): string|int {
       static $cache = [];
       if ($term === '') {
@@ -232,9 +231,7 @@ class SimilarItems extends AbstractHelper {
       return $term;
     };
 
-    // Seed candidates by shared Item Sets so the block works even when
-    // bibliographic/authority properties are not mapped. Scoring for item
-    // set overlap is added in post-processing below.
+    // Seed candidates by shared Item Sets.
     $curItemSetIds = [];
     $curItemSets = [];
     if ($useItemSets && method_exists($resource, 'itemSets')) {
@@ -247,7 +244,6 @@ class SimilarItems extends AbstractHelper {
       $log('seeding by item sets: ' . implode(',', array_keys($curItemSetIds)));
       foreach (array_keys($curItemSetIds) as $sid) {
         $query = [
-          // Use array form for compatibility with Omeka API.
           'item_set_id' => [$sid],
           'limit' => 200,
         ];
@@ -268,8 +264,6 @@ class SimilarItems extends AbstractHelper {
             break 2;
           }
         }
-        // If nothing added via API query (e.g., due to site filters), try
-        // fetching via the Item Set representation directly.
         if ($before === count($candidates) && isset($curItemSets[$sid])) {
           try {
             $items = $curItemSets[$sid]->items(['limit' => 200]);
@@ -294,8 +288,7 @@ class SimilarItems extends AbstractHelper {
       $log('seeded candidates from item sets: ' . count($candidates));
     }
 
-    // Fallback: if no candidates yet and we scoped to site, try again without
-    // site filter so that something shows when items are not assigned to site.
+    // Fallback: if still empty and site-scoped, retry without site filter.
     if ($useItemSets && $curItemSetIds && empty($candidates) && $siteId) {
       $log('fallback seeding by item sets without site filter');
       foreach (array_keys($curItemSetIds) as $sid) {
@@ -352,9 +345,18 @@ class SimilarItems extends AbstractHelper {
         if (count($candidates) >= $maxCandidates) {
           break;
         }
-        $candidates[$id]['score'] += $weight;
-        $candidates[$id]['signals'][] = ["prop:$term", $weight];
-        $added++;
+        // Avoid double-counting the same property term when the seed has
+        // multiple values (e.g., multiple subjects). Base weight is applied
+        // once per property term; multi-match bonus handles 2nd+ matches.
+        if (!isset($candidates[$id]['__prop_hit'])) {
+          $candidates[$id]['__prop_hit'] = [];
+        }
+        if (!isset($candidates[$id]['__prop_hit'][$term])) {
+          $candidates[$id]['__prop_hit'][$term] = TRUE;
+          $candidates[$id]['score'] += $weight;
+          $candidates[$id]['signals'][] = ["prop:$term", $weight];
+          $added++;
+        }
       }
       $log('prop result added: ' . $added . ' (total candidates: ' . count($candidates) . ')');
     };
@@ -362,105 +364,191 @@ class SimilarItems extends AbstractHelper {
     if (!$demoteSameBib) {
       $addByProp($mapBib, $sig['bibid'], $wBib);
     }
-    $addByProp($mapAuthorId, $sig['author_id'], $wAuthorId);
-    $addByProp($mapAuthName, $sig['auth_name'], $wAuthName);
+    if ($mapAuthorId && $wAuthorId !== 0 && !empty($sig['author_id'])) {
+      foreach (array_unique($sig['author_id']) as $av) {
+        $addByProp($mapAuthorId, $av, $wAuthorId);
+      }
+    }
+    if ($mapAuthName && $wAuthName !== 0 && !empty($sig['auth_name'])) {
+      foreach (array_unique($sig['auth_name']) as $av) {
+        $addByProp($mapAuthName, $av, $wAuthName);
+      }
+    }
     if ($mapSubject && $wSubject > 0 && !empty($sig['subject'])) {
       foreach ($sig['subject'] as $sv) {
         $addByProp($mapSubject, $sv, $wSubject);
       }
     }
-
     if ($mapSeries && $wSeries !== 0 && !empty($sig['series'])) {
       foreach (array_unique($sig['series']) as $sv) {
         $addByProp($mapSeries, $sv, $wSeries);
       }
     }
-
     if ($mapPublisher && $wPublisher !== 0 && !empty($sig['publisher'])) {
       foreach (array_unique($sig['publisher']) as $sv) {
         $addByProp($mapPublisher, $sv, $wPublisher);
       }
     }
 
-    // Optional seeding by shelf: add items whose call number starts with the
-    // current shelf prefix (e.g., "210...") so that shelf weight can surface
-    // more neighbors even when no other properties match.
-    if ($useShelfSeeding && $wShelf > 0 && $mapCall && $curShelf !== '') {
-      $pid = $propId($mapCall);
-      $limitShelf = max(1, min(200, $shelfSeedLimit));
-      $modes = [
-        // Prefer starts-with when supported by the API.
-        ['type' => 'sw', 'text' => $curShelf, 'label' => 'sw'],
-        // Fallback to broad LIKE (contains) with user-provided wildcard.
-        ['type' => 'like', 'text' => $curShelf . '%', 'label' => 'like'],
-      ];
-      foreach ($modes as $mode) {
-        $query = [
-          'property' => [
-            [
-              'property' => $pid,
-              'type' => $mode['type'],
-              'text' => $mode['text'],
-            ],
-          ],
-          'limit' => $limitShelf,
-        ];
-        if ($siteId) {
-          $query['site_id'] = $siteId;
-        }
-        $log('shelf seeding (' . $mode['label'] . '): shelf=' . $curShelf . ' pid=' . (is_int($pid) ? (string) $pid : $pid) . ' limit=' . $limitShelf);
+    // Bucket-based candidate expansion: use matched bucket keys to expand the
+    // candidate pool (independent from the scoring step).
+    if ($wBucket > 0 && !empty($curBucketKeys) && $bucketRules !== '' && ($mapCall !== '' || $mapClass !== '')) {
+      $targetPool = max(200, $limit * 10);
+      if (count($candidates) < $targetPool) {
+        $log('expanding candidates by domain buckets: ' . implode(',', $curBucketKeys));
         try {
-          $resp = $api->search('items', $query);
-          $scanned = 0;
-          $added = 0;
-          $exact = 0;
-          $dups = 0;
-          $mismatch = 0;
-          $noCall = 0;
-          $mismatchSamples = [];
-          foreach ($resp->getContent() as $it) {
-            if ($it->id() === $resource->id()) {
-              continue;
-            }
-            $scanned++;
-            // Filter to exact same shelf after normalization.
-            $callVal = $mapCall ? ($this->firstString($it, $mapCall) ?? '') : '';
-            $seedShelf = $this->parseShelf((string) $callVal);
-            if ($seedShelf === '') {
-              $noCall++;
-              continue;
-            }
-            if ($seedShelf !== $curShelf) {
-              $mismatch++;
-              if (count($mismatchSamples) < 5) {
-                $mismatchSamples[] = $callVal;
+          $data = json_decode($bucketRules, TRUE);
+          if (is_array($data) && isset($data['buckets']) && is_array($data['buckets'])) {
+            $toType = static function (string $op): string {
+              if ($op === 'prefix') {
+                return 'sw';
               }
-              continue;
+              if ($op === 'contains') {
+                return 'in';
+              }
+              if ($op === 'equals') {
+                return 'eq';
+              }
+              return '';
+            };
+
+            $added = 0;
+            foreach ($data['buckets'] as $bucket) {
+              if (!is_array($bucket) || !isset($bucket['key'])) {
+                continue;
+              }
+              $key = (string) $bucket['key'];
+              if ($key === '' || !in_array($key, $curBucketKeys, TRUE)) {
+                continue;
+              }
+
+              if (isset($bucket['all']) && is_array($bucket['all']) && !empty($bucket['all'])) {
+                $props = [];
+                foreach ($bucket['all'] as $cond) {
+                  if (!is_array($cond)) {
+                    continue;
+                  }
+                  $field = isset($cond['field']) ? (string) $cond['field'] : '';
+                  $op = isset($cond['op']) ? (string) $cond['op'] : '';
+                  $value = isset($cond['value']) ? (string) $cond['value'] : '';
+                  if ($field === '' || $op === '' || $value === '') {
+                    continue;
+                  }
+                  if (strpos($op, 'not_') === 0) {
+                    continue;
+                  }
+                  $term = ($field === 'call_number') ? $mapCall : (($field === 'class_number') ? $mapClass : '');
+                  if ($term === '') {
+                    continue;
+                  }
+                  $type = $toType($op);
+                  if ($type === '') {
+                    continue;
+                  }
+                  $props[] = [
+                    'property' => $propId($term),
+                    'type' => $type,
+                    'text' => $value,
+                  ];
+                }
+                if (!empty($props)) {
+                  $query = [
+                    'property' => $props,
+                    'limit' => 200,
+                  ];
+                  if ($siteId) {
+                    $query['site_id'] = $siteId;
+                  }
+                  $log('query by bucket expand(all): key=' . $key . ' conds=' . count($props));
+                  $resp = $api->search('items', $query);
+                  foreach ($resp->getContent() as $it) {
+                    if ($it->id() === $resource->id()) {
+                      continue;
+                    }
+                    $id = $it->id();
+                    if (!isset($candidates[$id])) {
+                      $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
+                      $candidates[$id]['signals'][] = ['bucket_expand:' . $key, 0];
+                      $added++;
+                    }
+                    if (count($candidates) >= $maxCandidates) {
+                      break 2;
+                    }
+                  }
+                }
+              }
+              elseif (isset($bucket['any']) && is_array($bucket['any']) && !empty($bucket['any'])) {
+                $conds = [];
+                foreach ($bucket['any'] as $cond) {
+                  if (!is_array($cond)) {
+                    continue;
+                  }
+                  $field = isset($cond['field']) ? (string) $cond['field'] : '';
+                  $op = isset($cond['op']) ? (string) $cond['op'] : '';
+                  $value = isset($cond['value']) ? (string) $cond['value'] : '';
+                  if ($field === '' || $op === '' || $value === '') {
+                    continue;
+                  }
+                  if (strpos($op, 'not_') === 0) {
+                    continue;
+                  }
+                  $term = ($field === 'call_number') ? $mapCall : (($field === 'class_number') ? $mapClass : '');
+                  if ($term === '') {
+                    continue;
+                  }
+                  $type = $toType($op);
+                  if ($type === '') {
+                    continue;
+                  }
+                  $uniq = $field . '|' . $op . '|' . $value;
+                  $conds[$uniq] = ['term' => $term, 'type' => $type, 'value' => $value];
+                }
+                foreach ($conds as $c) {
+                  if (count($candidates) >= $maxCandidates) {
+                    break 2;
+                  }
+                  $term = (string) ($c['term'] ?? '');
+                  $type = (string) ($c['type'] ?? '');
+                  $value = (string) ($c['value'] ?? '');
+                  if ($term === '' || $type === '' || $value === '') {
+                    continue;
+                  }
+                  $query = [
+                    'property' => [[
+                      'property' => $propId($term),
+                      'type' => $type,
+                      'text' => $value,
+                    ],
+                    ],
+                    'limit' => 200,
+                  ];
+                  if ($siteId) {
+                    $query['site_id'] = $siteId;
+                  }
+                  $log('query by bucket expand(any): key=' . $key . ' term=' . $term . ' type=' . $type . ' value=' . $value);
+                  $resp = $api->search('items', $query);
+                  foreach ($resp->getContent() as $it) {
+                    if ($it->id() === $resource->id()) {
+                      continue;
+                    }
+                    $id = $it->id();
+                    if (!isset($candidates[$id])) {
+                      $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
+                      $candidates[$id]['signals'][] = ['bucket_expand:' . $key, 0];
+                      $added++;
+                    }
+                    if (count($candidates) >= $maxCandidates) {
+                      break 3;
+                    }
+                  }
+                }
+              }
             }
-            $exact++;
-            $id = $it->id();
-            if (!isset($candidates[$id])) {
-              $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
-              $added++;
-            }
-            else {
-              $dups++;
-            }
+            $log('bucket expand added: ' . $added . ' (total candidates: ' . count($candidates) . ')');
           }
-          $msg = 'shelf seeding (' . $mode['label'] . ') scanned: ' . $scanned . ' exact: ' . $exact . ' dups: ' . $dups . ' added: ' . $added . ' mismatched: ' . $mismatch . ' no_call: ' . $noCall . ' (total candidates: ' . count($candidates) . ')';
-          if ($mismatch > 0 && empty($exact) && !empty($mismatchSamples)) {
-            $msg .= ' mismatch_samples=' . json_encode($mismatchSamples, JSON_UNESCAPED_UNICODE);
-          }
-          $log($msg);
-          // If we found exact matches or added new ones, stop trying modes.
-          if ($exact > 0 || $added > 0) {
-            break;
-          }
-          // Otherwise, try next mode.
         }
         catch (\Throwable $e) {
-          // Try next mode on errors.
-          continue;
+          $log('bucket expand error: ' . $e->getMessage());
         }
       }
     }
@@ -508,12 +596,14 @@ class SimilarItems extends AbstractHelper {
     // same-title penalty during tests.
     // Apply only when demote_same_bibid is enabled.
     $applySameTitlePenalty = $demoteSameBib;
-    $sameTitlePenalty = $applySameTitlePenalty ? max(100, (int) $sameBibPenalty) : 0;
+    $sameTitlePenalty = $applySameTitlePenalty ? max(0, (int) $sameTitlePenaltySetting) : 0;
     $log('serendipity: same_title_penalty_applied=' . ($applySameTitlePenalty ? '1' : '0') . ' penalty=' . $sameTitlePenalty . ' same_bibid_penalty=' . (int) $sameBibPenalty);
 
     // Post-process candidates with bucket/shelf/class proximity and
     // item sets. Also compute candidate base titles for diversification.
     // Optional multi-match bonus helper (set-based, shared across signals).
+    // Returns ONLY the decayed bonus for 2nd+ matches:
+    // bonus = (n-1) * weight * decay when n >= 2, else 0.
     $bonusMultiMatch = function (array $seedVals, array $candVals, int $weight) use ($multiMatchOn, $multiDecay): float {
       if (!$multiMatchOn) {
         return 0.0;
@@ -534,14 +624,11 @@ class SimilarItems extends AbstractHelper {
         return 0.0;
       }
       $n = count(array_intersect($s, $c));
-      if ($n <= 0) {
+      if ($n < 2) {
         return 0.0;
       }
-      if ($n === 1) {
-        return (float) $weight;
-      }
       $extra = ($n - 1) * ($weight * $multiDecay);
-      return (float) $weight + (float) $extra;
+      return (float) $extra;
     };
 
     foreach ($candidates as &$entry) {
@@ -596,12 +683,18 @@ class SimilarItems extends AbstractHelper {
           $entry['signals'][] = ['bucket', $wBucket];
         }
       }
-      [$candShelf, $candClassNum] = $this->parseCallAndClass($call, $class);
+      [$candShelf, $candClassNum, $candClassPrefix] = $this->parseCallAndClass($call, $class);
       if ($wShelf > 0 && $curShelf && $candShelf && $curShelf === $candShelf) {
         $entry['score'] += $wShelf;
         $entry['signals'][] = ['shelf', $wShelf];
       }
-      if ($wClassProx > 0 && $curClassNum !== NULL && $candClassNum !== NULL) {
+      // Classification proximity only applies when the non-numeric prefix
+      // matches (e.g., "ル185" and "ル190" share prefix "ル").
+      if ($wClassProx > 0
+        && $curClassNum !== NULL
+        && $candClassNum !== NULL
+        && $curClassPrefix === $candClassPrefix
+      ) {
         $diff = abs($curClassNum - $candClassNum);
         if ($diff <= $classThresh) {
           $entry['score'] += $wClassProx;
@@ -610,7 +703,12 @@ class SimilarItems extends AbstractHelper {
       }
 
       // Classification exact-match bonus (same normalized numeric part).
-      if ($wClassExact !== 0 && $curClassNum !== NULL && $candClassNum !== NULL && $curClassNum === $candClassNum) {
+      if ($wClassExact !== 0
+        && $curClassNum !== NULL
+        && $candClassNum !== NULL
+        && $curClassPrefix === $candClassPrefix
+        && $curClassNum === $candClassNum
+      ) {
         $entry['score'] += $wClassExact;
         $entry['signals'][] = ['class_exact', $wClassExact];
       }
@@ -645,7 +743,7 @@ class SimilarItems extends AbstractHelper {
             }
           }
         }
-        catch (hrowable $e) {
+        catch (\Throwable $e) {
           // Ignore.
         }
       }
@@ -686,20 +784,20 @@ class SimilarItems extends AbstractHelper {
       // Multi-match bonuses for multi-valued signals (set-based).
       if ($multiMatchOn) {
         // Author IDs.
-        if ($mapAuthorId && $wAuthorId !== 0 && $sig['author_id']) {
-          $seedVals = [$sig['author_id']];
+        if ($mapAuthorId && $wAuthorId !== 0 && !empty($sig['author_id'])) {
+          $seedVals = $sig['author_id'];
           $candVals = $this->firstStrings($it, $mapAuthorId);
-          $delta = $bonusMultiMatch($seedVals, $candVals, $wAuthorId) - (float) $wAuthorId;
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wAuthorId);
           if ($delta !== 0.0) {
             $entry['score'] += $delta;
             $entry['signals'][] = ['author_id_multi', $delta];
           }
         }
         // Authorized names.
-        if ($mapAuthName && $wAuthName !== 0 && $sig['auth_name']) {
-          $seedVals = [$sig['auth_name']];
+        if ($mapAuthName && $wAuthName !== 0 && !empty($sig['auth_name'])) {
+          $seedVals = $sig['auth_name'];
           $candVals = $this->firstStrings($it, $mapAuthName);
-          $delta = $bonusMultiMatch($seedVals, $candVals, $wAuthName) - (float) $wAuthName;
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wAuthName);
           if ($delta !== 0.0) {
             $entry['score'] += $delta;
             $entry['signals'][] = ['authorized_name_multi', $delta];
@@ -709,7 +807,7 @@ class SimilarItems extends AbstractHelper {
         if ($mapSubject && $wSubject !== 0 && !empty($sig['subject'])) {
           $seedVals = $sig['subject'];
           $candVals = $this->firstStrings($it, $mapSubject);
-          $delta = $bonusMultiMatch($seedVals, $candVals, $wSubject) - (float) $wSubject;
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wSubject);
           if ($delta !== 0.0) {
             $entry['score'] += $delta;
             $entry['signals'][] = ['subject_multi', $delta];
@@ -719,7 +817,7 @@ class SimilarItems extends AbstractHelper {
         if ($mapSeries && $wSeries !== 0 && !empty($sig['series'])) {
           $seedVals = $sig['series'];
           $candVals = $this->firstStrings($it, $mapSeries);
-          $delta = $bonusMultiMatch($seedVals, $candVals, $wSeries) - (float) $wSeries;
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wSeries);
           if ($delta !== 0.0) {
             $entry['score'] += $delta;
             $entry['signals'][] = ['series_multi', $delta];
@@ -729,7 +827,7 @@ class SimilarItems extends AbstractHelper {
         if ($mapPublisher && $wPublisher !== 0 && !empty($sig['publisher'])) {
           $seedVals = $sig['publisher'];
           $candVals = $this->firstStrings($it, $mapPublisher);
-          $delta = $bonusMultiMatch($seedVals, $candVals, $wPublisher) - (float) $wPublisher;
+          $delta = $bonusMultiMatch($seedVals, $candVals, $wPublisher);
           if ($delta !== 0.0) {
             $entry['score'] += $delta;
             $entry['signals'][] = ['publisher_multi', $delta];
@@ -809,6 +907,7 @@ class SimilarItems extends AbstractHelper {
         'properties' => $propVals,
         'buckets' => $candBuckets,
         'shelf' => $candShelf,
+        'class_prefix' => $candClassPrefix,
         'class_number' => $candClassNum,
       ];
     }
@@ -1087,7 +1186,7 @@ class SimilarItems extends AbstractHelper {
 
     // If exclude mode removed all preferred candidates, fallback to random
     // items (site-scoped when applicable) so the UI can still show entries.
-    if ($excludeSameTitle && $limit > 0 && count($diversified) === 0) {
+    if (!$excludeSameTitleNoFallback && $excludeSameTitle && $limit > 0 && count($diversified) === 0) {
       try {
         $base = [];
         if ($siteId) {
@@ -1418,17 +1517,57 @@ class SimilarItems extends AbstractHelper {
    * Parse shelf string and class number from call/class values.
    *
    * @return array
-   *   [string shelf, int|null classNumber]
+   *   [string shelf, int|null classNumber, string classPrefix]
    */
   private function parseCallAndClass(string $call, string $class): array {
     $shelf = $this->parseShelf($call);
-    // Prefer explicit class when present; if it's non-numeric, fall back to
-    // deriving from call number.
-    $classNum = $this->parseClassNumber($class !== '' ? $class : $call);
+    // Prefer explicit class when present; if it doesn't yield a number, fall
+    // back to deriving from call number.
+    $source = ($class !== '' ? $class : $call);
+    $classNum = $this->parseClassNumber($source);
     if ($classNum === NULL && $class !== '') {
-      $classNum = $this->parseClassNumber($call);
+      $source = $call;
+      $classNum = $this->parseClassNumber($source);
     }
-    return [$shelf, $classNum];
+    $classPrefix = $this->parseClassPrefix($source);
+    return [$shelf, $classNum, $classPrefix];
+  }
+
+  /**
+   * Extract the non-numeric prefix of a class/call string (up to first digit).
+   *
+   * Examples:
+   * - "ル185" -> "ル"
+   * - "QA76"  -> "QA"
+   * - "210-H" -> "" (starts with digits)
+   */
+  private function parseClassPrefix(string $s): string {
+    if ($s === '') {
+      return '';
+    }
+    try {
+      if (function_exists('mb_convert_kana')) {
+        $s = mb_convert_kana($s, 'as', 'UTF-8');
+      }
+    }
+    catch (\Throwable $e) {
+      // Ignore.
+    }
+    $s = trim($s);
+    if ($s === '') {
+      return '';
+    }
+    if (!preg_match('/^\D+/', $s, $m)) {
+      return '';
+    }
+    $prefix = (string) $m[0];
+    // Trim common separators from the end of the prefix.
+    $prefix = preg_replace('/[\s\.\-]+$/u', '', $prefix) ?? $prefix;
+    // Uppercase ASCII letters; leave other scripts (e.g., カナ) as-is.
+    if ($prefix !== '' && preg_match('/^[A-Za-z]+$/', $prefix)) {
+      $prefix = strtoupper($prefix);
+    }
+    return $prefix;
   }
 
   /**
@@ -1547,6 +1686,145 @@ class SimilarItems extends AbstractHelper {
     $call = $mapCall ? ($this->firstString($res, $mapCall) ?? '') : '';
     $class = $mapClass ? ($this->firstString($res, $mapClass) ?? '') : '';
     return $this->evalBuckets($bucketRules, (string) $call, (string) $class);
+  }
+
+  /**
+   * Public utility: compute debug seed info for a resource.
+   *
+   * Intended for the async endpoint when `debug=1`.
+   *
+   * @return array
+   *   Seed debug payload with keys: id, title, base_title, cur_buckets, values.
+   */
+  public function computeDebugSeedForResource(AbstractResourceEntityRepresentation $res): array {
+    $mapCall = (string) ($this->settings->get('similaritems.map.call_number') ?? '');
+    $mapClass = (string) ($this->settings->get('similaritems.map.class_number') ?? '');
+    $mapBib = (string) ($this->settings->get('similaritems.map.bibid') ?? '');
+    $mapAuthorId = (string) ($this->settings->get('similaritems.map.author_id') ?? '');
+    $mapAuthName = (string) ($this->settings->get('similaritems.map.authorized_name') ?? '');
+    $mapSubject = (string) ($this->settings->get('similaritems.map.subject') ?? '');
+    $mapLocation = (string) ($this->settings->get('similaritems.map.location') ?? '');
+    $mapIssued = (string) ($this->settings->get('similaritems.map.issued') ?? '');
+    $mapMaterial = (string) ($this->settings->get('similaritems.map.material_type') ?? '');
+    $mapViewing = (string) ($this->settings->get('similaritems.map.viewing_direction') ?? '');
+    $mapSeries = (string) ($this->settings->get('similaritems.map.series_title') ?? '');
+    $mapPublisher = (string) ($this->settings->get('similaritems.map.publisher') ?? '');
+
+    $title = '';
+    try {
+      $title = (string) $res->displayTitle();
+    }
+    catch (\Throwable $e) {
+      $title = '';
+    }
+
+    $baseTitle = '';
+    if ($title !== '') {
+      try {
+        $baseTitle = $this->normalizeTitleBase($title);
+      }
+      catch (\Throwable $e) {
+        $baseTitle = '';
+      }
+    }
+
+    $bucketRules = (string) ($this->settings->get('similaritems.bucket_rules') ?? '');
+    $call = (string) ($mapCall ? ($this->firstString($res, $mapCall) ?? '') : '');
+    $class = (string) ($mapClass ? ($this->firstString($res, $mapClass) ?? '') : '');
+    $curBucketKeys = $this->evalBuckets($bucketRules, $call, $class);
+    [$curShelf, $curClassNum, $curClassPrefix] = $this->parseCallAndClass($call, $class);
+
+    $propVals = [];
+    try {
+      if ($mapBib) {
+        $vals = $this->firstStrings($res, $mapBib);
+        if (!empty($vals)) {
+          $propVals[$mapBib] = $vals;
+        }
+      }
+      if ($mapAuthorId) {
+        $vals = $this->firstStrings($res, $mapAuthorId);
+        if (!empty($vals)) {
+          $propVals[$mapAuthorId] = $vals;
+        }
+      }
+      if ($mapAuthName) {
+        $vals = $this->firstStrings($res, $mapAuthName);
+        if (!empty($vals)) {
+          $propVals[$mapAuthName] = $vals;
+        }
+      }
+      if ($mapSubject) {
+        $vals = $this->firstStrings($res, $mapSubject);
+        if (!empty($vals)) {
+          $propVals[$mapSubject] = $vals;
+        }
+      }
+      if ($mapSeries) {
+        $vals = $this->firstStrings($res, $mapSeries);
+        if (!empty($vals)) {
+          $propVals[$mapSeries] = $vals;
+        }
+      }
+      if ($mapPublisher) {
+        $vals = $this->firstStrings($res, $mapPublisher);
+        if (!empty($vals)) {
+          $propVals[$mapPublisher] = $vals;
+        }
+      }
+      if ($mapCall) {
+        $vals = $this->firstStrings($res, $mapCall);
+        if (!empty($vals)) {
+          $propVals[$mapCall] = $vals;
+        }
+      }
+      if ($mapClass) {
+        $vals = $this->firstStrings($res, $mapClass);
+        if (!empty($vals)) {
+          $propVals[$mapClass] = $vals;
+        }
+      }
+      if ($mapLocation) {
+        $vals = $this->firstStrings($res, $mapLocation);
+        if (!empty($vals)) {
+          $propVals[$mapLocation] = $vals;
+        }
+      }
+      if ($mapIssued) {
+        $vals = $this->firstStrings($res, $mapIssued);
+        if (!empty($vals)) {
+          $propVals[$mapIssued] = $vals;
+        }
+      }
+      if ($mapMaterial) {
+        $vals = $this->firstStrings($res, $mapMaterial);
+        if (!empty($vals)) {
+          $propVals[$mapMaterial] = $vals;
+        }
+      }
+      if ($mapViewing) {
+        $vals = $this->firstStrings($res, $mapViewing);
+        if (!empty($vals)) {
+          $propVals[$mapViewing] = $vals;
+        }
+      }
+    }
+    catch (\Throwable $e) {
+      // Ignore debug value collection errors.
+    }
+
+    return [
+      'id' => (int) $res->id(),
+      'title' => $title,
+      'base_title' => $baseTitle,
+      'cur_buckets' => $curBucketKeys,
+      'values' => [
+        'properties' => $propVals,
+        'shelf' => $curShelf,
+        'class_prefix' => $curClassPrefix,
+        'class_number' => $curClassNum,
+      ],
+    ];
   }
 
 }
