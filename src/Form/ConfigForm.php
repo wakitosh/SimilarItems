@@ -849,7 +849,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_group_title_rules',
         'options' => [
           'label' => 'タイトルルール',
-          'info' => 'ベースタイトルの抽出に用いる区切り文字を指定します（巻号・番号等を除去）。',
+          'info' => 'ベースタイトルの抽出に用いる区切り文字を指定します（巻号・番号等を除去）。区切り文字は「指定した文字列の完全一致」で判定します（前後のスペースも含めて区切りの一部になります）。',
         ],
       ])
       ->add([
@@ -857,7 +857,7 @@ class ConfigForm extends Form {
         'type' => 'text',
         'options' => [
           'label' => ' ',
-          'info' => 'ベースタイトルの抽出に用いる区切り文字を指定します（巻号・番号等を除去）。',
+          'info' => 'ベースタイトルの抽出に用いる区切り文字を指定します（巻号・番号等を除去）。区切り文字は「指定した文字列の完全一致」で判定します（前後のスペースも含めて区切りの一部になります）。',
         ],
         'attributes' => [
           'id' => 'similaritems_group_title_rules_info',
@@ -871,7 +871,7 @@ class ConfigForm extends Form {
                   // @translate
           'label' => 'タイトルと巻号の区切り文字',
                   // @translate
-          'info' => 'ベースタイトルを判定するために、タイトルと巻号を区切る文字列を1行に1つ指定します (例: 「 , 」)。',
+          'info' => 'ベースタイトルを判定するために、タイトルと巻号を区切る文字列を1行に1つ指定します。判定は完全一致です（前後のスペースも含みます）。例: 「 , 」を指定した場合、「, 」では一致しません。',
         ],
         'attributes' => [
           'id' => 'similaritems_title_volume_separators',

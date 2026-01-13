@@ -111,7 +111,7 @@ class SimilarItems extends AbstractHelper {
       $weightItemSets = (int) $options['item_sets_weight'];
     }
     $itemSetsSeedOnly = (bool) ($options['item_sets_seed_only'] ?? FALSE);
-    $applyItemSetsWeight = !$itemSetsSeedOnly && $weightItemSets > 0;
+    $applyItemSetsWeight = !$itemSetsSeedOnly && $weightItemSets !== 0;
 
     // Mapping terms.
     $mapCall = (string) ($this->settings->get('similaritems.map.call_number') ?? '');
@@ -570,10 +570,6 @@ class SimilarItems extends AbstractHelper {
         if (!isset($candidates[$id])) {
           $candidates[$id] = ['resource' => $it, 'score' => 0.0, 'signals' => []];
         }
-        if ($applyItemSetsWeight) {
-          $candidates[$id]['score'] += $weightItemSets;
-          $candidates[$id]['signals'][] = ['item_sets', $weightItemSets];
-        }
         if (count($candidates) >= $maxCandidates) {
           break;
         }
@@ -634,6 +630,41 @@ class SimilarItems extends AbstractHelper {
     foreach ($candidates as &$entry) {
       /** @var \Omeka\Api\Representation\AbstractResourceEntityRepresentation $it */
       $it = $entry['resource'];
+
+      // Apply property-based weights on overlap, even for candidates that
+      // entered the pool via other mechanisms (bucket expansion, item sets,
+      // random fallback, etc.). This is important for negative weights.
+      $applyPropOverlap = function (string $term, int $weight, array $seedVals, array $candVals) use (&$entry): void {
+        if ($term === '' || $weight === 0) {
+          return;
+        }
+        if (empty($seedVals) || empty($candVals)) {
+          return;
+        }
+        // Avoid double-counting: if the candidate was already scored for this
+        // property term during candidate collection, skip.
+        if (isset($entry['__prop_hit']) && is_array($entry['__prop_hit']) && isset($entry['__prop_hit'][$term])) {
+          return;
+        }
+        $s = array_unique(array_filter(array_map('strval', $seedVals), static function ($v): bool {
+          return $v !== '';
+        }));
+        $c = array_unique(array_filter(array_map('strval', $candVals), static function ($v): bool {
+          return $v !== '';
+        }));
+        if (empty($s) || empty($c)) {
+          return;
+        }
+        if (count(array_intersect($s, $c)) < 1) {
+          return;
+        }
+        if (!isset($entry['__prop_hit']) || !is_array($entry['__prop_hit'])) {
+          $entry['__prop_hit'] = [];
+        }
+        $entry['__prop_hit'][$term] = TRUE;
+        $entry['score'] += $weight;
+        $entry['signals'][] = ["prop:$term", $weight];
+      };
       // Serendipity: penalize near-duplicate title base (when enabled).
       if ($baseTitle !== '') {
         try {
@@ -673,24 +704,79 @@ class SimilarItems extends AbstractHelper {
           // Ignore.
         }
       }
+
+      // Property weights (base components) for candidates added by non-prop
+      // mechanisms.
+      // Bibid weight is only relevant when demote-same-bibid is disabled.
+      if (!$demoteSameBib && $mapBib && $wBib !== 0 && $sig['bibid']) {
+        try {
+          $candBib = (string) ($this->firstString($it, $mapBib) ?? '');
+          if ($candBib !== '') {
+            $applyPropOverlap($mapBib, $wBib, [(string) $sig['bibid']], [$candBib]);
+          }
+        }
+        catch (\Throwable $e) {
+          // Ignore.
+        }
+      }
+      if ($mapAuthorId && $wAuthorId !== 0 && !empty($sig['author_id'])) {
+        try {
+          $applyPropOverlap($mapAuthorId, $wAuthorId, $sig['author_id'], $this->firstStrings($it, $mapAuthorId));
+        }
+        catch (\Throwable $e) {
+          // Ignore.
+        }
+      }
+      if ($mapAuthName && $wAuthName !== 0 && !empty($sig['auth_name'])) {
+        try {
+          $applyPropOverlap($mapAuthName, $wAuthName, $sig['auth_name'], $this->firstStrings($it, $mapAuthName));
+        }
+        catch (\Throwable $e) {
+          // Ignore.
+        }
+      }
+      if ($mapSubject && $wSubject !== 0 && !empty($sig['subject'])) {
+        try {
+          $applyPropOverlap($mapSubject, $wSubject, $sig['subject'], $this->firstStrings($it, $mapSubject));
+        }
+        catch (\Throwable $e) {
+          // Ignore.
+        }
+      }
+      if ($mapSeries && $wSeries !== 0 && !empty($sig['series'])) {
+        try {
+          $applyPropOverlap($mapSeries, $wSeries, $sig['series'], $this->firstStrings($it, $mapSeries));
+        }
+        catch (\Throwable $e) {
+          // Ignore.
+        }
+      }
+      if ($mapPublisher && $wPublisher !== 0 && !empty($sig['publisher'])) {
+        try {
+          $applyPropOverlap($mapPublisher, $wPublisher, $sig['publisher'], $this->firstStrings($it, $mapPublisher));
+        }
+        catch (\Throwable $e) {
+          // Ignore.
+        }
+      }
       // Ensure string types to satisfy strict signatures.
       $call = (string) ($mapCall ? ($this->firstString($it, $mapCall) ?? '') : '');
       $class = (string) ($mapClass ? ($this->firstString($it, $mapClass) ?? '') : '');
       $candBuckets = $this->evalBuckets($bucketRules, $call, $class);
-      if ($wBucket > 0 && $curBucketKeys && $candBuckets) {
+      if ($wBucket !== 0 && $curBucketKeys && $candBuckets) {
         if (count(array_intersect($curBucketKeys, $candBuckets)) > 0) {
           $entry['score'] += $wBucket;
           $entry['signals'][] = ['bucket', $wBucket];
         }
       }
       [$candShelf, $candClassNum, $candClassPrefix] = $this->parseCallAndClass($call, $class);
-      if ($wShelf > 0 && $curShelf && $candShelf && $curShelf === $candShelf) {
+      if ($wShelf !== 0 && $curShelf && $candShelf && $curShelf === $candShelf) {
         $entry['score'] += $wShelf;
         $entry['signals'][] = ['shelf', $wShelf];
       }
       // Classification proximity only applies when the non-numeric prefix
       // matches (e.g., "ル185" and "ル190" share prefix "ル").
-      if ($wClassProx > 0
+      if ($wClassProx !== 0
         && $curClassNum !== NULL
         && $candClassNum !== NULL
         && $curClassPrefix === $candClassPrefix
@@ -713,7 +799,7 @@ class SimilarItems extends AbstractHelper {
         $entry['signals'][] = ['class_exact', $wClassExact];
       }
       // Material type equality (light boost).
-      if ($wMaterial > 0 && $mapMaterial) {
+      if ($wMaterial !== 0 && $mapMaterial) {
         try {
           $curMat = isset($sig['material']) ? (string) ($sig['material'] ?? '') : '';
           $candMat = (string) ($this->firstString($it, $mapMaterial) ?? '');
@@ -748,7 +834,7 @@ class SimilarItems extends AbstractHelper {
         }
       }
       // Issued proximity (within threshold years, light boost).
-      if ($wIssuedProx > 0 && $mapIssued && $issuedThresh >= 0) {
+      if ($wIssuedProx !== 0 && $mapIssued && $issuedThresh >= 0) {
         try {
           $curYear = $this->parseYear((string) ($sig['issued'] ?? ''));
           $candIssued = (string) ($this->firstString($it, $mapIssued) ?? '');
@@ -1281,39 +1367,22 @@ class SimilarItems extends AbstractHelper {
         $lines = preg_split('/\R+/', $rawSeps) ?: [];
         $seps = [];
         foreach ($lines as $ln) {
-          $s = trim((string) $ln);
-          if ($s !== '') {
-            // Normalize whitespace inside separator to single space for
-            // matching.
-            $norm = preg_replace('/\s+/u', ' ', $s);
-            $seps[] = $norm ?? $s;
+          // Keep leading/trailing spaces: a separator like " , " must be
+          // treated strictly (not as ","). Ignore lines that are only
+          // whitespace.
+          $s = (string) $ln;
+          if (!preg_match('/\S/u', $s)) {
+            continue;
           }
+          // Normalize runs of whitespace to a single space, but preserve
+          // presence of leading/trailing spaces.
+          $norm = preg_replace('/\s+/u', ' ', $s);
+          $seps[] = $norm ?? $s;
         }
         if (!empty($seps)) {
           foreach ($seps as $sep) {
-            // Try several lenient variants: exact, trimmed, and around comma
-            // without spaces.
-            $cands = [];
-            $trimSep = trim($sep);
-            $cands[] = $sep;
-            if ($trimSep !== $sep) {
-              $cands[] = $trimSep;
-            }
-            // If separator contains a comma, also try Japanese comma
-            // variants and spacing variants.
-            if (mb_strpos($trimSep, ',') !== FALSE) {
-              $noSpace = str_replace(' ', '', $trimSep);
-              if ($noSpace !== $trimSep) {
-                $cands[] = $noSpace;
-              }
-              // Fullwidth comma.
-              $cands[] = str_replace(',', '，', $trimSep);
-              // Japanese toten.
-              $cands[] = str_replace(',', '、', $trimSep);
-              // Also without spaces for these.
-              $cands[] = str_replace(' ', '', str_replace(',', '，', $trimSep));
-              $cands[] = str_replace(' ', '', str_replace(',', '、', $trimSep));
-            }
+            // Be strict: only the configured separator should match.
+            $cands = [$sep];
             $cut = FALSE;
             foreach ($cands as $cand) {
               $pos = mb_stripos($t, $cand);
@@ -1429,6 +1498,10 @@ class SimilarItems extends AbstractHelper {
     if (!is_array($data) || !isset($data['buckets']) || !is_array($data['buckets'])) {
       return [];
     }
+    // Normalize labeled values like "CAL:ル205" or "NDC9:210".
+    $call = $this->stripLeadingLabel($call);
+    $class = $this->stripLeadingLabel($class);
+
     // Build context. If class is empty, derive numeric class from call
     // (e.g., "210-H..." -> "210").
     $classNorm = (string) $class;
@@ -1479,6 +1552,25 @@ class SimilarItems extends AbstractHelper {
     if (!is_array($cond)) {
       return FALSE;
     }
+
+    // Support nested boolean groups.
+    if (isset($cond['all']) && is_array($cond['all'])) {
+      foreach ($cond['all'] as $c) {
+        if (!$this->evalCond($c, $ctx)) {
+          return FALSE;
+        }
+      }
+      return TRUE;
+    }
+    if (isset($cond['any']) && is_array($cond['any'])) {
+      foreach ($cond['any'] as $c) {
+        if ($this->evalCond($c, $ctx)) {
+          return TRUE;
+        }
+      }
+      return FALSE;
+    }
+
     $field = isset($cond['field']) ? (string) $cond['field'] : '';
     $op = isset($cond['op']) ? (string) $cond['op'] : '';
     $value = isset($cond['value']) ? (string) $cond['value'] : '';
@@ -1520,6 +1612,8 @@ class SimilarItems extends AbstractHelper {
    *   [string shelf, int|null classNumber, string classPrefix]
    */
   private function parseCallAndClass(string $call, string $class): array {
+    $call = $this->stripLeadingLabel($call);
+    $class = $this->stripLeadingLabel($class);
     $shelf = $this->parseShelf($call);
     // Prefer explicit class when present; if it doesn't yield a number, fall
     // back to deriving from call number.
@@ -1545,6 +1639,7 @@ class SimilarItems extends AbstractHelper {
     if ($s === '') {
       return '';
     }
+    $s = $this->stripLeadingLabel($s);
     try {
       if (function_exists('mb_convert_kana')) {
         $s = mb_convert_kana($s, 'as', 'UTF-8');
@@ -1578,7 +1673,7 @@ class SimilarItems extends AbstractHelper {
       return '';
     }
     // Normalize common Unicode separators to ASCII for robust prefix parsing.
-    $s = (string) $call;
+    $s = $this->stripLeadingLabel((string) $call);
     // 1) Convert fullwidth alphanumerics and spaces to ASCII when available.
     // This fixes cases like "２１０-H12" vs "210-H12".
     try {
@@ -1607,12 +1702,13 @@ class SimilarItems extends AbstractHelper {
     if (preg_match('/^\d+/', $s, $m)) {
       return strtoupper($m[0]);
     }
-    // If starts with 1–3 ASCII letters (e.g., QA76), return that.
-    if (preg_match('/^[A-Za-z]{1,3}/', $s, $m)) {
-      return strtoupper($m[0]);
+    // Prefer the non-numeric prefix up to the first digit (e.g., "ル185" -> "ル",
+    // "QA76" -> "QA").
+    $prefix = $this->parseClassPrefix($s);
+    if ($prefix !== '') {
+      return $prefix;
     }
-    // Fallback: take until first space, dot, or hyphen
-    // (Unicode-normalized above).
+    // Fallback: take until the first separator.
     if (preg_match('/^[^\s\.\-]+/u', $s, $m)) {
       return strtoupper($m[0]);
     }
@@ -1626,6 +1722,7 @@ class SimilarItems extends AbstractHelper {
     if ($s === '') {
       return NULL;
     }
+    $s = $this->stripLeadingLabel($s);
     // Normalize fullwidth alphanumerics to ASCII for digit extraction.
     try {
       if (function_exists('mb_convert_kana')) {
@@ -1668,6 +1765,33 @@ class SimilarItems extends AbstractHelper {
       return $y;
     }
     return NULL;
+  }
+
+  /**
+   * Strip leading scheme-like labels that end with a colon.
+   *
+   * Examples:
+   * - "CAL:ル205"  -> "ル205"
+   * - "NDC9:210"  -> "210"
+   * - "NDC6: 913" -> "913"
+   */
+  private function stripLeadingLabel(string $s): string {
+    $s = trim($s);
+    if ($s === '') {
+      return '';
+    }
+    // Remove up to a few nested labels defensively.
+    for ($i = 0; $i < 3; $i++) {
+      if (!preg_match('/^[A-Za-z]{2,10}[0-9]{0,2}[:\x{FF1A}]\s*/u', $s)) {
+        break;
+      }
+      $s = preg_replace('/^[A-Za-z]{2,10}[0-9]{0,2}[:\x{FF1A}]\s*/u', '', $s) ?? $s;
+      $s = trim($s);
+      if ($s === '') {
+        return '';
+      }
+    }
+    return $s;
   }
 
   /**

@@ -6,7 +6,7 @@ The display is controlled by the active theme, while all recommendation logic is
 
 ## Features
 
-- **Configurable Scoring Engine**: Fine-tune recommendation relevance using multiple weighted signals (Author ID, Authorized name, Subject, Series title, Publisher, Domain buckets, Item sets, etc.).
+- **Configurable Scoring Engine**: Fine-tune recommendation relevance using multiple weighted signals (Author ID, Authorized name, Subject, Series title, Publisher, Domain buckets, Item sets, etc.). Weights can be positive (boost) or negative (penalty).
 - **Async Loading**: Recommendations are loaded via a JSON API after the main page content, preventing slow page loads.
 - **Advanced Serendipity Control**: Promote diversity by penalizing items from the same series (BibID) and same base title, with final-stage diversification by base title.
 - **Smart Candidate Expansion**: Expands the candidate pool using item sets and mapped properties (Author/Subject/Series/Publisher), with an internal hard cap to keep performance predictable.
@@ -64,11 +64,13 @@ Introduces intentional randomness to the results to promote serendipity (acciden
 Connects the concepts used by the module (e.g., Call Number, Author ID) to the properties in your Omeka S vocabulary. Properties are grouped by their role in the recommendation process.
 
 - **Candidate Selection + Scoring**:
-  - When a property value matches, the item is selected as a candidate *and* its score is increased. These are the primary signals for relevance.
+  - These are the primary signals for relevance. When a property value overlaps between the seed item and a candidate, its score is adjusted (positive or negative weight).
+  - Note: candidates can enter the pool via expansion (e.g., item sets or bucket expansion) and still receive property-based scoring when values overlap.
   - Properties (typical): `Author ID`, `Authorized name (weak)`, `Subject`, `Series title`, `Publisher`.
 
 - **Shelf Scoring (Scoring Only)**:
-  - Maps the `Call number` property. It is not used for candidate expansion. A score bonus is applied to candidates on the same shelf.
+  - Maps the `Call number` property. It is not used for candidate expansion. A score bonus/penalty is applied to candidates on the same shelf.
+  - Shelf key extraction uses the leading non-numeric prefix for alphanumeric/kana call numbers (e.g., `ル185` → `ル`, `QA76` → `QA`). For purely numeric call numbers, the leading digits are used.
 
 - **Proximity & Equality (Scoring Only)**:
   - These properties are not used for initial candidate selection. They only add to the score if a candidate meets a proximity or equality condition.
@@ -86,7 +88,9 @@ Connects the concepts used by the module (e.g., Call Number, Author ID) to the p
 Configures the scoring weights and proximity thresholds. Higher weights give a signal more influence over the final score.
 
 - **Weights**:
-  - The base score added when a match or proximity is detected for each property (e.g., `Author ID`) or concept (e.g., `Shelf`, `Class proximity`).
+- **Weights**:
+  - The base score applied when a match or proximity is detected for each property (e.g., `Author ID`) or concept (e.g., `Shelf`, `Class proximity`).
+  - Negative weights are allowed and act as penalties.
 - **Thresholds**:
   - `Class proximity threshold`: Items with class numbers within this range are considered "close."
   - `Issued proximity threshold`: Items with publication years within this range are considered "close."
@@ -103,7 +107,9 @@ Settings designed to increase the diversity of results and promote discovery by 
 
 #### Title Rules
 
-- **Title-volume separators**: Define characters or strings used to separate a base title from volume information (e.g., ` , `, ` - `, ` : `). This helps the module correctly identify items belonging to the same series.
+- **Title-volume separators**: Define strings used to separate a base title from volume information (e.g., ` , `, ` - `, ` : `).
+  - Matching is **exact** (the configured string must appear as-is; leading/trailing spaces are significant).
+  - Example: if you configure ` , ` then `, ` will **not** be treated as a separator.
 
 #### Domain Bucket Rules (JSON)
 
@@ -384,7 +390,9 @@ MIT
 
 #### タイトルルール
 
-- **タイトル・巻の区切り文字**: ベースタイトルと巻数情報を区切る文字や文字列を定義します（例：` , `, ` - `, ` : `）。これにより、モジュールが同じシリーズに属するアイテムを正しく識別できます。
+- **タイトル・巻の区切り文字**: ベースタイトルと巻数情報を区切る文字列を定義します（例：` , `, ` - `, ` : `）。
+  - 判定は **完全一致**（指定した文字列がそのまま現れた場合のみ区切りとみなします。前後のスペースも区切りの一部です）。
+  - 例：` , ` を指定した場合、`, ` は区切りとして扱われません。
 
 #### 分野バケットのルール（JSON）
 

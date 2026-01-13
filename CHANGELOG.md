@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.3] - 2026-01-13
+
+### EN
+
+#### Fixed
+- Shelf/class proximity and bucket evaluation now strip leading labels like `CAL:` and `NDC9:`/`NDC6:` (including fullwidth colon `：`) before parsing and comparison.
+- Title–volume separators used for base-title normalization are now matched strictly by exact string (including leading/trailing spaces), with no lenient comma/spacing variants.
+- Scoring now honors negative weights consistently across signals (bucket/shelf/class proximity/material/issued/item sets) and applies property overlap scoring even when candidates are added via expansion.
+- Shelf key parsing now prefers the non-numeric prefix for alphanumeric/kana call numbers (e.g. `ル185` → `ル`).
+
+### 日本語
+
+#### 修正
+- 棚番号／分類近接および分野バケット判定において、`CAL:` や `NDC9:` `NDC6:` 等の「ラベル＋コロン」（全角コロン `：` を含む）が先頭に付く場合でも、ラベル部分を除去した値で判定するように修正しました。
+- ベースタイトル抽出に用いる「タイトルと巻号の区切り文字」を、指定した文字列の完全一致（前後スペースを含む）で判定するように変更しました（カンマやスペースのゆるい同一視は行いません）。
+- 負の重みが一部のシグナルで反映されない不具合を修正しました（バケット/棚/分類近接/資料種別/出版年近接/アイテムセット）。また、拡大で入った候補にもプロパティ一致（著者・主題等）を適用します。
+- 棚番号の抽出を改善し、英字/仮名+数字の記号は非数字プレフィックスを採用するようにしました（例: `ル185` → `ル`）。
+
+## [0.4.2] - 2026-01-13
+
+### EN
+
+#### Fixed
+- Domain bucket rule evaluation now correctly supports nested boolean groups (`all`/`any`) inside other groups. This fixes cases like a Literature bucket rule that intends: `call_number` starts with "ル" AND does NOT start with "ル185".
+
+### 日本語
+
+#### 修正
+- 分野バケットの条件評価で、条件の入れ子（`any` の中に `all` を置く等）が正しく評価されない問題を修正しました。これにより「`ル` で始まり、かつ `ル185` では始まらない」などの条件が意図どおりに機能します。
+
 ## [0.4.1] - 2025-12-18
 
 ### EN
