@@ -1361,6 +1361,7 @@ class SimilarItems extends AbstractHelper {
     // Normalize whitespace early to make separator matching robust.
     $t = preg_replace('/\s+/u', ' ', $t) ?? $t;
     // Apply configured title-volume separators first (cut right-hand part).
+    $useConfiguredSeparatorsOnly = FALSE;
     try {
       $rawSeps = (string) ($this->settings->get('similaritems.title_volume_separators') ?? '');
       if ($rawSeps !== '') {
@@ -1380,6 +1381,10 @@ class SimilarItems extends AbstractHelper {
           $seps[] = $norm ?? $s;
         }
         if (!empty($seps)) {
+          // When separators are explicitly configured, treat them as the only
+          // base-title rule: do not apply automatic trailing digit/volume
+          // stripping heuristics.
+          $useConfiguredSeparatorsOnly = TRUE;
           foreach ($seps as $sep) {
             // Be strict: only the configured separator should match.
             $cands = [$sep];
@@ -1405,6 +1410,14 @@ class SimilarItems extends AbstractHelper {
     // Normalize spaces and ASCII case for rough match (again, post-split).
     $t = preg_replace('/\s+/u', ' ', $t) ?? $t;
     $t = mb_strtolower($t);
+
+    // If separators are configured, we only split on those strings.
+    // Do not strip trailing digits/volume markers, since that can remove
+    // meaningful content like years ("1840") or cataloged parts ("存1巻").
+    if ($useConfiguredSeparatorsOnly) {
+      return trim($t);
+    }
+
     // Remove common volume markers.
     $patterns = [
       // Arabic numerals.

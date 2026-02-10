@@ -110,6 +110,7 @@ Settings designed to increase the diversity of results and promote discovery by 
 - **Title-volume separators**: Define strings used to separate a base title from volume information (e.g., ` , `, ` - `, ` : `).
   - Matching is **exact** (the configured string must appear as-is; leading/trailing spaces are significant).
   - Example: if you configure ` , ` then `, ` will **not** be treated as a separator.
+  - When this setting is configured (non-empty), separators are the **only** base-title rule: the module will not automatically strip trailing numbers/years/volume markers unless a configured separator matches.
 
 #### Domain Bucket Rules (JSON)
 
