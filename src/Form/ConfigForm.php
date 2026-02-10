@@ -18,7 +18,7 @@ use Laminas\Form\Form;
 class ConfigForm extends Form {
 
   /**
-   * Initialize form elements for Similar Items module settings.
+   * Initialize the SimilarItems module configuration form.
    */
   public function init(): void {
     $this
@@ -212,6 +212,7 @@ class ConfigForm extends Form {
           'style' => 'display:none;',
         ],
       ])
+      /*
       ->add([
         'type' => Fieldset::class,
         'name' => 'similaritems_group_mapping_select_weight',
@@ -233,12 +234,13 @@ class ConfigForm extends Form {
           'style' => 'display:none;',
         ],
       ])
+      */
       ->add([
         'name' => 'similaritems_map_author_id',
         'type' => PropertySelectElement::class,
         'options' => [
           'label' => 'プロパティ対応付け: 著者ID（候補に追加＋スコア加算）',
-          'info' => '同一著者IDのアイテムを候補に追加し、重みに応じてスコアを加算します。',
+          'info' => '同一著者IDのアイテムを候補に追加し、重みに応じてスコアを加算します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -254,7 +256,7 @@ class ConfigForm extends Form {
         'type' => PropertySelectElement::class,
         'options' => [
           'label' => 'プロパティ対応付け: 著者名典拠形（候補に追加＋スコア加算・弱）',
-          'info' => '著者IDがない場合のフォールバック。候補への追加とスコア加算に使用しますが、IDより弱いシグナルです。',
+          'info' => '著者IDがない場合のフォールバック。候補への追加とスコア加算に使用しますが、IDより弱いシグナルです。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -270,7 +272,7 @@ class ConfigForm extends Form {
         'type' => PropertySelectElement::class,
         'options' => [
           'label' => 'プロパティ対応付け: 主題（候補に追加＋スコア加算）',
-          'info' => '同一主題のアイテムを候補に追加し、重みに応じてスコアを加算します。',
+          'info' => '同一主題のアイテムを候補に追加し、重みに応じてスコアを加算します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -286,7 +288,7 @@ class ConfigForm extends Form {
         'type' => PropertySelectElement::class,
         'options' => [
           'label' => 'プロパティ対応付け: シリーズタイトル（候補に追加＋スコア加算）',
-          'info' => '同一シリーズタイトルのアイテムを候補に追加し、重みに応じてスコアを加算します。',
+          'info' => '同一シリーズタイトルのアイテムを候補に追加し、重みに応じてスコアを加算します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -302,7 +304,7 @@ class ConfigForm extends Form {
         'type' => PropertySelectElement::class,
         'options' => [
           'label' => 'プロパティ対応付け: 出版者（候補に追加＋スコア加算）',
-          'info' => '同一出版者のアイテムを候補に追加し、重みに応じてスコアを加算します。',
+          'info' => '同一出版者のアイテムを候補に追加し、重みに応じてスコアを加算します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -313,6 +315,7 @@ class ConfigForm extends Form {
           'data-placeholder' => '出版者のプロパティを選択…',
         ],
       ])
+      /*
       ->add([
         'type' => Fieldset::class,
         'name' => 'similaritems_group_mapping_shelf',
@@ -333,11 +336,12 @@ class ConfigForm extends Form {
           'style' => 'display:none;',
         ],
       ])
+      */
       ->add([
         'name' => 'similaritems_map_call_number',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 請求記号（棚のスコア加算）',
+          'label' => 'プロパティ対応付け: 請求記号（加点のみ）',
           'info' => '候補拡大には使用しません。同一棚の候補には「重み: 棚記号」によるスコア加算が入ります。',
           'empty_option' => '',
           'term_as_value' => TRUE,
@@ -349,6 +353,7 @@ class ConfigForm extends Form {
           'data-placeholder' => '請求記号のプロパティを選択…',
         ],
       ])
+      /*
       ->add([
         'type' => Fieldset::class,
         'name' => 'similaritems_group_mapping_boosts',
@@ -369,6 +374,7 @@ class ConfigForm extends Form {
           'style' => 'display:none;',
         ],
       ])
+      */
       ->add([
         'name' => 'similaritems_map_class_number',
         'type' => PropertySelectElement::class,
@@ -452,59 +458,65 @@ class ConfigForm extends Form {
           'class' => 'chosen-select',
           'data-placeholder' => '書誌IDのプロパティを選択…',
         ],
-      ])
-      ->add([
-        'type' => Fieldset::class,
-        'name' => 'similaritems_group_mapping_debug',
-        'options' => [
-          'label' => 'デバッグ用',
-          'info' => 'スコアには影響しません。デバッグのために値を確認する用途です。',
-        ],
-      ])
-      ->add([
-        'name' => 'similaritems_group_mapping_debug_info',
-        'type' => 'text',
-        'options' => [
-          'label' => ' ',
-          'info' => 'スコアには影響しません。デバッグのために値を確認する用途です。',
-        ],
-        'attributes' => [
-          'id' => 'similaritems_group_mapping_debug_info',
-          'style' => 'display:none;',
-        ],
-      ])
-      ->add([
-        'name' => 'similaritems_map_location',
-        'type' => PropertySelectElement::class,
-        'options' => [
-          'label' => 'プロパティ対応付け: 出版地（デバッグ用）',
-          'info' => 'スコアには影響しません。デバッグ用に値を表示します。',
-          'empty_option' => '',
-          'term_as_value' => TRUE,
-          'use_hidden_element' => TRUE,
-        ],
-        'attributes' => [
-          'id' => 'similaritems_map_location',
-          'class' => 'chosen-select',
-          'data-placeholder' => '出版地のプロパティを選択…',
-        ],
-      ])
-      ->add([
-        'name' => 'similaritems_map_viewing_direction',
-        'type' => PropertySelectElement::class,
-        'options' => [
-          'label' => 'プロパティ対応付け: 閲覧方向（デバッグ用）',
-          'info' => 'スコアには影響しません。デバッグ用に値を表示します。',
-          'empty_option' => '',
-          'term_as_value' => TRUE,
-          'use_hidden_element' => TRUE,
-        ],
-        'attributes' => [
-          'id' => 'similaritems_map_viewing_direction',
-          'class' => 'chosen-select',
-          'data-placeholder' => '閲覧方向のプロパティを選択…',
-        ],
       ]);
+    /*
+    ->add([
+    'type' => Fieldset::class,
+    'name' => 'similaritems_group_mapping_debug',
+    'options' => [
+    'label' => 'デバッグ用',
+    'info' => 'スコアには影響しません。デバッグのために値を確認する用途です。',
+    ],
+    'attributes' => [
+    'style' => 'display:none;',
+    ],
+    ])
+    ->add([
+    'name' => 'similaritems_group_mapping_debug_info',
+    'type' => 'text',
+    'options' => [
+    'label' => ' ',
+    'info' => 'スコアには影響しません。デバッグのために値を確認する用途です。',
+    ],
+    'attributes' => [
+    'id' => 'similaritems_group_mapping_debug_info',
+    'style' => 'display:none;',
+    ],
+    ])
+    ->add([
+    'name' => 'similaritems_map_location',
+    'type' => PropertySelectElement::class,
+    'options' => [
+    'label' => 'プロパティ対応付け: 出版地（デバッグ用）',
+    'info' => 'スコアには影響しません。デバッグ用に値を表示します。',
+    'empty_option' => '',
+    'term_as_value' => TRUE,
+    'use_hidden_element' => TRUE,
+    ],
+    'attributes' => [
+    'id' => 'similaritems_map_location',
+    'class' => 'chosen-select',
+    'data-placeholder' => '出版地のプロパティを選択…',
+    'style' => 'display:none;',
+    ],
+    ])
+    ->add([
+    'name' => 'similaritems_map_viewing_direction',
+    'type' => PropertySelectElement::class,
+    'options' => [
+    'label' => 'プロパティ対応付け: 閲覧方向（デバッグ用）',
+    'info' => 'スコアには影響しません。デバッグ用に値を表示します。',
+    'empty_option' => '',
+    'term_as_value' => TRUE,
+    'use_hidden_element' => TRUE,
+    ],
+    'attributes' => [
+    'id' => 'similaritems_map_viewing_direction',
+    'class' => 'chosen-select',
+    'data-placeholder' => '閲覧方向のプロパティを選択…',
+    'style' => 'display:none;',
+    ],
+    ])*/
 
     // ==============================
     // Weights (basic set)
@@ -551,6 +563,7 @@ class ConfigForm extends Form {
         'options' => [
                   // @translate
           'label' => '重み: 著者ID',
+          'info' => '※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_author_id',
@@ -565,6 +578,7 @@ class ConfigForm extends Form {
         'options' => [
                   // @translate
           'label' => '重み: 著者名典拠形',
+          'info' => '※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_authorized_name',
@@ -579,6 +593,7 @@ class ConfigForm extends Form {
         'options' => [
                   // @translate
           'label' => '重み: 主題',
+          'info' => '※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_subject',
@@ -606,6 +621,7 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
           'label' => '重み: シリーズタイトル',
+          'info' => '※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_series_title',
@@ -619,6 +635,7 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
           'label' => '重み: 出版者',
+          'info' => '※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_publisher',
@@ -632,7 +649,6 @@ class ConfigForm extends Form {
         'type' => NumberElement::class,
         'options' => [
           'label' => '重み: アイテムセット',
-          'info' => '候補に入ったアイテムが現在のアイテムと同じアイテムセットに属する場合にスコアを加算します。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_item_sets',
@@ -648,7 +664,7 @@ class ConfigForm extends Form {
                   // @translate
           'label' => '重み: 棚記号',
                   // @translate
-          'info' => '候補が同一棚に属する場合にスコアを加算します（候補拡大には使用しません）。',
+    //          'info' => '候補が同一棚に属する場合にスコアを加算します（候補拡大には使用しません）。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_call_shelf',

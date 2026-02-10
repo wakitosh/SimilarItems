@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.4] - 2026-02-10
+
+### EN
+
+#### Changed
+- Admin config UI: hide debug-only mapping fields for Location and Viewing direction (no functional change; settings keys remain available).
+- Admin config UI: removed redundant help text from some weight fields (Item sets and Shelf).
+
+### 日本語
+
+#### 変更
+- 管理画面の設定UI: デバッグ用の「出版地」「閲覧方向」の対応付け項目を非表示にしました（機能面の変更はありません。設定キー自体は維持されます）。
+- 管理画面の設定UI: 一部の重み（アイテムセット／棚記号）から重複していた説明文を削除しました。
+
 ## [0.4.3] - 2026-01-13
 
 ### EN
@@ -11,7 +25,7 @@ All notable changes to this project will be documented in this file.
 - Title–volume separators used for base-title normalization are now matched strictly by exact string (including leading/trailing spaces), with no lenient comma/spacing variants.
 - When title-volume separators are configured, base-title normalization no longer strips trailing numbers/years/volume markers unless a configured separator matches (prevents accidental truncation).
 - Scoring now honors negative weights consistently across signals (bucket/shelf/class proximity/material/issued/item sets) and applies property overlap scoring even when candidates are added via expansion.
-- Shelf key parsing now prefers the non-numeric prefix for alphanumeric/kana call numbers (e.g. `ル185` → `ル`).
+- Shelf key parsing now keeps the leading token (up to space/dot/hyphen) for call numbers (e.g. `ハ220-186` → `ハ220`, `ル185` → `ル185`).
 
 ### 日本語
 
@@ -20,7 +34,7 @@ All notable changes to this project will be documented in this file.
 - ベースタイトル抽出に用いる「タイトルと巻号の区切り文字」を、指定した文字列の完全一致（前後スペースを含む）で判定するように変更しました（カンマやスペースのゆるい同一視は行いません）。
 - 「タイトルと巻号の区切り文字」が設定されている場合、区切りに一致しない限り末尾の数字/年号/巻号などを自動で切り落とさないように修正しました（意図しない切り詰めを防止）。
 - 負の重みが一部のシグナルで反映されない不具合を修正しました（バケット/棚/分類近接/資料種別/出版年近接/アイテムセット）。また、拡大で入った候補にもプロパティ一致（著者・主題等）を適用します。
-- 棚番号の抽出を改善し、英字/仮名+数字の記号は非数字プレフィックスを採用するようにしました（例: `ル185` → `ル`）。
+- 棚番号の抽出を改善し、請求記号の先頭トークン（空白/ドット/ハイフンまで）を棚記号として扱うようにしました（例: `ハ220-186` → `ハ220`, `ル185` → `ル185`）。
 
 ## [0.4.2] - 2026-01-13
 

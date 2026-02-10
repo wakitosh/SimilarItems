@@ -70,7 +70,7 @@ Connects the concepts used by the module (e.g., Call Number, Author ID) to the p
 
 - **Shelf Scoring (Scoring Only)**:
   - Maps the `Call number` property. It is not used for candidate expansion. A score bonus/penalty is applied to candidates on the same shelf.
-  - Shelf key extraction uses the leading non-numeric prefix for alphanumeric/kana call numbers (e.g., `ル185` → `ル`, `QA76` → `QA`). For purely numeric call numbers, the leading digits are used.
+  - Shelf key extraction uses the first token up to a separator (space/dot/hyphen). Examples: `ハ220-186` → `ハ220`, `ル185` → `ル185`, `QA76` → `QA76`. For purely numeric call numbers, the leading digits are used.
 
 - **Proximity & Equality (Scoring Only)**:
   - These properties are not used for initial candidate selection. They only add to the score if a candidate meets a proximity or equality condition.
@@ -82,6 +82,7 @@ Connects the concepts used by the module (e.g., Call Number, Author ID) to the p
 - **For Debugging**:
   - These properties are only displayed in debug output and do not affect scoring.
   - Properties: `Location`, `Viewing hint`.
+  - Note (v0.4.4+): the admin settings UI hides these debug-only mapping fields. Existing saved values (if any) are still read and can appear in debug output.
 
 #### Weights and Thresholds
 

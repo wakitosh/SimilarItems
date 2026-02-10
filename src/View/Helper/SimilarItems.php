@@ -1628,14 +1628,10 @@ class SimilarItems extends AbstractHelper {
     $call = $this->stripLeadingLabel($call);
     $class = $this->stripLeadingLabel($class);
     $shelf = $this->parseShelf($call);
-    // Prefer explicit class when present; if it doesn't yield a number, fall
-    // back to deriving from call number.
-    $source = ($class !== '' ? $class : $call);
+    // Prefer call number when present; fallback to explicit class only when
+    // call is not available.
+    $source = ($call !== '' ? $call : $class);
     $classNum = $this->parseClassNumber($source);
-    if ($classNum === NULL && $class !== '') {
-      $source = $call;
-      $classNum = $this->parseClassNumber($source);
-    }
     $classPrefix = $this->parseClassPrefix($source);
     return [$shelf, $classNum, $classPrefix];
   }
@@ -1715,13 +1711,8 @@ class SimilarItems extends AbstractHelper {
     if (preg_match('/^\d+/', $s, $m)) {
       return strtoupper($m[0]);
     }
-    // Prefer the non-numeric prefix up to the first digit (e.g., "ル185" -> "ル",
-    // "QA76" -> "QA").
-    $prefix = $this->parseClassPrefix($s);
-    if ($prefix !== '') {
-      return $prefix;
-    }
-    // Fallback: take until the first separator.
+    // Take the first token up to a separator (space/dot/hyphen).
+    // Examples: "ハ220-186" -> "ハ220", "ル185" -> "ル185".
     if (preg_match('/^[^\s\.\-]+/u', $s, $m)) {
       return strtoupper($m[0]);
     }
