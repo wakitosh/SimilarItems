@@ -218,7 +218,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_group_mapping_select_weight',
         'options' => [
           // @translate
-          'label' => '候補に追加＋スコア加算',
+          'label' => '候補に追加＋加点',
           'info' => '指定プロパティが一致するアイテムを候補に追加し、対応する重みに応じてスコアを加算します。',
         ],
       ])
@@ -239,7 +239,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_author_id',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 著者ID（候補に追加＋スコア加算）',
+          'label' => 'プロパティ対応付け: 著者ID（候補に追加＋加点）',
           'info' => '同一著者IDのアイテムを候補に追加し、重みに応じてスコアを加算します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
@@ -255,7 +255,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_authorized_name',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 著者名典拠形（候補に追加＋スコア加算・弱）',
+          'label' => 'プロパティ対応付け: 著者名典拠形（候補に追加＋加点）',
           'info' => '著者IDがない場合のフォールバック。候補への追加とスコア加算に使用しますが、IDより弱いシグナルです。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
@@ -271,7 +271,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_subject',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 主題（候補に追加＋スコア加算）',
+          'label' => 'プロパティ対応付け: 主題（候補に追加＋加点）',
           'info' => '同一主題のアイテムを候補に追加し、重みに応じてスコアを加算します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
@@ -287,7 +287,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_series_title',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: シリーズタイトル（候補に追加＋スコア加算）',
+          'label' => 'プロパティ対応付け: シリーズタイトル（候補に追加＋加点）',
           'info' => '同一シリーズタイトルのアイテムを候補に追加し、重みに応じてスコアを加算します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
@@ -303,7 +303,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_publisher',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 出版者（候補に追加＋スコア加算）',
+          'label' => 'プロパティ対応付け: 出版者（候補に追加＋加点）',
           'info' => '同一出版者のアイテムを候補に追加し、重みに応じてスコアを加算します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
@@ -341,8 +341,8 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_call_number',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 請求記号（加点のみ）',
-          'info' => '候補拡大には使用しません。同一棚の候補には「重み: 棚記号」によるスコア加算が入ります。',
+          'label' => 'プロパティ対応付け: 請求記号（候補に追加＋加点：分野バケット・棚記号・分類近接・分類記号完全一致）',
+          // 'info' => '同一棚の候補には「重み: 棚記号」によるスコア加算が入ります。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -379,8 +379,8 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_class_number',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 分類記号（加点のみ：分野バケット・分類近接）',
-          'info' => '候補選択には使用しません。分野バケットと分類近接（閾値以内）の加点に使用します。',
+          'label' => 'プロパティ対応付け: 分類記号（候補に追加＋加点：分野バケット・棚記号*・分類近接*・分類記号完全一致*）',
+          'info' => '*棚記号・分類近接・分類記号完全一致では、請求記号がない場合にのみ使用します。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -663,8 +663,6 @@ class ConfigForm extends Form {
         'options' => [
                   // @translate
           'label' => '重み: 棚記号',
-                  // @translate
-    //          'info' => '候補が同一棚に属する場合にスコアを加算します（候補拡大には使用しません）。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_call_shelf',

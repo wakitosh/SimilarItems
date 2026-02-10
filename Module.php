@@ -270,18 +270,26 @@ class Module extends AbstractModule {
     $settings->set('similaritems.jitter.pool_multiplier', (string) $poolMul);
 
     // Save property mapping (advanced).
-    $settings->set('similaritems.map.call_number', $getStr('similaritems_map_call_number', ''));
-    $settings->set('similaritems.map.class_number', $getStr('similaritems_map_class_number', ''));
-    $settings->set('similaritems.map.bibid', $getStr('similaritems_map_bibid', ''));
-    $settings->set('similaritems.map.author_id', $getStr('similaritems_map_author_id', ''));
-    $settings->set('similaritems.map.authorized_name', $getStr('similaritems_map_authorized_name', ''));
-    $settings->set('similaritems.map.location', $getStr('similaritems_map_location', ''));
-    $settings->set('similaritems.map.issued', $getStr('similaritems_map_issued', ''));
-    $settings->set('similaritems.map.material_type', $getStr('similaritems_map_material_type', ''));
-    $settings->set('similaritems.map.viewing_direction', $getStr('similaritems_map_viewing_direction', ''));
-    $settings->set('similaritems.map.subject', $getStr('similaritems_map_subject', ''));
-    $settings->set('similaritems.map.series_title', $getStr('similaritems_map_series_title', ''));
-    $settings->set('similaritems.map.publisher', $getStr('similaritems_map_publisher', ''));
+    // Only update settings that are present in POST.
+    // This prevents wiping existing values when form elements are
+    // hidden or removed.
+    $setMapIfPresent = function (string $settingKey, string $postKey) use ($settings, $post, $getStr): void {
+      if (isset($post[$postKey])) {
+        $settings->set($settingKey, $getStr($postKey, ''));
+      }
+    };
+    $setMapIfPresent('similaritems.map.call_number', 'similaritems_map_call_number');
+    $setMapIfPresent('similaritems.map.class_number', 'similaritems_map_class_number');
+    $setMapIfPresent('similaritems.map.bibid', 'similaritems_map_bibid');
+    $setMapIfPresent('similaritems.map.author_id', 'similaritems_map_author_id');
+    $setMapIfPresent('similaritems.map.authorized_name', 'similaritems_map_authorized_name');
+    $setMapIfPresent('similaritems.map.location', 'similaritems_map_location');
+    $setMapIfPresent('similaritems.map.issued', 'similaritems_map_issued');
+    $setMapIfPresent('similaritems.map.material_type', 'similaritems_map_material_type');
+    $setMapIfPresent('similaritems.map.viewing_direction', 'similaritems_map_viewing_direction');
+    $setMapIfPresent('similaritems.map.subject', 'similaritems_map_subject');
+    $setMapIfPresent('similaritems.map.series_title', 'similaritems_map_series_title');
+    $setMapIfPresent('similaritems.map.publisher', 'similaritems_map_publisher');
 
     // Save weights (basic set).
     $settings->set('similaritems.weight.bibid', $getInt('similaritems_weight_bibid', 10));
