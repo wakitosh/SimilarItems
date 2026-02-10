@@ -197,7 +197,7 @@ class ConfigForm extends Form {
         'options' => [
           // @translate
           'label' => 'プロパティ対応付け',
-          'info' => 'アイテムのプロパティと、類似候補の選択・スコアリングで用いるシグナルの対応を指定します。下位のグループで役割が異なります。',
+          'info' => 'アイテムのプロパティと、類似候補の選択・スコアリングで用いるシグナルの対応を指定します。',
         ],
       ])
       ->add([
@@ -205,7 +205,7 @@ class ConfigForm extends Form {
         'type' => 'text',
         'options' => [
           'label' => ' ',
-          'info' => 'アイテムのプロパティと、類似候補の選択・スコアリングで用いるシグナルの対応を指定します。下位のグループで役割が異なります。',
+          'info' => 'アイテムのプロパティと、類似候補の選択・スコアリングで用いるシグナルの対応を指定します。',
         ],
         'attributes' => [
           'id' => 'similaritems_group_mapping_info',
