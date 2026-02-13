@@ -256,7 +256,7 @@ class ConfigForm extends Form {
         'type' => PropertySelectElement::class,
         'options' => [
           'label' => 'プロパティ対応付け: 著者名典拠形（候補に追加＋加点）',
-          'info' => '著者IDがない場合のフォールバック。候補への追加とスコア加算に使用しますが、IDより弱いシグナルです。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
+          'info' => '著者IDがない場合のフォールバック。候補への追加とスコア加算に使用します。※「一致回数加点」が有効な場合、多値（複数値）の一致件数に応じて追加加点されます。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -392,6 +392,22 @@ class ConfigForm extends Form {
         ],
       ])
       ->add([
+        'name' => 'similaritems_map_material_type',
+        'type' => PropertySelectElement::class,
+        'options' => [
+          'label' => 'プロパティ対応付け: 資料種別（加点のみ：資料種別一致）',
+          'info' => '候補選択には使用しません。資料種別が一致する場合に加点します。',
+          'empty_option' => '',
+          'term_as_value' => TRUE,
+          'use_hidden_element' => TRUE,
+        ],
+        'attributes' => [
+          'id' => 'similaritems_map_material_type',
+          'class' => 'chosen-select',
+          'data-placeholder' => '資料種別のプロパティを選択…',
+        ],
+      ])
+      ->add([
         'name' => 'similaritems_map_issued',
         'type' => PropertySelectElement::class,
         'options' => [
@@ -408,19 +424,19 @@ class ConfigForm extends Form {
         ],
       ])
       ->add([
-        'name' => 'similaritems_map_material_type',
+        'name' => 'similaritems_map_location',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 資料種別（加点のみ：資料種別一致）',
-          'info' => '候補選択には使用しません。資料種別が一致する場合に加点します。',
+          'label' => 'プロパティ対応付け: 出版地（加点のみ：出版地一致）',
+          'info' => '候補選択には使用しません。出版地が一致する場合に加点します。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
         ],
         'attributes' => [
-          'id' => 'similaritems_map_material_type',
+          'id' => 'similaritems_map_location',
           'class' => 'chosen-select',
-          'data-placeholder' => '資料種別のプロパティを選択…',
+          'data-placeholder' => '出版地のプロパティを選択…',
         ],
       ])
       ->add([
@@ -483,23 +499,9 @@ class ConfigForm extends Form {
     'style' => 'display:none;',
     ],
     ])
-    ->add([
-    'name' => 'similaritems_map_location',
-    'type' => PropertySelectElement::class,
-    'options' => [
-    'label' => 'プロパティ対応付け: 出版地（デバッグ用）',
-    'info' => 'スコアには影響しません。デバッグ用に値を表示します。',
-    'empty_option' => '',
-    'term_as_value' => TRUE,
-    'use_hidden_element' => TRUE,
-    ],
-    'attributes' => [
-    'id' => 'similaritems_map_location',
-    'class' => 'chosen-select',
-    'data-placeholder' => '出版地のプロパティを選択…',
-    'style' => 'display:none;',
-    ],
-    ])
+
+
+
     ->add([
     'name' => 'similaritems_map_viewing_direction',
     'type' => PropertySelectElement::class,
@@ -516,8 +518,8 @@ class ConfigForm extends Form {
     'data-placeholder' => '閲覧方向のプロパティを選択…',
     'style' => 'display:none;',
     ],
-    ])*/
-
+    ]);
+     */
     // ==============================
     // Weights (basic set)
     // ==============================
