@@ -341,7 +341,7 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_call_number',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 請求記号（候補に追加＋加点：分野バケット・棚記号・分類近接・分類記号完全一致）',
+          'label' => 'プロパティ対応付け: 請求記号（候補に追加＋加点：分野バケット・棚記号・分類近接）',
           // 'info' => '同一棚の候補には「重み: 棚記号」によるスコア加算が入ります。',
           'empty_option' => '',
           'term_as_value' => TRUE,
@@ -379,8 +379,8 @@ class ConfigForm extends Form {
         'name' => 'similaritems_map_class_number',
         'type' => PropertySelectElement::class,
         'options' => [
-          'label' => 'プロパティ対応付け: 分類記号（候補に追加＋加点：分野バケット・棚記号*・分類近接*・分類記号完全一致*）',
-          'info' => '*棚記号・分類近接・分類記号完全一致では、請求記号がない場合にのみ使用します。',
+          'label' => 'プロパティ対応付け: 分類記号（候補に追加＋加点：分野バケット・棚記号*・分類近接*）',
+          'info' => '*棚記号・分類近接では、請求記号がない場合にのみ使用します。',
           'empty_option' => '',
           'term_as_value' => TRUE,
           'use_hidden_element' => TRUE,
@@ -439,6 +439,7 @@ class ConfigForm extends Form {
           'data-placeholder' => '出版地のプロパティを選択…',
         ],
       ])
+      /*
       ->add([
         'type' => Fieldset::class,
         'name' => 'similaritems_group_mapping_penalty',
@@ -459,6 +460,7 @@ class ConfigForm extends Form {
           'style' => 'display:none;',
         ],
       ])
+      */
       ->add([
         'name' => 'similaritems_map_bibid',
         'type' => PropertySelectElement::class,
@@ -685,19 +687,6 @@ class ConfigForm extends Form {
           'min' => NULL,
           'step' => 1,
           'value' => 1,
-        ],
-      ])
-      ->add([
-        'name' => 'similaritems_weight_class_exact',
-        'type' => NumberElement::class,
-        'options' => [
-          'label' => '重み: 分類記号（完全一致）',
-        ],
-        'attributes' => [
-          'id' => 'similaritems_weight_class_exact',
-          'min' => NULL,
-          'step' => 1,
-          'value' => 2,
         ],
       ])
       ->add([
@@ -1025,7 +1014,6 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_weight_publisher', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_call_shelf', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_class_proximity', 'required' => FALSE])
-      ->add(['name' => 'similaritems_weight_class_exact', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_material_type', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_issued_proximity', 'required' => FALSE])
       ->add(['name' => 'similaritems_weight_publication_place', 'required' => FALSE])

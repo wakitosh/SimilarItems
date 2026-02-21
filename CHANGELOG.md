@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.5] - 2026-02-21
+
+### EN
+
+#### Changed
+- Removed the `class_exact` scoring signal from recommendation logic.
+- Removed the corresponding admin setting field `Weight: Class exact match`.
+- Classification scoring now relies on shelf match and class proximity only.
+
+### 日本語
+
+#### 変更
+- 推薦ロジックから `class_exact`（分類記号の完全一致）シグナルを削除しました。
+- 管理画面の対応する設定項目「重み: 分類記号（完全一致）」を削除しました。
+- 分類系の加点は「棚一致」と「分類近接」に統一しました。
+
 ## [0.4.4] - 2026-02-10
 
 ### EN

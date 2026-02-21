@@ -138,7 +138,6 @@ class SimilarItems extends AbstractHelper {
     $wSeries = (int) ($this->settings->get('similaritems.weight.series_title') ?? 3);
     $wPublisher = (int) ($this->settings->get('similaritems.weight.publisher') ?? 2);
     $wClassProx = (int) ($this->settings->get('similaritems.weight.class_proximity') ?? 1);
-    $wClassExact = (int) ($this->settings->get('similaritems.weight.class_exact') ?? 2);
     $classThresh = (int) ($this->settings->get('similaritems.class_proximity_threshold') ?? 5);
     // Optional small boosts.
     $wMaterial = (int) ($this->settings->get('similaritems.weight.material_type') ?? 2);
@@ -151,7 +150,7 @@ class SimilarItems extends AbstractHelper {
     if (!is_finite($multiDecay) || $multiDecay < 0.0) {
       $multiDecay = 0.0;
     }
-    $log('weights: bib=' . $wBib . ' author_id=' . $wAuthorId . ' auth_name=' . $wAuthName . ' subject=' . $wSubject . ' bucket=' . $wBucket . ' shelf=' . $wShelf . ' series=' . $wSeries . ' publisher=' . $wPublisher . ' class_exact=' . $wClassExact . ' class_prox=' . $wClassProx . ' class_thresh=' . $classThresh . ' material=' . $wMaterial . ' issued_prox=' . $wIssuedProx . ' issued_thresh=' . $issuedThresh . ' pub_place=' . $wPubPlace . ' multi_match=' . ($multiMatchOn ? '1' : '0') . ' multi_decay=' . $multiDecay);
+    $log('weights: bib=' . $wBib . ' author_id=' . $wAuthorId . ' auth_name=' . $wAuthName . ' subject=' . $wSubject . ' bucket=' . $wBucket . ' shelf=' . $wShelf . ' series=' . $wSeries . ' publisher=' . $wPublisher . ' class_prox=' . $wClassProx . ' class_thresh=' . $classThresh . ' material=' . $wMaterial . ' issued_prox=' . $wIssuedProx . ' issued_thresh=' . $issuedThresh . ' pub_place=' . $wPubPlace . ' multi_match=' . ($multiMatchOn ? '1' : '0') . ' multi_decay=' . $multiDecay);
 
     // Serendipity options: demote same-bibid (series/巻違い) aggressively.
     $demoteSameBib = (int) ($this->settings->get('similaritems.serendipity.demote_same_bibid') ?? 1) === 1;
@@ -788,16 +787,6 @@ class SimilarItems extends AbstractHelper {
         }
       }
 
-      // Classification exact-match bonus (same normalized numeric part).
-      if ($wClassExact !== 0
-        && $curClassNum !== NULL
-        && $candClassNum !== NULL
-        && $curClassPrefix === $candClassPrefix
-        && $curClassNum === $candClassNum
-      ) {
-        $entry['score'] += $wClassExact;
-        $entry['signals'][] = ['class_exact', $wClassExact];
-      }
       // Material type equality (light boost).
       if ($wMaterial !== 0 && $mapMaterial) {
         try {

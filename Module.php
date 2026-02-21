@@ -120,7 +120,6 @@ class Module extends AbstractModule {
       'similaritems_weight_publisher' => (int) ($settings->get('similaritems.weight.publisher') ?? 2),
       'similaritems_weight_item_sets' => (int) ($settings->get('similaritems.weight_item_sets') ?? 3),
       'similaritems_weight_class_proximity' => (int) ($settings->get('similaritems.weight.class_proximity') ?? 1),
-      'similaritems_weight_class_exact' => (int) ($settings->get('similaritems.weight.class_exact') ?? 2),
       'similaritems_weight_material_type' => (int) ($settings->get('similaritems.weight.material_type') ?? 2),
       'similaritems_weight_issued_proximity' => (int) ($settings->get('similaritems.weight.issued_proximity') ?? 1),
       'similaritems_weight_publication_place' => (int) ($settings->get('similaritems.weight.publication_place') ?? 1),
@@ -197,7 +196,6 @@ class Module extends AbstractModule {
       'similaritems.weight.series_title' => 3,
       'similaritems.weight.publisher' => 2,
       'similaritems.weight.class_proximity' => 1,
-      'similaritems.weight.class_exact' => 2,
       'similaritems.weight.material_type' => 2,
       'similaritems.weight.issued_proximity' => 1,
       'similaritems.weight.publication_place' => 1,
@@ -300,7 +298,6 @@ class Module extends AbstractModule {
     $settings->set('similaritems.weight.series_title', $getInt('similaritems_weight_series_title', 3));
     $settings->set('similaritems.weight.publisher', $getInt('similaritems_weight_publisher', 2));
     $settings->set('similaritems.weight.class_proximity', $getInt('similaritems_weight_class_proximity', 1));
-    $settings->set('similaritems.weight.class_exact', $getInt('similaritems_weight_class_exact', 2));
     $settings->set('similaritems.class_proximity_threshold', max(0, $getInt('similaritems_class_proximity_threshold', 5)));
     $settings->set('similaritems.weight.subject', $getInt('similaritems_weight_subject', 4));
     $settings->set('similaritems.weight.material_type', $getInt('similaritems_weight_material_type', 2));

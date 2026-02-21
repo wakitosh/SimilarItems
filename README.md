@@ -165,7 +165,6 @@ These defaults provide a good starting point for a balanced mix of topical relev
   - `Domain bucket`: 3
   - `Shelf match`: 2
   - `Class proximity`: 1 (Threshold: 5)
-  - `Class exact match`: 2
   - `Material type equality`: 2
   - `Publication place equality`: 1
   - `Issued proximity`: 1 (Threshold: 5 years)
@@ -180,7 +179,7 @@ These defaults provide a good starting point for a balanced mix of topical relev
 - **Fallback Signals (Authorized name (weak), Item Set Match)**: `Authorized name (weak)` (3) is a weaker author signal, while `Item Set Match` (2) provides a curated context, useful when other metadata is sparse.
 - **"Stack-Browsing" Signals (Domain, Shelf Match, Class)**: These are intentionally weighted low (1-2) to add a flavor of physical "shelf browsing" and serendipity without overpowering the topical signals.
 - **Light Boosts (Material, Issued)**: These provide a gentle nudge towards items of the same type or from a similar time period, adding subtle relevance.
-- **Exact vs. Close in Classification**: Use `Class exact match` to slightly favor items in exactly the same class number, while `Class proximity` keeps near-by classes in scope to preserve a shelf-browsing feel.
+- **Classification Proximity**: Use `Class proximity` with an appropriate threshold to keep near-by classes in scope while preserving a shelf-browsing feel.
 - **Publication Place Equality**: A small bonus for items sharing the same place of publication, useful when regional affinity is meaningful but should not dominate topical similarity.
 - **Bib ID (0 weight + penalty)**: Items from the same series (e.g., volumes of a journal) are often plentiful. By setting the weight to 0 and applying a strong penalty (150), they are pushed down the list, making room for more diverse results while still being available if no better matches exist.
 
@@ -449,7 +448,6 @@ MIT
   - `分野バケット`: 3
   - `棚一致`: 2
   - `分類近接`: 1 (閾値: 5)
-  - `分類完全一致ボーナス`: 2
   - `資料種別一致`: 2
   - `出版地一致`: 1
   - `出版年近接`: 1 (閾値: 5年)
@@ -463,7 +461,7 @@ MIT
 - **強力なシグナル（著者ID, 主題）**: `著者ID` と `主題` が著者・トピックの主要なシグナルです。
 - **フォールバックシグナル（著者名典拠形, アイテムセット）**: `著者名典拠形` は弱めの著者シグナルであり、`アイテムセット` は、他のメタデータが乏しいときに有用なキュレーションされたコンテキストを提供します。
 - **「書架散策」的シグナル（分野, 棚, 分類）**: これらは意図的に低く設定されており（1–2）、主題シグナルを圧倒することなく、物理的な「棚ブラウジング」のニュアンスとセレンディピティを加えます。
-- **完全一致と「近さ」の使い分け（分類）**: 分類番号がぴったり一致する場合に少しだけ優先したいときは「分類完全一致ボーナス」を使い、周辺の分類を含めて幅広く拾いたいときは「分類近接」の閾値を活用します。
+- **分類は「近さ」で調整**: 周辺の分類を含めて幅広く拾いたいときは「分類近接」の閾値を活用します。
 - **軽いブースト（資料種別, 出版年, 出版地）**: 同じタイプのアイテムや類似の時期／同じ地域で出版されたアイテムに対して微妙な関連性を追加します。ただし、主題や著者シグナルを上書きしない程度の控えめな値にしておくのが無難です。
 - **書誌ID（0ウェイト + ペナルティ）**: 同じシリーズのアイテム（例：ジャーナルの巻号）はしばしば豊富に存在します。ウェイトを0に設定し、強いペナルティを適用することで、より多様な結果のために押し下げられますが、より良い一致が存在しない場合には依然として利用可能です。
 
