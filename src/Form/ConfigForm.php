@@ -667,6 +667,7 @@ class ConfigForm extends Form {
         'options' => [
                   // @translate
           'label' => '重み: 棚記号',
+          'info' => '※棚記号は「請求記号」の前半（ハイフン・スペース等の区切り文字の前までの文字列）、または数値のみの場合は先頭の数字部分を切り出して完全一致で判定します。請求記号がない場合は分類記号全体を使用します。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_call_shelf',
@@ -681,6 +682,7 @@ class ConfigForm extends Form {
         'options' => [
                   // @translate
           'label' => '重み: 分類近接',
+          'info' => '※分類近接は「分類記号」の最初の数字部分を切り出して数値として比較し、差が「閾値: 分類近接」以内であれば加点します。分類記号がない場合は請求記号の中から同様に数字を切り出して使用します。',
         ],
         'attributes' => [
           'id' => 'similaritems_weight_class_proximity',

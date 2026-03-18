@@ -61,36 +61,29 @@ Introduces intentional randomness to the results to promote serendipity (acciden
 
 #### Property Mappings
 
-Connects the concepts used by the module (e.g., Call Number, Author ID) to the properties in your Omeka S vocabulary. Properties are grouped by their role in the recommendation process.
+Connects the concepts used by the module to the properties in your Omeka S vocabulary. Properties are grouped by their role in the recommendation process.
 
 - **Candidate Selection + Scoring**:
-  - These are the primary signals for relevance. When a property value overlaps between the seed item and a candidate, its score is adjusted (positive or negative weight).
-  - Note: candidates can enter the pool via expansion (e.g., item sets or bucket expansion) and still receive property-based scoring when values overlap.
-  - Properties (typical): `Author ID`, `Authorized name (weak)`, `Subject`, `Series title`, `Publisher`.
+  - These are the primary signals for relevance. When a property value overlaps between the seed item and a candidate, the item is added to the candidate pool and its score is adjusted based on the corresponding weight. Matches on multi-valued properties can receive an additional multi-match bonus.
+  - Properties: `Author ID`, `Authorized name`, `Subject`, `Series title`, `Publisher`.
+  - Properties that expand candidates via "Domain buckets": `Call number`, `Class number`.
 
-- **Shelf Scoring (Scoring Only)**:
-  - Maps the `Call number` property. It is not used for candidate expansion. A score bonus/penalty is applied to candidates on the same shelf.
-  - Shelf key extraction uses the first token up to a separator (space/dot/hyphen). Examples: `ハ220-186` → `ハ220`, `ル185` → `ル185`, `QA76` → `QA76`. For purely numeric call numbers, the leading digits are used.
-
-- **Proximity & Equality (Scoring Only)**:
-  - These properties are not used for initial candidate selection. They only add to the score if a candidate meets a proximity or equality condition.
-  - Properties: `Class number`, `Issued`, `Material type`, `Publication place`.
+- **Scoring Only**:
+  - These properties are not used for initial candidate selection, but they add to the score if a candidate is already in the pool and meets an equality or proximity condition.
+  - Equality matches: `Material type`, `Publication place` (configured via Omeka's `Location` mapping).
+  - Proximity/Derived matches: `Issued` (Issued proximity), `Call number` (Shelf match), `Class number` (Class proximity). Note that if Call number is missing, Class number may be used as a fallback for shelf matching. Additionally, both Call number and Class number can bring candidates into the pool via Domain buckets.
 
 - **Penalty-focused**:
-  - Maps the `Bibliographic ID` property. Primarily used to apply a penalty to items from the same bibliographic record, pushing them down in the results.
-
-- **For Debugging**:
-  - These properties are only displayed in debug output and do not affect scoring.
-  - Properties: `Location`, `Viewing hint`.
-  - Note (v0.4.4+): the admin settings UI hides these debug-only mapping fields. Existing saved values (if any) are still read and can appear in debug output.
+  - `Bibliographic ID`: Primarily used to apply a penalty to items from the same bibliographic record, suppressing same-series items in favor of diverse recommendations.
 
 #### Weights and Thresholds
 
 Configures the scoring weights and proximity thresholds. Higher weights give a signal more influence over the final score.
 
 - **Weights**:
-- **Weights**:
-  - The base score applied when a match or proximity is detected for each property (e.g., `Author ID`) or concept (e.g., `Shelf`, `Class proximity`).
+  - The base score applied when a match or proximity is detected for each property (e.g., `Author ID`) or concept (e.g., `Shelf match`, `Class proximity`).
+  - **Shelf match evaluation**: Uses the first part of the `Call number` (up to a hyphen or space) for an exact match. If `Call number` is empty, the entire `Class number` is used.
+  - **Class proximity evaluation**: Extracts numeric values from the `Class number` and compares them. If within the configured threshold, score is added. If `Class number` is empty, numeric values from `Call number` are extracted as a fallback.
   - Negative weights are allowed and act as penalties.
 - **Thresholds**:
   - `Class proximity threshold`: Items with class numbers within this range are considered "close."
@@ -105,6 +98,28 @@ Settings designed to increase the diversity of results and promote discovery by 
 - **Penalty Values**:
   - `Penalty for same bibliographic record`: The score to subtract from candidates sharing the current item's Bib ID.
   - `Penalty for same base title`: The score to subtract from candidates sharing the current item's normalized base title.
+
+#### Multi-match Bonus
+
+Applies to multi-valued properties (e.g., items with multiple subjects). Adds extra score based on how many distinct values match between the seed item and each candidate.
+
+- **Supported Properties**:
+  - `Author ID`
+  - `Authorized name`
+  - `Subject`
+  - `Series title`
+  - `Publisher`
+- **How it works**:
+  - A standard match adds the base weight (e.g., `Subject` weight).
+  - If additional values of the same property also match, a "bonus" score is added.
+  - The bonus increases with the number of matched values but is multiplied by a decay rate so that subsequent matches contribute less.
+- **Decay rate**:
+  - If set to `0`, every match adds the same base weight (flat addition).
+  - If set to `0.2` (or greater than `0`), the second and subsequent matches will yield progressively smaller bonuses.
+  - Higher decay rates mean subsequent matches have less impact, making the first match relatively more important.
+- **Use cases**:
+  - When you want to assign higher scores to items that share *many* subjects, rather than just one.
+  - When properties like series titles or publishers can hold multiple values, and you want to prioritize items that share multiple matching values over a single coincident shared value.
 
 #### Title Rules
 
@@ -157,30 +172,28 @@ These defaults provide a good starting point for a balanced mix of topical relev
 - **Core Signals (Candidate Selection + Scoring)**:
   - `Author ID`: 6
   - `Subject`: 4
-  - `Authorized name (weak)`: 4
+  - `Authorized name`: 4
   - `Series title`: 3
   - `Publisher`: 2
-  - `Item set match`: 3
-- **Proximity & Equality (Scoring Only)**:
+  - `Item sets`: 3
+- **Scoring Only**:
   - `Domain bucket`: 3
   - `Shelf match`: 2
   - `Class proximity`: 1 (Threshold: 5)
-  - `Material type equality`: 2
-  - `Publication place equality`: 1
+  - `Material type`: 2
+  - `Publication place`: 1
   - `Issued proximity`: 1 (Threshold: 5 years)
 - **Penalties**:
   - `Bibliographic ID`: 0 (Used for penalty, not scoring)
   - `Penalty for same bibliographic record`: 150
-  - `Penalty for same title`: 150
+  - `Penalty for same base title`: 150
 
 #### Rationale Behind the Weights
 
 - **Strong Signals (Author ID, Subject)**: `Author ID` and `Subject` are the primary drivers of creator/topic affinity.
-- **Fallback Signals (Authorized name (weak), Item Set Match)**: `Authorized name (weak)` (3) is a weaker author signal, while `Item Set Match` (2) provides a curated context, useful when other metadata is sparse.
-- **"Stack-Browsing" Signals (Domain, Shelf Match, Class)**: These are intentionally weighted low (1-2) to add a flavor of physical "shelf browsing" and serendipity without overpowering the topical signals.
-- **Light Boosts (Material, Issued)**: These provide a gentle nudge towards items of the same type or from a similar time period, adding subtle relevance.
-- **Classification Proximity**: Use `Class proximity` with an appropriate threshold to keep near-by classes in scope while preserving a shelf-browsing feel.
-- **Publication Place Equality**: A small bonus for items sharing the same place of publication, useful when regional affinity is meaningful but should not dominate topical similarity.
+- **Fallback Signals (Authorized name, Item sets)**: `Authorized name` is a weaker author signal, while `Item sets` provides a curated context, useful when other metadata is sparse.
+- **"Stack-Browsing" Signals (Domain bucket, Shelf match, Class proximity)**: These are intentionally weighted low to add a flavor of physical "shelf browsing" and serendipity without overpowering the topical signals.
+- **Light Boosts (Material type, Issued proximity, Publication place)**: These provide a gentle nudge towards items of the same type, similar time period, or origin adding subtle relevance.
 - **Bib ID (0 weight + penalty)**: Items from the same series (e.g., volumes of a journal) are often plentiful. By setting the weight to 0 and applying a strong penalty (150), they are pushed down the list, making room for more diverse results while still being available if no better matches exist.
 
 > Note: NCID is no longer used as a similarity signal in 0.4.0 and later; it has been removed from the settings UI.
@@ -327,45 +340,42 @@ MIT
 
 #### プロパティ対応付け
 
-モジュールが利用する概念（請求記号、著者IDなど）と、お使いのOmeka Sが持つ語彙のプロパティを紐付けます。プロパティは、その役割に応じて以下のグループに分かれています。
+モジュールが利用する概念と、お使いのOmeka Sが持つ語彙のプロパティを紐付けます。プロパティは、その役割に応じて機能が異なります。
 
-- **候補に追加＋スコア加算**:
-  - ここで指定されたプロパティの値が一致した場合、そのアイテムは類似候補として選ばれ、さらにスコアが加算されます。関連性を見つけるための最も基本的なシグナルです。
-  - 代表的な対象: `著者ID`, `著者名典拠形（弱）`, `主題`, `シリーズタイトル`, `出版者`
+- **候補に追加＋加点**:
+  - ここで指定されたプロパティを現在のアイテムと共有するアイテムは、類似候補としてプールに追加され、設定した「重み」に基づくスコアが加算されます。「一致回数加点」が有効な場合、複数値の一致に応じて追加ボーナスを得られます。
+  - 対象: `著者ID`, `著者名典拠形`, `主題`, `シリーズタイトル`, `出版者`
+  - ※ `請求記号` および `分類記号` も、設定された「分野バケット」経由での候補範囲拡大に役立ちます。
 
-- **棚のスコア加算**:
-  - `請求記号`を紐付けます。候補拡大には使用しませんが、棚が一致する候補には常にスコアが加算されます。
+- **加点のみ（候補選択には不使用）**:
+  - ここで指定されたプロパティは、新たな候補を探すためには使われません。すでにピックアップされた候補の中から、一致や近接などの条件を満たしたものにスコアを加算するために用いられます。
+  - 一致条件: `資料種別`（資料種別一致）, `出版地`（出版地一致／UI上は `Location` などのプロパティをマッピングできます）。
+  - 近接・派生条件: `出版年`（出版年近接）, `請求記号`（棚記号一致）, `分類記号`（分類近接）。※ 請求記号と分類記号は「分野バケット」経由での候補範囲拡大のトリガーとしても機能します。また、請求記号がない場合は分類記号が棚記号や近接の代用（フォールバック）として使われる場合があります。
 
-- **近接・一致系（スコア加算のみ）**:
-  - ここで指定されたプロパティは、候補を探すためには使われません。候補の中から条件（近接や一致）を満たすものを見つけてスコアを加算するためだけに使われます。
-  - 対象: `分類記号`, `出版年`, `資料種別`, `出版地`
-
-- **ペナルティ中心**:
-  - `書誌ID`を紐付けます。主に、同一書誌のアイテムにペナルティを与えて表示順位を下げるために使われます。
-
-- **デバッグ用**:
-  - デバッグ時にのみ表示されるプロパティです。スコアリングには影響しません。
-  - 対象: `所蔵館`, `閲覧注記`
+- **ペナルティ用**:
+  - `書誌ID`: 主に、同一書誌の別ボリューム（同一シリーズの巻違いなど）に減点ペナルティを与え、表示順位を下げることで推奨結果の多様性を高めることに使われます。
 
 #### ウェイトと閾値
 
-スコアリングの重みと、近接判定の閾値を設定します。ウェイトの数値が大きいほど、そのシグナルが最終スコアに与える影響が強くなります。
+スコアリングの重み（加点）と、近接判定の閾値を設定します。ウェイトの数値が大きいほど、そのシグナルが最終スコアに与える影響が強くなります。
 
 - **重み**:
-  - 各プロパティ（`著者ID` など）や概念（`棚記号`, `分類近接` など）の一致・近接が検出されたときに加算されるスコアの基本値です。
+  - 各プロパティ（`著者ID`など）や一致条件（`棚記号`、`分類近接`など）に該当したときに加算されるスコアの基本値です。マイナスの数値を設定した場合はペナルティ（減点）として機能します。
+  - **棚記号の判定**: 「請求記号」の前半（ハイフン・スペース等の区切り文字の前までの文字列）、または数値のみの場合は先頭の数字部分を切り出して完全一致で判定します。請求記号がない場合は分類記号全体を使用します。
+  - **分類近接の判定**: 「分類記号」の最初の数字部分を切り出して数値として比較し、差が「閾値: 分類近接」以内であれば加点します。分類記号がない場合は請求記号の中から同様に数字を切り出して使用します。
 - **閾値**:
-  - `分類近接の閾値`: この数値以内の分類番号を持つアイテムを「近い」と見なします。
-  - `出版年近接の閾値`: この年数以内の出版年を持つアイテムを「近い」と見なします。
+  - `分類近接の閾値`: 分類番号の差がこの数値以内のアイテムを「近い」と見なします。
+  - `出版年近接の閾値`: 出版年の差がこの年数以内のアイテムを「近い」と見なします。
 
 #### セレンディピティ
 
 結果の多様性を高め、偶然の発見を促すための設定です。主にペナルティを利用して、似すぎているアイテムの表示順位を下げます。
 
-- **同一書誌を抑制**: （推奨：オン）多様性のためのマスタースイッチです。オンのとき、同じ書誌ID（例: 全集の各巻）を持つ候補にペナルティを課します。
+- **セレンディピティ: 同一書誌を抑制**: （推奨：オン）多様性のためのマスタースイッチです。オンのとき、同じ書誌ID（例: 全集の各巻）を持つ候補にペナルティを課します。
 - **同一ベースタイトルの扱い**: 同一ベースタイトルの候補を許可するか、完全除外するかを制御します（除外で0件になった場合はランダム表示）。
 - **ペナルティの値**:
-  - `同一書誌へのペナルティ`: 現在のアイテムと書誌IDが同じ候補から減算するスコア。
-  - `同一ベースタイトルへのペナルティ`: 現在のアイテムとベースタイトルが同じ候補から減算するスコア。
+  - `ペナルティ: 同一書誌ID`: 現在のアイテムと書誌IDが同じ候補から減算するスコア。
+  - `ペナルティ: 同一ベースタイトル`: 現在のアイテムとベースタイトルが同じ候補から減算するスコア。
 
 #### 一致回数ボーナス（Multi-match）
 
@@ -373,7 +383,7 @@ MIT
 
 - **対象となるプロパティの例**:
   - `著者ID`
-  - `著者名典拠形（弱）`
+  - `著者名典拠形`
   - `主題`
   - `シリーズタイトル`
   - `出版者`
@@ -391,7 +401,7 @@ MIT
 
 #### タイトルルール
 
-- **タイトル・巻の区切り文字**: ベースタイトルと巻数情報を区切る文字列を定義します（例：` , `, ` - `, ` : `）。
+- **タイトルと巻号の区切り文字**: ベースタイトルと巻数情報を区切る文字列を定義します（例：` , `, ` - `, ` : `）。
   - 判定は **完全一致**（指定した文字列がそのまま現れた場合のみ区切りとみなします。前後のスペースも区切りの一部です）。
   - 例：` , ` を指定した場合、`, ` は区切りとして扱われません。
 
@@ -440,30 +450,29 @@ MIT
 - **コアシグナル（候補に追加＋スコア加算）**:
   - `著者ID`: 6
   - `主題`: 4
-  - `著者名典拠形（弱）`: 4
+  - `著者名典拠形`: 4
   - `シリーズタイトル`: 3
   - `出版者`: 2
-  - `アイテムセット一致`: 3
-- **近接・一致系（スコア加算のみ）**:
+  - `アイテムセット`: 3
+- **近接・一致系（加点のみ）**:
   - `分野バケット`: 3
-  - `棚一致`: 2
+  - `棚記号`: 2
   - `分類近接`: 1 (閾値: 5)
-  - `資料種別一致`: 2
-  - `出版地一致`: 1
+  - `資料種別`: 2
+  - `出版地`: 1
   - `出版年近接`: 1 (閾値: 5年)
 - **ペナルティ**:
-    - `書誌ID`: 0 （スコア加算はせず、ペナルティにのみ使用）
-    - `同一書誌へのペナルティ`: 150
-    - `同一タイトルへのペナルティ`: 150
+    - `書誌ID`: 0 （スコア加算はせず、ペナルティ判定にのみ使用）
+    - `ペナルティ: 同一書誌ID`: 150
+    - `ペナルティ: 同一ベースタイトル`: 150
 
 #### ウェイト設定の理論的背景
 
 - **強力なシグナル（著者ID, 主題）**: `著者ID` と `主題` が著者・トピックの主要なシグナルです。
-- **フォールバックシグナル（著者名典拠形, アイテムセット）**: `著者名典拠形` は弱めの著者シグナルであり、`アイテムセット` は、他のメタデータが乏しいときに有用なキュレーションされたコンテキストを提供します。
-- **「書架散策」的シグナル（分野, 棚, 分類）**: これらは意図的に低く設定されており（1–2）、主題シグナルを圧倒することなく、物理的な「棚ブラウジング」のニュアンスとセレンディピティを加えます。
-- **分類は「近さ」で調整**: 周辺の分類を含めて幅広く拾いたいときは「分類近接」の閾値を活用します。
-- **軽いブースト（資料種別, 出版年, 出版地）**: 同じタイプのアイテムや類似の時期／同じ地域で出版されたアイテムに対して微妙な関連性を追加します。ただし、主題や著者シグナルを上書きしない程度の控えめな値にしておくのが無難です。
-- **書誌ID（0ウェイト + ペナルティ）**: 同じシリーズのアイテム（例：ジャーナルの巻号）はしばしば豊富に存在します。ウェイトを0に設定し、強いペナルティを適用することで、より多様な結果のために押し下げられますが、より良い一致が存在しない場合には依然として利用可能です。
+- **フォールバックシグナル（著者名典拠形, アイテムセット）**: `著者名典拠形` は著者に対する「揺れ」のシグナルであり、`アイテムセット` はメタデータが乏しいときに有用なコンテキストを提供します。
+- **「書架散策」的シグナル（分野バケット, 棚記号, 分類近接）**: これらは意図的に低く設定されており、主題シグナルを圧倒することなく、物理的な「棚ブラウジング」のニュアンスなどを加えます。「分類近接」の閾値を活用することで周辺の分類を幅広く拾うことができます。
+- **軽いブースト（資料種別, 出版年近接, 出版地）**: 同じタイプのアイテムや類似の時期／同じ地域で出版されたアイテムに対して微小な関連性を追加します。主題や著者シグナルを上書きしない程度の控えめな値にするのが無難です。
+- **書誌ID（0ウェイト + ペナルティ）**: 同じシリーズのアイテム（例：同じ全集の各巻）はしばしば豊富に存在します。ウェイトを0に設定し、強いペナルティを適用することで、他候補を上位に上げて多様な結果を提供します。より良い一致が存在しない場合には依然として推薦先として利用されます。
 
 > 注: NCID は 0.4.0 以降、類似度シグナルとしては使用しておらず、設定画面からも削除されています。
 
@@ -471,16 +480,15 @@ MIT
 
 - **著者中心の結果を増やすには**: `著者ID` のウェイトを6または7に増やします。
 - **主題のマッチングを強化するには**: 主題のカタログが強力な場合、`主題` のウェイトを6または7に増やします。
-- **「書架散策」感を出すには**: `棚一致` または `分類近接` を2に優しく増やします。結果があまりにも均質にならないように監視します。
+- **「書架散策」感を出すには**: `棚記号` または `分類近接` を2に優しく増やします。結果があまりにも均質にならないように監視します。
 
 #### セレンディピティと多様性の制御
 
 これらの設定は、同じシリーズのアイテムによって結果が支配されるのを防ぐために連携して機能します。
 
-- **同一書誌を抑制（スイッチ）**: これは多様性のためのマスタースイッチです。**オン**のとき：
-    - `同一書誌へのペナルティ` が、現在のアイテムの書誌IDを共有するアイテムに適用されます。
-- **オンのとき**: `同一ベースタイトルへのペナルティ` も併せて適用されます。
-- **オフのとき**: これらのペナルティが無効になります。これはテストに便利な場合や、直接的なシリーズ関係を優先したい場合に役立ちます。
+- **セレンディピティ: 同一書誌を抑制（スイッチ）**: これは多様性のためのマスタースイッチです。
+  - **オンのとき**: `ペナルティ: 同一書誌ID` および `ペナルティ: 同一ベースタイトル` が、それぞれ該当する候補のアイテムに適用されます。
+  - **オフのとき**: これらのペナルティが無効になります。テストや直接的なシリーズ関係を優先表示したい場合に役立ちます。
 - **最終段階の多様化**: すべてのスコアリングが完了した後、モジュールは最終的な再配置ステップを実行します。異なるベースタイトルを持つアイテムを優先的に表示するようにし、結果の多様性を大幅に向上させます。
 
 ---

@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.6] - 2026-03-18
+
+### EN
+
+#### Changed
+- Completely overhauled and synchronized `README.md` for exact parity between English and Japanese sections (e.g., added missing "Multi-match Bonus" section to English docs).
+- Synchronized admin UI field labels with README terminology exactly.
+- Added explicit documentation in `ConfigForm.php` field descriptions (UI info blocks) and `README.md` explaining the background extraction logic for "Shelf match" and "Class proximity".
+
+### 日本語
+
+#### 変更
+- `README.md` を全面的に見直し、英語と日本語のドキュメントの構造と内容を完全に同期させました（英語版に欠落していた「一致回数ボーナス」セクションを追加など）。
+- 管理画面の各設定項目ラベルの表記を README の用語と厳密に一致させました。
+- 「重み: 棚記号」および「重み: 分類近接」について、システム内で文字列や修飾子がどのように抽出・評価され、フォールバックするかという具体的な処理ロジックを、設定画面上の説明テキストおよび README に追記しました。
+
 ## [0.4.5] - 2026-02-21
 
 ### EN
