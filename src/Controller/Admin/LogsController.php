@@ -363,6 +363,7 @@ class LogsController extends AbstractActionController {
         'avg_duration_ms' => (float) $row['avg_duration'],
         'empties' => (int) $row['empties'],
         'views' => 0,
+        'never_seen' => 0,
         'clicks' => 0,
         'cross' => 0,
         'same' => 0,
@@ -374,7 +375,8 @@ class LogsController extends AbstractActionController {
     }
 
     foreach ($this->safeFetchAll(
-      'SELECT arm, event_type, COUNT(*) AS n FROM ' . $evt . ' ' . $evtWhere . ' GROUP BY arm, event_type',
+      'SELECT arm, event_type, SUM(was_visible = 1) AS seen, COUNT(*) AS n FROM ' . $evt . ' '
+      . $evtWhere . ' GROUP BY arm, event_type',
       $evtParams
     ) as $row) {
       $arm = (string) ($row['arm'] ?? '');
@@ -382,7 +384,9 @@ class LogsController extends AbstractActionController {
         continue;
       }
       if ($row['event_type'] === 'view') {
-        $rows[$arm]['views'] = (int) $row['n'];
+        // Visible views only; see buildSummary() for why.
+        $rows[$arm]['views'] = (int) $row['seen'];
+        $rows[$arm]['never_seen'] = (int) $row['n'] - (int) $row['seen'];
       }
       elseif ($row['event_type'] === 'click') {
         $rows[$arm]['clicks'] = (int) $row['n'];
@@ -451,6 +455,7 @@ class LogsController extends AbstractActionController {
       'avg_candidates' => 0.0,
       'avg_results' => 0.0,
       'views' => 0,
+      'never_seen' => 0,
       'clicks' => 0,
       'ctr' => 0.0,
       'viewed_ctr' => 0.0,
@@ -499,13 +504,19 @@ class LogsController extends AbstractActionController {
       $out['chains'] = (int) $head['chains'];
     }
 
+    // A `view` row is written whether or not the block was ever on screen: the
+    // client reports it on first intersection, and otherwise on page hide with
+    // was_visible = 0. Counting both as "viewed" would defeat the purpose of
+    // the event, which is to separate rendered from actually seen.
     $events = $this->safeFetchAll(
-      'SELECT event_type, COUNT(*) AS n FROM ' . $evt . ' ' . $evtWhere . ' GROUP BY event_type',
+      'SELECT event_type, SUM(was_visible = 1) AS seen, COUNT(*) AS n FROM ' . $evt . ' '
+      . $evtWhere . ' GROUP BY event_type',
       $evtParams
     );
     foreach ($events as $row) {
       if ($row['event_type'] === 'view') {
-        $out['views'] = (int) $row['n'];
+        $out['views'] = (int) $row['seen'];
+        $out['never_seen'] = (int) $row['n'] - (int) $row['seen'];
       }
       elseif ($row['event_type'] === 'click') {
         $out['clicks'] = (int) $row['n'];

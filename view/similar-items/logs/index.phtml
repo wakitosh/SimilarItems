@@ -180,12 +180,17 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
   <div class="si-kpi">
     <span class="si-kpi__label"><?= $escape($translate('Viewed (in viewport)')) ?></span>
     <span class="si-kpi__value"><?= $num($summary['views']) ?></span>
-    <span class="si-kpi__sub"><?= $escape($pct($summary['view_rate'])) ?> <?= $escape($translate('of impressions')) ?></span>
+    <span class="si-kpi__sub">
+      <?= $escape($pct($summary['view_rate'])) ?> <?= $escape($translate('of impressions')) ?>
+      <?php if (!empty($summary['never_seen'])): ?>
+        &middot; <?= $escape(sprintf($translate('%s never on screen'), $num($summary['never_seen']))) ?>
+      <?php endif; ?>
+    </span>
   </div>
   <div class="si-kpi">
     <span class="si-kpi__label"><?= $escape($translate('Clicks')) ?></span>
     <span class="si-kpi__value"><?= $num($summary['clicks']) ?></span>
-    <span class="si-kpi__sub">CTR <?= $escape($pct($summary['ctr'])) ?> / <?= $escape($translate('viewed')) ?> <?= $escape($pct($summary['viewed_ctr'])) ?></span>
+    <span class="si-kpi__sub">CTR <?= $escape($pct($summary['ctr'])) ?> &middot; <?= $escape($translate('among viewed')) ?> <?= $escape($pct($summary['viewed_ctr'])) ?></span>
   </div>
   <div class="si-kpi">
     <span class="si-kpi__label"><?= $escape($translate('Recommendation-driven hops')) ?></span>
@@ -265,7 +270,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
       </table>
     </div>
     <p class="si-note">
-      <?= $escape($translate('The "off" arm records impressions but displays nothing, so its viewed/CTR columns are empty by construction. Export the impressions dataset for a proper statistical comparison; these figures are for monitoring.')) ?>
+      <?= $escape($translate('"Viewed" counts only blocks that actually reached the screen; an impression whose block was never on screen is reported too, but is not counted here. The "off" arm records impressions and displays nothing, so its viewed/CTR columns are empty by construction. Export the impressions dataset for a proper statistical comparison; these figures are for monitoring.')) ?>
     </p>
     <?php else: ?>
     <p class="si-note"><?= $escape($translate('No impressions recorded under any arm yet.')) ?></p>

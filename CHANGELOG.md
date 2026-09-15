@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.2] - 2026-09-15
+
+### EN
+
+#### Fixed
+- The dashboard counted every `view` row as "viewed", including the ones the client reports on page hide for a block that never reached the screen (`was_visible = 0`). That overstated the in-viewport rate and put never-seen impressions into the denominator of the viewed CTR - defeating the purpose of the event, which is to separate rendered from actually seen. Both the summary and the per-arm table now count visible views only, and the number of impressions reported as never on screen is shown alongside. No data was lost: `was_visible` was already stored, so existing rows re-aggregate correctly.
+
+### 日本語
+
+#### 修正
+- ダッシュボードが `view` イベントを `was_visible` に関係なく「可視化」として数えていました。クライアントは、ブロックが画面に入らないまま離脱した場合も `was_visible = 0` で `view` を送るため、可視化率が過大になり、可視化ベース CTR の分母に「見られていない表示」が混入していました。「表示された」と「実際に見られた」を分離するというこのイベントの目的に反するため、概況・アーム別表とも可視化済みのみを数えるようにし、「画面に入らなかった件数」を併記するようにしました。データの欠損はありません（`was_visible` は当初から保存しているため、既存の行も正しく再集計されます）。
+
 ## [0.5.1] - 2026-09-15
 
 ### EN
