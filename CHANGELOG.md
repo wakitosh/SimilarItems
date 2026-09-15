@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2026-09-15
+
+### EN
+
+#### Fixed
+- The client logging script was never loaded on themes that override `layout.phtml` without repeating `$this->trigger('view.layout')`. That event is fired only from Omeka's own layout, so every listener attached to it is silently dropped by such a theme - and the theme in production here is one of them. The result was that impressions were recorded but **no `view` or `click` event ever arrived**, and the "off" arm's hiding stylesheet would not have been applied either. The assets are now queued on the MVC render event, which runs regardless of the layout in use. Verified on both an overriding and a non-overriding theme, on browse, item and error pages, injecting exactly once.
+
+> Operators: any other module relying on `view.layout` (CSSEditor, for one) is affected by the same theme behaviour and should be checked separately.
+
+### 日本語
+
+#### 修正
+- `layout.phtml` を上書きし `$this->trigger('view.layout')` を呼ばないテーマでは、クライアント側ログ収集スクリプトが読み込まれませんでした。このイベントは Omeka コアのレイアウトからしか発火されないため、そうしたテーマでは同イベントに登録したリスナーがすべて無視されます（本番で使用中のテーマが該当）。結果としてインプレッションは記録されるものの、**`view`・`click` イベントが 1 件も届かない**状態になり、対照群「非表示」アームの非表示スタイルも適用されないところでした。MVC の render イベントで登録する方式に変更し、レイアウトの実装に依存しないようにしました。上書きテーマ・非上書きテーマの双方、一覧／資料／エラーページで、重複なく 1 回だけ注入されることを確認済みです。
+
+> 運用上の注意: `view.layout` に依存する他のモジュール（CSSEditor など）も同じ影響を受けます。別途確認してください。
+
 ## [0.5.0] - 2026-09-15
 
 ### EN

@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace SimilarItems;
 
 use Omeka\Module\AbstractModule;
-use Laminas\EventManager\Event;
-use Laminas\EventManager\SharedEventManagerInterface;
 use Laminas\View\Renderer\PhpRenderer;
 use Laminas\Mvc\Controller\AbstractController;
 use Laminas\Mvc\MvcEvent;
@@ -56,6 +54,14 @@ class Module extends AbstractModule {
     // The log browser is administrative.
     $acl->allow(['global_admin', 'site_admin'], [LogsController::class]);
 
+    // Queue the client assets at render time; see queueClientAssets() for why
+    // the `view.layout` view event cannot be relied on here.
+    $event->getApplication()->getEventManager()->attach(
+      MvcEvent::EVENT_RENDER,
+      [$this, 'queueClientAssets'],
+      100
+    );
+
     // Make sure the log tables exist even when the module was updated without
     // re-running install().
     try {
@@ -70,43 +76,58 @@ class Module extends AbstractModule {
   }
 
   /**
-   * Load the client-side logging script on public pages.
+   * Whether the client assets were already queued for this request.
    *
-   * The script is theme independent: it reacts to the hidden JSON payload the
-   * recommendation endpoint injects into the rendered list.
+   * @var bool
    */
-  public function attachListeners(SharedEventManagerInterface $sharedEventManager): void {
-    $sharedEventManager->attach('*', 'view.layout', function (Event $event): void {
-      try {
-        $services = $this->getServiceLocator();
-        if (!$services->get('Omeka\Status')->isSiteRequest()) {
-          return;
-        }
-        if (!$services->get(LogService::class)->isEnabled()) {
-          return;
-        }
-        /** @var \Laminas\View\Renderer\PhpRenderer $view */
-        $view = $event->getTarget();
-        $view->headScript()->appendFile(
-          $view->assetUrl('js/similar-items-log.js', 'SimilarItems'),
-          'text/javascript',
-          ['defer' => 'defer']
-        );
+  private bool $clientAssetsQueued = FALSE;
 
-        // Control arm "off": hide the block from the stylesheet rather than
-        // from script, so there is no flash of a loading block that then
-        // disappears. The endpoint still records the impression, which keeps
-        // page views in this arm visible to session-level analysis.
-        $arms = $services->get(ArmAssigner::class);
-        if ($arms->isEnabled()
-          && $arms->isHidden($services->get(LogService::class)->getSessionKey())) {
-          $view->headStyle()->appendStyle('[data-similar-items]{display:none !important;}');
-        }
+  /**
+   * Queue the client-side logging assets on public pages.
+   *
+   * Deliberately attached to the MVC render event rather than to the
+   * `view.layout` view event. `view.layout` is triggered from Omeka's own
+   * `layout.phtml`, so any theme that overrides the layout without repeating
+   * `$this->trigger('view.layout')` silently drops every listener attached to
+   * it - which is the case for at least one theme in use here. Placeholders
+   * populated at render time are picked up by whatever layout does run, so
+   * this works regardless of the theme.
+   */
+  public function queueClientAssets(MvcEvent $event): void {
+    if ($this->clientAssetsQueued) {
+      return;
+    }
+    try {
+      $services = $event->getApplication()->getServiceManager();
+      if (!$services->get('Omeka\Status')->isSiteRequest()) {
+        return;
       }
-      catch (\Throwable $e) {
-        // A missing asset must not break page rendering.
+      if (!$services->get(LogService::class)->isEnabled()) {
+        return;
       }
-    });
+      $this->clientAssetsQueued = TRUE;
+
+      $helpers = $services->get('ViewHelperManager');
+      $assetUrl = $helpers->get('assetUrl');
+      $helpers->get('headScript')->appendFile(
+        $assetUrl('js/similar-items-log.js', 'SimilarItems'),
+        'text/javascript',
+        ['defer' => 'defer']
+      );
+
+      // Control arm "off": hide the block from the stylesheet rather than
+      // from script, so there is no flash of a loading block that then
+      // disappears. The endpoint still records the impression, which keeps
+      // page views in this arm visible to session-level analysis.
+      $arms = $services->get(ArmAssigner::class);
+      if ($arms->isEnabled()
+        && $arms->isHidden($services->get(LogService::class)->getSessionKey())) {
+        $helpers->get('headStyle')->appendStyle('[data-similar-items]{display:none !important;}');
+      }
+    }
+    catch (\Throwable $e) {
+      // Logging assets must never break page rendering.
+    }
   }
 
   /**

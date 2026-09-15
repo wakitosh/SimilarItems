@@ -388,7 +388,7 @@ To compare configurations, set a **variant label** (e.g. `baseline`, `jitter-on`
 
 ### Theme requirements
 
-None. The module's bundled default block already uses the async endpoint, so logging works on an untouched theme. The endpoint prepends a hidden `<script type="application/json" data-similar-items-log>` payload to the rendered list, and the module ships its own client script (`asset/js/similar-items-log.js`), loaded automatically on public pages while logging is enabled. Any theme that injects the returned `html` into the page is logged correctly. Themes that render the list themselves can read the same payload from `log` in the JSON response.
+None, and the client script does not depend on the theme's layout either: it is queued on the MVC render event rather than on the `view.layout` view event, which a theme that overrides `layout.phtml` can silently swallow. The module's bundled default block already uses the async endpoint, so logging works on an untouched theme. The endpoint prepends a hidden `<script type="application/json" data-similar-items-log>` payload to the rendered list, and the module ships its own client script (`asset/js/similar-items-log.js`), loaded automatically on public pages while logging is enabled. Any theme that injects the returned `html` into the page is logged correctly. Themes that render the list themselves can read the same payload from `log` in the JSON response.
 
 ### Caveats
 
@@ -804,7 +804,7 @@ WHERE event_type = 'click' AND cross_domain IS NOT NULL AND is_bot = 0;
 
 ### テーマ側の要件
 
-ありません。モジュール同梱の既定ブロックが非同期エンドポイントを使用するため、テーマを改修していなくてもログが取得できます。エンドポイントは描画済みリストの先頭に隠し要素 `<script type="application/json" data-similar-items-log>` を付加し、モジュール同梱のクライアントスクリプト（`asset/js/similar-items-log.js`）がログ有効時に公開ページへ自動で読み込まれます。返却された `html` をページに挿入するテーマであれば、そのまま正しく記録されます。リストを独自に描画するテーマは、JSON 応答の `log` キーから同じ情報を取得できます。
+ありません。クライアントスクリプトの読み込みもテーマのレイアウトに依存しません（`view.layout` ビューイベントではなく MVC の render イベントで登録するため。前者は `layout.phtml` を上書きしたテーマに握り潰されることがあります）。モジュール同梱の既定ブロックが非同期エンドポイントを使用するため、テーマを改修していなくてもログが取得できます。エンドポイントは描画済みリストの先頭に隠し要素 `<script type="application/json" data-similar-items-log>` を付加し、モジュール同梱のクライアントスクリプト（`asset/js/similar-items-log.js`）がログ有効時に公開ページへ自動で読み込まれます。返却された `html` をページに挿入するテーマであれば、そのまま正しく記録されます。リストを独自に描画するテーマは、JSON 応答の `log` キーから同じ情報を取得できます。
 
 ### 注意点
 
