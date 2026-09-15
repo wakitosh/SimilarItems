@@ -1,0 +1,129 @@
+<?php
+/**
+ * Impression table.
+ *
+ * @var array $rows
+ * @var int   $page
+ * @var int   $perPage
+ * @var int   $total
+ * @var array $filters
+ */
+
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+$escapeAttr = $this->plugin('escapeHtmlAttr');
+
+$tz = (string) ($this->setting('time_zone', 'UTC'));
+$fmt = function ($ts) use ($tz) {
+    $ts = (int) $ts;
+    if ($ts <= 0) {
+        return '-';
+    }
+    try {
+        $dt = new \DateTime('@' . $ts);
+        $dt->setTimezone(new \DateTimeZone($tz));
+        return $dt->format('Y-m-d H:i:s');
+    } catch (\Throwable $e) {
+        return date('Y-m-d H:i:s', $ts);
+    }
+};
+
+$pages = (int) max(1, ceil($total / max(1, $perPage)));
+$baseQuery = array_filter([
+    'from' => $filters['from'],
+    'to' => $filters['to'],
+    'site_slug' => $filters['site_slug'],
+    'variant' => $filters['variant'],
+    'device' => $filters['device'],
+    'seed_item_id' => $filters['seed_item_id'] ?: '',
+    'session_key' => $filters['session_key'],
+    'include_bots' => $filters['include_bots'],
+    'per_page' => $perPage,
+], function ($v) { return $v !== '' && $v !== null; });
+$pageUrl = function (int $p) use ($baseQuery) {
+    return $this->url('admin/similar-items-logs-impressions', [], ['query' => array_merge($baseQuery, ['page' => $p])]);
+};
+$sessionUrl = function (string $key) use ($baseQuery) {
+    return $this->url('admin/similar-items-logs-impressions', [], [
+        'query' => array_merge($baseQuery, ['session_key' => $key, 'page' => 1]),
+    ]);
+};
+?>
+
+<p><?= $escape(sprintf($translate('%d impressions'), $total)) ?></p>
+
+<table class="si-log-table">
+  <thead>
+    <tr>
+      <th><?= $escape($translate('ID')) ?></th>
+      <th><?= $escape($translate('Time')) ?></th>
+      <th><?= $escape($translate('Seed item')) ?></th>
+      <th class="num"><?= $escape($translate('Shown')) ?></th>
+      <th class="num"><?= $escape($translate('Pool')) ?></th>
+      <th class="num"><?= $escape($translate('ms')) ?></th>
+      <th class="num"><?= $escape($translate('Hop')) ?></th>
+      <th><?= $escape($translate('Entry')) ?></th>
+      <th><?= $escape($translate('Session')) ?></th>
+      <th><?= $escape($translate('Device')) ?></th>
+      <th><?= $escape($translate('Variant')) ?></th>
+      <th><?= $escape($translate('Results (rank: id, score)')) ?></th>
+    </tr>
+  </thead>
+  <tbody>
+    <?php if (empty($rows)): ?>
+      <tr><td colspan="12"><?= $escape($translate('No logs yet.')) ?></td></tr>
+    <?php else: ?>
+      <?php foreach ($rows as $r): ?>
+        <?php
+        $seedId = (int) ($r['seed_item_id'] ?? 0);
+        $seedTitle = (string) ($r['seed_item_title'] ?? '');
+        $results = json_decode((string) ($r['results'] ?? ''), true);
+        $sessionKey = (string) ($r['session_key'] ?? '');
+        ?>
+        <tr<?= !empty($r['is_bot']) ? ' style="opacity:.55;"' : '' ?>>
+          <td><?= (int) $r['id'] ?></td>
+          <td><?= $escape($fmt($r['created_at'] ?? 0)) ?></td>
+          <td>
+            <a href="<?= $escapeAttr($this->url('admin/id', ['controller' => 'item', 'id' => $seedId])) ?>" target="_blank" rel="noopener" title="<?= $escapeAttr($seedTitle) ?>">
+              #<?= $seedId ?>
+            </a>
+            <?php if ($seedTitle !== ''): ?>
+              <div style="color:#666;"><?= $escape(mb_strimwidth($seedTitle, 0, 40, '…', 'UTF-8')) ?></div>
+            <?php endif; ?>
+          </td>
+          <td class="num"><?= (int) ($r['result_count'] ?? 0) ?></td>
+          <td class="num"><?= (int) ($r['candidate_count'] ?? 0) ?></td>
+          <td class="num"><?= (int) ($r['duration_ms'] ?? 0) ?></td>
+          <td class="num"><?= (int) ($r['hop_depth'] ?? 0) ?></td>
+          <td><?= $escape((string) ($r['entry_kind'] ?? '')) ?></td>
+          <td>
+            <?php if ($sessionKey !== ''): ?>
+              <a href="<?= $escapeAttr($sessionUrl($sessionKey)) ?>" title="<?= $escapeAttr($sessionKey) ?>"><code><?= $escape(substr($sessionKey, 0, 8)) ?></code></a>
+            <?php endif; ?>
+          </td>
+          <td><?= $escape((string) ($r['device'] ?? '')) ?><?= !empty($r['is_bot']) ? ' (bot)' : '' ?></td>
+          <td><?= $escape((string) ($r['variant'] ?? '')) ?></td>
+          <td>
+            <?php if (is_array($results) && $results): ?>
+              <?php foreach ($results as $res): ?>
+                <div><?= (int) ($res['rank'] ?? 0) ?>: #<?= (int) ($res['id'] ?? 0) ?>
+                  (<?= $escape((string) ($res['score'] ?? 0)) ?><?= !empty($res['bucket']) ? ', ' . $escape((string) $res['bucket']) : '' ?>)
+                </div>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <span style="color:#999;"><?= $escape($translate('(empty)')) ?></span>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    <?php endif; ?>
+  </tbody>
+</table>
+
+<div class="si-pagination">
+  <a class="button <?= $page <= 1 ? 'disabled' : '' ?>" href="<?= $escapeAttr($pageUrl(1)) ?>"><?= $escape($translate('First')) ?></a>
+  <a class="button <?= $page <= 1 ? 'disabled' : '' ?>" href="<?= $escapeAttr($pageUrl(max(1, $page - 1))) ?>"><?= $escape($translate('Previous')) ?></a>
+  <span><?= $escape(sprintf($translate('Page %d / %d'), $page, $pages)) ?></span>
+  <a class="button <?= $page >= $pages ? 'disabled' : '' ?>" href="<?= $escapeAttr($pageUrl(min($pages, $page + 1))) ?>"><?= $escape($translate('Next')) ?></a>
+  <a class="button <?= $page >= $pages ? 'disabled' : '' ?>" href="<?= $escapeAttr($pageUrl($pages)) ?>"><?= $escape($translate('Last')) ?></a>
+</div>

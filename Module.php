@@ -5,11 +5,17 @@ declare(strict_types=1);
 namespace SimilarItems;
 
 use Omeka\Module\AbstractModule;
+use Laminas\EventManager\Event;
+use Laminas\EventManager\SharedEventManagerInterface;
 use Laminas\View\Renderer\PhpRenderer;
 use Laminas\Mvc\Controller\AbstractController;
 use Laminas\Mvc\MvcEvent;
+use SimilarItems\Controller\Admin\LogsController;
+use SimilarItems\Controller\EventController;
 use SimilarItems\Controller\RecommendController as RecommendControllerAlias;
+use SimilarItems\Experiment\ArmAssigner;
 use SimilarItems\Form\ConfigForm;
+use SimilarItems\Log\LogService;
 use Laminas\ServiceManager\ServiceLocatorInterface;
 
 /**
@@ -28,6 +34,8 @@ class Module extends AbstractModule {
    * Register ACL so the recommend endpoint is publicly accessible.
    */
   public function onBootstrap(MvcEvent $event): void {
+    // Registers the service locator and calls attachListeners().
+    parent::onBootstrap($event);
     $services = $event->getApplication()->getServiceManager();
     /** @var \Omeka\Permissions\Acl $acl */
     $acl = $services->get('Omeka\Acl');
@@ -39,6 +47,66 @@ class Module extends AbstractModule {
 
     // Also allow controller alias resource.
     $acl->allow(NULL, ['SimilarItems\\Controller\\RecommendController'], ['list']);
+
+    // The usage-log collection endpoint must be reachable by anonymous
+    // visitors; it only accepts POST and writes nothing the caller can read.
+    $acl->allow(NULL, [EventController::class], ['collect']);
+    $acl->allow(NULL, ['SimilarItems\\Controller\\EventController'], ['collect']);
+
+    // The log browser is administrative.
+    $acl->allow(['global_admin', 'site_admin'], [LogsController::class]);
+
+    // Make sure the log tables exist even when the module was updated without
+    // re-running install().
+    try {
+      $log = $services->get(LogService::class);
+      if ($log->isEnabled()) {
+        $log->ensureTables();
+      }
+    }
+    catch (\Throwable $e) {
+      // Never block bootstrap because of logging.
+    }
+  }
+
+  /**
+   * Load the client-side logging script on public pages.
+   *
+   * The script is theme independent: it reacts to the hidden JSON payload the
+   * recommendation endpoint injects into the rendered list.
+   */
+  public function attachListeners(SharedEventManagerInterface $sharedEventManager): void {
+    $sharedEventManager->attach('*', 'view.layout', function (Event $event): void {
+      try {
+        $services = $this->getServiceLocator();
+        if (!$services->get('Omeka\Status')->isSiteRequest()) {
+          return;
+        }
+        if (!$services->get(LogService::class)->isEnabled()) {
+          return;
+        }
+        /** @var \Laminas\View\Renderer\PhpRenderer $view */
+        $view = $event->getTarget();
+        $view->headScript()->appendFile(
+          $view->assetUrl('js/similar-items-log.js', 'SimilarItems'),
+          'text/javascript',
+          ['defer' => 'defer']
+        );
+
+        // Control arm "off": hide the block from the stylesheet rather than
+        // from script, so there is no flash of a loading block that then
+        // disappears. The endpoint still records the impression, which keeps
+        // page views in this arm visible to session-level analysis.
+        $arms = $services->get(ArmAssigner::class);
+        if ($arms->isEnabled()
+          && $arms->isHidden($services->get(LogService::class)->getSessionKey())) {
+          $view->headStyle()->appendStyle('[data-similar-items]{display:none !important;}');
+        }
+      }
+      catch (\Throwable $e) {
+        // A missing asset must not break page rendering.
+      }
+    });
   }
 
   /**
@@ -141,6 +209,25 @@ class Module extends AbstractModule {
       // Multi-match bonus (global).
       'similaritems_multi_match_enable' => (int) ($settings->get('similaritems.multi_match.enable') ?? 0),
       'similaritems_multi_match_decay' => (string) ($settings->get('similaritems.multi_match.decay') ?? '0.2'),
+
+      // Usage logging (research).
+      'similaritems_log_enable' => (int) ($settings->get('similaritems.log.enable') ?? 0),
+      'similaritems_log_exclude_bots' => (int) ($settings->get('similaritems.log.exclude_bots') ?? 1),
+      'similaritems_log_session_cookie' => (int) ($settings->get('similaritems.log.session_cookie') ?? 1),
+      'similaritems_log_session_ttl' => (int) ($settings->get('similaritems.log.session_ttl') ?? 1800),
+      'similaritems_log_chain_window' => (int) ($settings->get('similaritems.log.chain_window') ?? 300),
+      'similaritems_log_ip_mode' => (string) ($settings->get('similaritems.log.ip_mode') ?? 'hash'),
+      'similaritems_log_store_user' => (int) ($settings->get('similaritems.log.store_user') ?? 0),
+      'similaritems_log_retention_days' => (int) ($settings->get('similaritems.log.retention_days') ?? 0),
+      'similaritems_log_variant' => (string) ($settings->get('similaritems.log.variant') ?? ''),
+
+      // Control-group trial.
+      'similaritems_experiment_enable' => (int) ($settings->get('similaritems.experiment.enable') ?? 0),
+      'similaritems_experiment_use_random' => (int) ($settings->get('similaritems.experiment.use_random') ?? 1),
+      'similaritems_experiment_use_off' => (int) ($settings->get('similaritems.experiment.use_off') ?? 1),
+      'similaritems_experiment_weight_default' => (int) ($settings->get('similaritems.experiment.weight_default') ?? 80),
+      'similaritems_experiment_weight_random' => (int) ($settings->get('similaritems.experiment.weight_random') ?? 10),
+      'similaritems_experiment_weight_off' => (int) ($settings->get('similaritems.experiment.weight_off') ?? 10),
     ]);
 
     $form->prepare();
@@ -221,6 +308,27 @@ class Module extends AbstractModule {
       // Multi-match defaults.
       'similaritems.multi_match.enable' => 0,
       'similaritems.multi_match.decay' => '0.2',
+
+      // Usage logging defaults. Logging is OFF until an operator turns it on,
+      // so that a first-party cookie is never set without a decision.
+      'similaritems.log.enable' => 0,
+      'similaritems.log.exclude_bots' => 1,
+      'similaritems.log.session_cookie' => 1,
+      'similaritems.log.session_ttl' => 1800,
+      'similaritems.log.chain_window' => 300,
+      'similaritems.log.ip_mode' => 'hash',
+      'similaritems.log.store_user' => 0,
+      'similaritems.log.retention_days' => 0,
+      'similaritems.log.variant' => '',
+
+      // Control-group trial. Disabled by default, so nothing about the live
+      // site changes until an operator deliberately starts it.
+      'similaritems.experiment.enable' => 0,
+      'similaritems.experiment.use_random' => 1,
+      'similaritems.experiment.use_off' => 1,
+      'similaritems.experiment.weight_default' => 80,
+      'similaritems.experiment.weight_random' => 10,
+      'similaritems.experiment.weight_off' => 10,
     ];
 
     foreach ($defaults as $key => $value) {
@@ -228,6 +336,65 @@ class Module extends AbstractModule {
       if ($current === NULL) {
         $settings->set($key, $value);
       }
+    }
+
+    $this->createLogTables($services);
+    $this->ensureLogSalt($services);
+    $this->ensureExperimentSeed($services);
+  }
+
+  /**
+   * Create log artefacts when upgrading from a version without them.
+   *
+   * Existing log rows are deliberately kept on uninstall/upgrade: they are
+   * research data.
+   */
+  public function upgrade($oldVersion, $newVersion, ServiceLocatorInterface $services): void {
+    $this->install($services);
+  }
+
+  /**
+   * Create the usage log tables.
+   */
+  private function createLogTables(ServiceLocatorInterface $services): void {
+    try {
+      $services->get(LogService::class)->ensureTables(TRUE);
+    }
+    catch (\Throwable $e) {
+      // The tables are also created lazily on first use.
+    }
+  }
+
+  /**
+   * Fix the arm assignment seed before the first visitor is assigned.
+   *
+   * Like the hashing salt, it must be stable for the whole trial: changing it
+   * reassigns every visitor and splits the data into two incomparable halves.
+   */
+  private function ensureExperimentSeed(ServiceLocatorInterface $services): void {
+    try {
+      $services->get(ArmAssigner::class)->ensureSeed();
+    }
+    catch (\Throwable $e) {
+      // Falls back to lazy creation on first assignment.
+    }
+  }
+
+  /**
+   * Fix the hashing salt before the first row can be written.
+   *
+   * The salt must be stable for the whole observation period: it is what lets
+   * a stored `client_ip` hash be reproduced from a raw address when joining
+   * this log to a web server access log. Creating it at install time (and
+   * again when logging is switched on) avoids it appearing midway through a
+   * study, which would split the data into two incomparable halves.
+   */
+  private function ensureLogSalt(ServiceLocatorInterface $services): void {
+    try {
+      $services->get(LogService::class)->ensureSalt();
+    }
+    catch (\Throwable $e) {
+      // Falls back to lazy creation on first use.
     }
   }
 
@@ -329,6 +496,62 @@ class Module extends AbstractModule {
       $decay = 0.0;
     }
     $settings->set('similaritems.multi_match.decay', (string) $decay);
+
+    // Usage logging (research).
+    $logEnable = $getInt('similaritems_log_enable', 0);
+    $settings->set('similaritems.log.enable', $logEnable);
+    $settings->set('similaritems.log.exclude_bots', $getInt('similaritems_log_exclude_bots', 1));
+    $settings->set('similaritems.log.session_cookie', $getInt('similaritems_log_session_cookie', 1));
+    $settings->set('similaritems.log.session_ttl', max(300, $getInt('similaritems_log_session_ttl', 1800)));
+    $settings->set('similaritems.log.chain_window', max(30, $getInt('similaritems_log_chain_window', 300)));
+    $ipMode = strtolower($getStr('similaritems_log_ip_mode', 'hash'));
+    if (!in_array($ipMode, ['hash', 'raw', 'none'], TRUE)) {
+      $ipMode = 'hash';
+    }
+    $settings->set('similaritems.log.ip_mode', $ipMode);
+    $settings->set('similaritems.log.store_user', $getInt('similaritems_log_store_user', 0));
+    $settings->set('similaritems.log.retention_days', max(0, $getInt('similaritems_log_retention_days', 0)));
+    $settings->set('similaritems.log.variant', trim($getStr('similaritems_log_variant', '')));
+    // Control-group trial.
+    $expEnable = $getInt('similaritems_experiment_enable', 0);
+    $settings->set('similaritems.experiment.enable', $expEnable);
+    $settings->set('similaritems.experiment.use_random', $getInt('similaritems_experiment_use_random', 1));
+    $settings->set('similaritems.experiment.use_off', $getInt('similaritems_experiment_use_off', 1));
+    $settings->set('similaritems.experiment.weight_default', max(0, $getInt('similaritems_experiment_weight_default', 80)));
+    $settings->set('similaritems.experiment.weight_random', max(0, $getInt('similaritems_experiment_weight_random', 10)));
+    $settings->set('similaritems.experiment.weight_off', max(0, $getInt('similaritems_experiment_weight_off', 10)));
+    if ($expEnable === 1) {
+      $arms = $services->get(ArmAssigner::class);
+      if ($arms->ensureSeed() === '') {
+        $controller->messenger()->addWarning('The experiment seed could not be stored; arm assignment will not be reproducible.');
+      }
+      $allocation = $arms->getAllocation();
+      if (!$allocation || array_keys($allocation) === [\SimilarItems\Experiment\ArmAssigner::ARM_DEFAULT]) {
+        $controller->messenger()->addWarning('No control arm is in use; every visitor will get the normal recommendations.');
+      }
+      elseif (($allocation[\SimilarItems\Experiment\ArmAssigner::ARM_DEFAULT] ?? 0) < 50) {
+        $controller->messenger()->addWarning(sprintf(
+          'Only %d%% of visitors will get the normal recommendations. Check that this is intended.',
+          (int) round($allocation[\SimilarItems\Experiment\ArmAssigner::ARM_DEFAULT] ?? 0)
+        ));
+      }
+      if ($logEnable !== 1) {
+        $controller->messenger()->addWarning('The control-group trial needs usage logging: without it the arms cannot be compared.');
+      }
+    }
+
+    if ($logEnable === 1) {
+      try {
+        $log = $services->get(LogService::class);
+        $log->ensureTables(TRUE);
+        if ($log->ensureSalt() === '') {
+          $controller->messenger()->addWarning('The usage-log hashing salt could not be stored; IP hashes will not be reproducible.');
+        }
+      }
+      catch (\Throwable $e) {
+        $controller->messenger()->addWarning('Usage log tables could not be created: ' . $e->getMessage());
+      }
+    }
 
     $controller->messenger()->addSuccess('SimilarItems settings were saved.');
     return TRUE;

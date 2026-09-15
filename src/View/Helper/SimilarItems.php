@@ -27,6 +27,13 @@ class SimilarItems extends AbstractHelper {
   private $logger;
 
   /**
+   * Diagnostics from the last __invoke() run (candidate pool size, options).
+   *
+   * @var array
+   */
+  private array $lastStats = [];
+
+  /**
    * Constructor.
    */
   public function __construct(Settings $settings, $logger = NULL) {
@@ -762,6 +769,9 @@ class SimilarItems extends AbstractHelper {
       $call = (string) ($mapCall ? ($this->firstString($it, $mapCall) ?? '') : '');
       $class = (string) ($mapClass ? ($this->firstString($it, $mapClass) ?? '') : '');
       $candBuckets = $this->evalBuckets($bucketRules, $call, $class);
+      // Keep the primary bucket so callers (usage logging) can tell whether a
+      // recommendation stays inside the seed's subject domain.
+      $entry['bucket'] = $candBuckets ? (string) reset($candBuckets) : '';
       if ($wBucket !== 0 && $curBucketKeys && $candBuckets) {
         if (count(array_intersect($curBucketKeys, $candBuckets)) > 0) {
           $entry['score'] += $wBucket;
@@ -1332,7 +1342,33 @@ class SimilarItems extends AbstractHelper {
 
     $log('final candidates: ' . count($diversified) . ' (limit=' . $limit . ')');
 
+    // Diagnostics for usage logging / research analysis. Kept on the helper so
+    // the scoring signature stays unchanged for existing callers.
+    $this->lastStats = [
+      'candidate_count' => count($candidates),
+      'result_count' => count($diversified),
+      'limit' => $limit,
+      'tiebreak' => $tiebreak,
+      'jitter' => $jitterOn ? 1 : 0,
+      'site_id' => $siteId ? (int) $siteId : NULL,
+      'seed_buckets' => array_values($curBucketKeys),
+      'seed_item_sets' => array_map('intval', array_keys($curItemSetIds)),
+    ];
+
     return $diversified;
+  }
+
+  /**
+   * Diagnostics from the most recent __invoke() call.
+   *
+   * Used by the usage log to record candidate pool size, the seed's domain
+   * buckets and the ranking options that were in effect.
+   *
+   * @return array
+   *   Statistics array; empty before the first call.
+   */
+  public function getLastStats(): array {
+    return $this->lastStats;
   }
 
   /**

@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-09-15
+
+### EN
+
+#### Added
+- **Usage logging for research** (opt-in, off by default). The module now collects the data needed to study how recommendations are used, without requiring access to the web server's raw access logs.
+  - New table `similaritems_impression`: one row per served recommendation, with seed item and its domain buckets, per-rank results (id, score, bucket, base title, signals), candidate pool size, computation time, effective configuration (`variant`, `config_hash`, `tiebreak`, `jitter`), referrer-based entry channel, device, and bot flag.
+  - New table `similaritems_event`: in-viewport `view` and `click` events, with rank, score, signals and domain of the clicked item, plus dwell time from render and from first visibility. Rank/score/signals are resolved server-side from the stored impression so they cannot be forged.
+  - Server-side reconstruction of recommendation-driven browsing chains (`chain_key`, `hop_depth`, `parent_event_id`), corrected by a click key carried forward in `sessionStorage`.
+  - New public endpoint `/similar-items/event` (POST only) and a theme-independent client script `asset/js/similar-items-log.js`, loaded automatically on public pages while logging is enabled.
+  - New admin screen *Similar Items logs*: dashboard (CTR overall and by rank, in-viewport rate, hop-depth distribution, chain statistics, cross-domain click share, entry channels, devices, top seeds and targets), impression and event tables with filters, log deletion, and CSV/TSV export of `impressions`, `events` and derived `chains` datasets.
+  - Privacy controls: pseudonymous first-party session cookie (can be disabled in favour of a daily-rotating key), IP stored hashed / raw / not at all, optional user id, bot exclusion, and a retention period in days.
+- **Control-group trial** (opt-in, off by default). Visitors are assigned by session to `default` (scored), `random` (same block, randomly drawn items) or `off` (block hidden), so the effect of the feature and of the scoring engine can be measured without a before/after baseline.
+  - Assignment is deterministic from the session key and a stored seed: stable within a session, requiring no storage, and recomputable during analysis. Weights are configurable, and each control arm can be switched on independently: a disabled arm weighs zero and the remainder is reallocated automatically. The dashboard reports the effective allocation.
+  - The `off` arm still records an impression, so session-level outcomes (pages and items per session) exist in every arm; it is hidden from the layout stylesheet, so there is no flash of a loading block.
+  - The seed item's domain buckets are recorded in every arm, keeping the cross-domain (serendipity) measure comparable.
+  - New `arm` column on both log tables, included in all three exports, with a per-arm comparison table on the dashboard.
+- Neutral default styling for the bundled block (`asset/css/similar-items.css`).
+- The hashing salt is now created and stored at install time and whenever logging is switched on, instead of lazily on the first logged request, so that it is fixed before a study starts. The log dashboard shows it together with the formula that reproduces a stored `client_ip` from a raw address, which is what allows this log to be joined to a web server access log.
+- `SimilarItems::getLastStats()` exposes candidate pool size, seed buckets and ranking options from the last scoring run.
+- Scored candidates now carry their primary domain bucket, which makes cross-domain (serendipity) analysis possible.
+
+#### Changed
+- The module's default block (`view/common/resource-page-blocks/similar-items.phtml`) now loads recommendations from the async endpoint instead of running its own inline, hard-coded scoring (item sets 3 / subject 2 / creator 1). A site with no theme override therefore gets the configured scoring engine, the same markup as a themed site, and usage logging - previously it silently bypassed all three. Themes that override this partial are unaffected.
+
+#### Fixed
+- The entry channel (`entry_kind`, `referrer_host`) was derived from the recommendation request's `Referer` header. That request is an XHR issued by the item page itself, so every visit was classified as `internal`. The browser now reports `document.referrer` with the `view` event instead; chain-derived `similar_items` still takes precedence.
+- `Module::onBootstrap()` did not call `parent::onBootstrap()`, so module event listeners were never attached.
+
+### 日本語
+
+#### 追加
+- **研究用の利用ログ収集**（既定は無効、明示的に有効化）。Apache 等の生ログを参照しなくても、推薦の利用状況を分析できるようになりました。
+  - 新テーブル `similaritems_impression`：推薦 1 回につき 1 行。シードアイテムとその分野、順位ごとの結果（ID・スコア・分野・ベースタイトル・発火シグナル）、候補数、計算時間、実効設定（`variant`, `config_hash`, `tiebreak`, `jitter`）、リファラに基づく流入経路、デバイス、ボット判定を記録します。
+  - 新テーブル `similaritems_event`：画面内に入ったことを示す `view` と `click` を記録。クリック先の順位・スコア・シグナル・分野に加え、描画時点および可視化時点からの滞留時間を保持します。順位・スコア・シグナルは保存済みインプレッションからサーバ側で解決するため、偽装できません。
+  - 推薦経由の回遊経路をサーバ側で復元（`chain_key`, `hop_depth`, `parent_event_id`）。`sessionStorage` で持ち越したクリックキーにより対応関係を補正します。
+  - 公開エンドポイント `/similar-items/event`（POST 専用）と、テーマに依存しないクライアントスクリプト `asset/js/similar-items-log.js` を追加。ログ有効時に公開ページへ自動で読み込まれます。
+  - 管理画面「Similar Items logs」を追加：ダッシュボード（全体および順位別 CTR、可視化率、回遊深度の分布、経路統計、分野越えクリック率、流入経路、デバイス、推薦元・クリック先の上位）、絞り込み付きのインプレッション／イベント一覧、ログ削除、`impressions`／`events`／派生データセット `chains` の CSV・TSV エクスポート。
+  - プライバシー設定：匿名の第一者セッションクッキー（無効化して日次ローテーションの擬似 ID に切替可）、IP のハッシュ化／そのまま／保存しない、ユーザ ID 記録の可否、ボット除外、保持日数。
+- **対照群試験**（既定は無効、明示的に有効化）。閲覧者をセッション単位で `default`（通常の推薦）／`random`（同じ見た目でランダムな資料）／`off`（ブロック非表示）に割り付け、前後比較のベースラインなしに機能そのものとスコアリングの効果を測定できます。
+  - 割付はセッションキーと保存済みシードから決定的に導出します。セッション内で固定され、保存領域を必要とせず、分析時に再計算できます。配分は設定可能で、対照群アームは個別に有効・無効を切り替えられます（無効にしたアームは重み 0 になり、残りで自動的に再配分）。ダッシュボードには実効配分を表示します。
+  - `off` アームでもインプレッションを記録するため、セッション単位の指標（セッションあたりページ数・資料数）が全アームで揃います。非表示はレイアウトのスタイルシートで行うため、読み込み中のブロックが一瞬見えることはありません。
+  - シード資料の分野バケットを全アームで記録し、分野越え（セレンディピティ）指標の比較可能性を保ちます。
+  - 両テーブルに `arm` 列を追加し、3 種のエクスポートすべてに含め、ダッシュボードにアーム別比較表を表示します。
+- 同梱ブロック用の最小限の既定スタイル（`asset/css/similar-items.css`）を追加しました。
+- ハッシュ用ソルトを、最初のログ書き込み時ではなく**インストール時およびログ有効化時**に生成・保存するようにしました。観測開始前に値が確定します。管理画面のログ画面に、保存済み `client_ip` を生アドレスから再現する式とともに表示します（Web サーバのアクセスログとの突合に必要）。
+- `SimilarItems::getLastStats()` を追加し、直近のスコアリング実行の候補数・シードの分野・並び替えオプションを取得できるようにしました。
+- スコアリング済み候補が主分野（バケット）を保持するようになり、分野越え（セレンディピティ）の分析が可能になりました。
+
+#### 変更
+- モジュール既定ブロック（`view/common/resource-page-blocks/similar-items.phtml`）を、独自のインラインスコアリング（アイテムセット 3／主題 2／著者 1 の固定重み）ではなく、非同期エンドポイントから推薦を取得する方式に変更しました。これにより、テーマを上書きしていないサイトでも設定済みのスコアリングエンジン、テーマ適用サイトと同じマークアップ、利用ログ収集が有効になります（従来はいずれも迂回されていました）。このパーシャルを上書きしているテーマには影響しません。
+
+#### 修正
+- 流入経路（`entry_kind`, `referrer_host`）を推薦リクエストの `Referer` ヘッダから判定していました。このリクエストはアイテムページ自身が発行する XHR のため、すべての流入が `internal` と判定されていました。`view` イベントでブラウザから `document.referrer` を受け取る方式に変更しました（クリック連鎖から確定する `similar_items` が優先されます）。
+- `Module::onBootstrap()` が `parent::onBootstrap()` を呼んでおらず、モジュールのイベントリスナーが登録されていませんでした。
+
 ## [0.4.6] - 2026-03-18
 
 ### EN

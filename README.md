@@ -14,6 +14,8 @@ The display is controlled by the active theme, while all recommendation logic is
 - **Title Normalization**: Intelligently groups items by their base title, ignoring volume numbers and separators (e.g., "Title, Vol. 1" and "Title, Vol. 2" are treated as having the same base title).
 - **Light Jitter**: Subtly varies results on each page reload to increase discovery, without sacrificing top relevance.
 - **Rich Diagnostics**: A debug mode provides detailed logs and a structured JSON payload, showing exactly how each recommendation was scored.
+- **Usage Logging (research)**: Optional, self-contained collection of impressions, in-viewport views and clicks, with server-side reconstruction of recommendation-driven browsing chains. Browse and export as CSV/TSV from the admin UI - no access to the web server's raw logs required.
+- **Control-Group Trial (research)**: Optional randomised assignment of visitors to a scored arm, a random-items arm and a hidden arm, so the effect of the feature and of the scoring engine can be measured without a before/after baseline.
 
 ---
 
@@ -257,18 +259,156 @@ These overrides do not modify saved settings; they apply to the current request 
 
 The module is responsible for the "what" (the logic), while the theme is responsible for the "how" (the presentation).
 
+- **Works out of the box**: The module ships a complete default block (`view/common/resource-page-blocks/similar-items.phtml`) that renders a placeholder, calls the `/similar-items/recommend` endpoint and injects the result, together with neutral default styling (`asset/css/similar-items.css`). No theme code is required for the scoring engine or the usage log to work.
 - **Rendering Partial**: The module uses a simple partial (`view/similar-items/partial/list.phtml`) to render the list of items.
-- **Theme Override**: A theme should provide its own `view/common/resource-page-blocks/similar-items.phtml`. This file is responsible for:
+- **Theme Override (optional)**: A theme may provide its own `view/common/resource-page-blocks/similar-items.phtml` to take over:
     - The loading container and any placeholder/spinner UI.
     - The JavaScript that calls the `/similar-items/recommend` endpoint and injects the returned HTML.
     - Localized strings for the block title or other UI elements.
+
+  An override must keep injecting the endpoint's `html` verbatim; that string carries the hidden usage-log payload. Give the container a `data-similar-items` attribute so the logging script can scope click tracking to the block.
 - **Thumbnails**: The module attempts to use IIIF thumbnails (`/square/240,/0/default.jpg`) and falls back to standard Omeka thumbnails. The client-side script can implement a further fallback (e.g., to `/square/max/0/default.jpg`) if an image fails to load.
 - **Title Length**: The maximum length of item titles is controlled by the theme via a theme setting (e.g., `similar_items_title_max_length`).
+
+## Usage Logging (research)
+
+The module can record how recommendations are actually used, so that browsing behaviour can be analysed without requesting access to the web server's raw access logs. Logging is **off by default**; enable it under *Modules → Similar Items → Configure → 利用ログ収集（研究用）*.
+
+### What is recorded
+
+Two tables are created on install (or on the first request after enabling):
+
+**`similaritems_impression`** - one row per served recommendation request. Because the block is rendered on every item page that carries it, an impression row doubles as a page-view record and carries the browsing path of a session.
+
+| Column | Purpose in analysis |
+| --- | --- |
+| `created_at`, `impression_key` | Time base and join key for events |
+| `session_key`, `visitor_key` | Pseudonymous session grouping (see *Privacy*) |
+| `seed_item_id`, `seed_item_title`, `seed_buckets`, `seed_item_sets` | Which item the visitor was on, and its subject domain(s) |
+| `requested_limit`, `result_count`, `is_empty` | Exposure volume and miss rate |
+| `candidate_count`, `duration_ms` | Cost of the scoring run (performance reporting) |
+| `results` (JSON) | Per rank: item id, score, domain bucket, base title and which signals fired |
+| `variant`, `config_hash`, `tiebreak`, `jitter` | Which algorithm configuration produced this list (A/B comparison) |
+| `parent_event_id`, `chain_key`, `hop_depth` | Position in a recommendation-driven browsing chain |
+| `entry_kind`, `referrer_host` | How the visitor reached the page: `similar_items`, `internal`, `search_engine`, `social`, `external`, `direct`. Reported by the browser (`document.referrer`) with the `view` event, so it is empty when that beacon is lost |
+| `device`, `is_bot`, `locale`, `site_slug` | Segmentation |
+
+**`similaritems_event`** - client-side events attached to an impression.
+
+| Column | Purpose in analysis |
+| --- | --- |
+| `event_type` | `view` (the block entered the viewport) or `click` |
+| `was_visible` | For a `view` row, whether the block was ever actually seen |
+| `target_item_id`, `target_rank`, `target_score`, `target_signals` | Which recommendation was opened - position bias, score-response relation, signal effectiveness |
+| `target_bucket`, `cross_domain` | Whether the click left the seed item's subject domain (the serendipity measure) |
+| `dwell_ms`, `visible_ms` | Time from render, and from the block becoming visible, to the click |
+
+Rank, score and signals are always taken from the stored impression rather than from the browser, so they cannot be forged by a client.
+
+### How browsing chains are reconstructed
+
+When a visitor clicks a recommendation, the click is recorded server-side. On the next item page, the module looks for an unconsumed click from the same session that targeted exactly this item within the configured window (default 300 s). If it finds one, the new impression inherits the `chain_key` and increments `hop_depth`; otherwise it starts a new chain at depth 0. The browser additionally passes the click key forward through `sessionStorage`, which corrects the match when the same item is reached twice in one session.
+
+`hop_depth` therefore answers "how many recommendations in a row did this visitor follow?", and grouping by `chain_key` yields whole browsing paths.
+
+### Privacy
+
+- The session key is a random token in a first-party, `HttpOnly`, `SameSite=Lax` cookie (`si_slog`) with a sliding expiry. It contains no personal data and is only used to group requests into a browsing path. It can be switched off, in which case a daily-rotating pseudonymous key derived from IP and user agent is used instead (lower accuracy).
+- IP addresses are stored as a salted hash by default; `raw` and `none` are also available.
+- The signed-in user id is **not** recorded unless the operator opts in.
+- Obvious bots are detected by user agent and excluded by default.
+- Set a retention period in days to drop old rows; the policy is applied when an administrator opens the log dashboard.
+- The hashing salt is created once at install time (and again when logging is switched on) and never rotated. The log dashboard shows it, together with the formula that reproduces a stored `client_ip` from a raw address - that is how this log can be joined to a web server access log when the log format cannot be changed. **Keep the salt out of published datasets**: the IPv4 space is small enough that releasing it alongside the hashes would make the addresses recoverable.
+
+Announce the collection in your site's privacy policy before enabling it on a production site.
+
+### Control-group trial
+
+The log on its own can say which recommendation was chosen, but not whether showing recommendations changes behaviour at all, nor whether the scoring beats simply putting some items on the page. Two control arms answer that, by randomising visitors within the live site instead of relying on a before/after comparison.
+
+| Arm | What the visitor sees | Contrast it provides |
+| --- | --- | --- |
+| `default` | Scored recommendations | - |
+| `random` | The same block, same number of items, drawn at random | vs `default`: what the **scoring engine** contributes, holding interface, position count and layout constant. Also gives an empirical chance level for CTR. |
+| `off` | Nothing; the block is hidden | vs `default`: what the **feature as a whole** contributes to browsing. |
+
+Assignment is per session and deterministic: the arm is derived from the session key and a stored seed, so it never changes mid-session, needs no storage of its own, and can be recomputed during analysis. Weights are relative (e.g. 80 / 10 / 10). The trial is **off by default**; until an operator starts it every visitor gets `default`.
+
+Each control arm can be switched on independently. A disabled arm weighs zero whatever its configured weight, and the remainder is reallocated automatically - turning `off` out of an 80/10/10 split leaves `default` 88.9% / `random` 11.1%. The log dashboard shows the effective allocation, not the raw weight fields.
+
+**`random` alone is a complete experiment for the algorithm claim**, and it is both faster and milder than running `off` as well: the share given to `random` can be raised, and a visitor in that arm still gets a list of items. What it cannot establish is whether the feature as a whole increases browsing; for that, the descriptive share of page views reached via a recommendation (`entry_kind = similar_items`) and the before/after access-log analysis are the fallbacks.
+
+Three properties make the arms comparable:
+
+- **The `off` arm still records an impression.** Nothing is displayed, but the page view is logged, so session-level outcomes - pages per session, distinct items per session - exist in every arm. Without this the control sessions would be invisible.
+- **The `off` arm is hidden from the layout stylesheet**, not from script, so there is no flash of a loading block that then disappears.
+- **The seed item's domain buckets are recorded in every arm**, so `cross_domain` (the serendipity measure) is comparable across arms.
+
+The admin dashboard shows a per-arm table: impressions, sessions, pages and items per session, share reached via a recommendation, in-viewport rate, CTR, CTR among viewed, cross-domain share and mean response time. `arm` is included in the impressions, events and chains exports.
+
+Two caveats worth carrying into the analysis:
+
+- The control arms deliberately degrade the service for part of the audience. Decide the split and the duration as a service question, not only a statistical one.
+- The `default` arm is slower than `random`, because only it runs the scoring engine. A CTR difference could therefore partly reflect latency. `duration_ms` is recorded per impression so it can be conditioned on.
+
+### Admin UI and exports
+
+*Admin → Modules → Similar Items logs* provides:
+
+- A **dashboard**: impressions, sessions, in-viewport rate, CTR (per impression and per viewed impression), **CTR by rank**, **hop-depth distribution**, chains with at least one hop, cross-domain click share, entry channels, devices, variants, and the most recommended-from / most clicked items.
+- **Impression** and **event** tables with filters (date range, site, variant, device, seed item, session) and paging.
+- **CSV / TSV export** of three datasets:
+  - `impressions` - the raw impression rows, including the `results` JSON;
+  - `events` - the raw view/click rows;
+  - `chains` - one row per browsing chain: `chain_key`, session, start/end, page count, `max_hop`, entry channel and the ordered `item_path` (e.g. `10307;10791;11302`).
+
+Timestamps are exported as ISO 8601 in the site's configured time zone, and CSV carries a UTF-8 BOM for spreadsheet software.
+
+### Example analysis
+
+```sql
+-- CTR by rank (bots excluded)
+SELECT e.target_rank, COUNT(*) AS clicks
+FROM similaritems_event e
+WHERE e.event_type = 'click' AND e.is_bot = 0
+GROUP BY e.target_rank ORDER BY e.target_rank;
+
+-- Browsing depth distribution
+SELECT hop_depth, COUNT(*) AS page_views
+FROM similaritems_impression WHERE is_bot = 0
+GROUP BY hop_depth ORDER BY hop_depth;
+
+-- Share of clicks that crossed a subject domain
+SELECT AVG(cross_domain) AS cross_domain_rate
+FROM similaritems_event
+WHERE event_type = 'click' AND cross_domain IS NOT NULL AND is_bot = 0;
+```
+
+To compare configurations, set a **variant label** (e.g. `baseline`, `jitter-on`) for each trial period; `config_hash` additionally fingerprints the effective weights so configuration drift is visible even without a label.
+
+### Theme requirements
+
+None. The module's bundled default block already uses the async endpoint, so logging works on an untouched theme. The endpoint prepends a hidden `<script type="application/json" data-similar-items-log>` payload to the rendered list, and the module ships its own client script (`asset/js/similar-items-log.js`), loaded automatically on public pages while logging is enabled. Any theme that injects the returned `html` into the page is logged correctly. Themes that render the list themselves can read the same payload from `log` in the JSON response.
+
+### Caveats
+
+- `view` and `click` events are sent with `navigator.sendBeacon`; a small loss rate is normal. Impressions are written server-side and are not affected.
+- With jitter enabled, the same seed item yields different lists on reload. The `results` JSON is stored per impression, so rank-level analysis stays correct.
+- Bot filtering is heuristic. Keep `is_bot` in the export and re-filter during analysis if needed.
+- The entry channel comes from the browser: an impression whose `view` beacon never arrived keeps an empty `entry_kind`. Report that share rather than treating it as `direct`. `similar_items` is the exception - it is established server-side from the click chain and is not affected.
+- For internal navigation the referrer is the full URL (including a search query string); for external referrers modern browsers send only the origin.
 
 ## Key Files
 
 - `src/View/Helper/SimilarItems.php`: The core logic for scoring, seeding, and diversification.
-- `src/Controller/RecommendController.php`: The async JSON endpoint.
+- `src/Controller/RecommendController.php`: The async JSON endpoint; also writes the impression log.
+- `src/Log/LogService.php`: Usage-log schema, writing, chain resolution and privacy handling.
+- `src/Experiment/ArmAssigner.php`: Randomised, session-stable assignment to control arms.
+- `src/Controller/EventController.php`: Public endpoint that receives view/click events.
+- `src/Controller/Admin/LogsController.php`: Log dashboard, tables and CSV/TSV export.
+- `view/common/resource-page-blocks/similar-items.phtml`: Default block; loads recommendations from the async endpoint.
+- `asset/js/similar-items-log.js`: Theme-independent client script for view/click logging.
+- `asset/css/similar-items.css`: Neutral default styling for the bundled block.
 - `Module.php`: Defines configuration keys and default values.
 
 ## License
@@ -293,6 +433,8 @@ MIT
 - **タイトル正規化**: 巻数や区切り文字を無視してベースタイトルを賢く判定（例：「タイトル, 上巻」と「タイトル, 下巻」は同じベースタイトルとして扱われます）。
 - **微揺らぎ（Light Jitter）**: ページをリロードするたびに結果をわずかに変化させ、上位の関連性を損なうことなく新たな発見を促します。
 - **豊富な診断機能**: デバッグモードを有効にすると、各アイテムがどのようにスコアリングされたかを正確に示す詳細なログと構造化JSONが出力されます。
+- **利用ログ収集（研究用）**: 推薦の表示（インプレッション）、実際に画面に入ったか（可視化）、クリックを記録し、推薦経由の回遊経路をサーバ側で復元します。管理画面から閲覧・CSV/TSV 出力でき、Apache 等の生ログへのアクセスを必要としません。
+- **対照群試験（研究用）**: 閲覧者を「通常の推薦」「ランダム推薦」「非表示」に無作為割付でき、前後比較のベースラインなしに、機能そのものとスコアリングの効果を測定できます。
 
 ---
 
@@ -533,18 +675,156 @@ A/Bテストや診断用途として、クエリパラメータで一部の設�
 
 このモジュールは「何を表示するか」（ロジック）を担当し、テーマは「どう表示するか」（プレゼンテーション）を担当します。
 
+- **テーマ改修なしで動作**: モジュールは完全に動作する既定ブロック（`view/common/resource-page-blocks/similar-items.phtml`）を同梱しています。プレースホルダを描画し、`/similar-items/recommend` エンドポイントを呼び出して結果を挿入します。最小限の既定スタイル（`asset/css/similar-items.css`）も付属します。スコアリングエンジンと利用ログを機能させるためにテーマ側の実装は不要です。
 - **描画パーシャル**: モジュールはアイテムリストを描画するためにシンプルなパーシャル（`view/similar-items/partial/list.phtml`）を使用します。
-- **テーマによる上書き**: テーマ側で `view/common/resource-page-blocks/similar-items.phtml` を用意すべきです。このファイルは以下を担当します。
+- **テーマによる上書き（任意）**: テーマ側で `view/common/resource-page-blocks/similar-items.phtml` を用意すれば、以下を引き取れます。
     - 読み込み中のコンテナや、プレースホルダ／スピナーなどのUI。
     - `/similar-items/recommend` エンドポイントを呼び出し、返されたHTMLを挿入するJavaScript。
     - ブロックタイトルなど、UI要素の多言語対応文字列。
+
+  上書きする場合も、エンドポイントが返す `html` をそのまま挿入してください。この文字列に利用ログ用の隠しデータが含まれます。また、クリック計測の範囲を限定できるよう、コンテナに `data-similar-items` 属性を付けてください。
 - **サムネイル**: モジュールはIIIFサムネイル（`/square/240,/0/default.jpg`）を優先し、なければOmekaの標準サムネイルにフォールバックします。画像読み込みに失敗した場合、クライアント側スクリプトでさらにフォールバック（例：`/square/max/0/default.jpg`へ）を実装できます。
 - **タイトル長**: アイテムタイトルの最大長は、テーマ設定（例：`similar_items_title_max_length`）によってテーマ側で制御します。
+
+## 利用ログ収集（研究用）
+
+推薦がどのように使われているかをモジュール内部で記録し、Apache 等の生ログを参照しなくても利用状況（回遊）を分析できるようにします。既定では**無効**です。*モジュール → Similar Items → 設定 → 利用ログ収集（研究用）* で有効化してください。
+
+### 記録される内容
+
+インストール時（または有効化後の最初のリクエスト時）に 2 つのテーブルを作成します。
+
+**`similaritems_impression`** — 推薦を 1 回返すごとに 1 行。ブロックを含むアイテムページの表示ごとに必ず生成されるため、セッション内のページ遷移そのものを表す記録にもなります。
+
+| カラム | 分析上の意味 |
+| --- | --- |
+| `created_at`, `impression_key` | 時刻と、イベントとの結合キー |
+| `session_key`, `visitor_key` | 匿名のセッション識別（「プライバシー」参照） |
+| `seed_item_id`, `seed_item_title`, `seed_buckets`, `seed_item_sets` | 閲覧中のアイテムと、その分野 |
+| `requested_limit`, `result_count`, `is_empty` | 露出件数と空振り率 |
+| `candidate_count`, `duration_ms` | スコアリングの計算コスト（性能報告用） |
+| `results`（JSON） | 順位ごとのアイテム ID・スコア・分野・ベースタイトル・発火したシグナル |
+| `variant`, `config_hash`, `tiebreak`, `jitter` | どの設定で生成された推薦か（A/B 比較用） |
+| `parent_event_id`, `chain_key`, `hop_depth` | 推薦経由の回遊経路における位置 |
+| `entry_kind`, `referrer_host` | 流入経路：`similar_items` / `internal` / `search_engine` / `social` / `external` / `direct`。`view` イベントでブラウザから受け取る `document.referrer` に基づくため、ビーコンが失われた場合は空になります |
+| `device`, `is_bot`, `locale`, `site_slug` | セグメント分け |
+
+**`similaritems_event`** — ブラウザ側で発生し、インプレッションに紐づくイベント。
+
+| カラム | 分析上の意味 |
+| --- | --- |
+| `event_type` | `view`（ブロックが画面内に入った）または `click` |
+| `was_visible` | `view` 行で、実際に見えたか／見えないまま離脱したか |
+| `target_item_id`, `target_rank`, `target_score`, `target_signals` | 開かれた推薦：順位バイアス、スコアと反応の関係、シグナル別の効き方 |
+| `target_bucket`, `cross_domain` | クリック先が元の分野の外かどうか（セレンディピティ指標） |
+| `dwell_ms`, `visible_ms` | 描画時点／可視化時点からクリックまでの時間 |
+
+順位・スコア・シグナルは常に保存済みインプレッションから引くため、クライアントから偽装できません。
+
+### 回遊経路の復元方法
+
+推薦がクリックされると、その事実がサーバ側に記録されます。次のアイテムページでは、同一セッションで「そのアイテムを対象とした未消費のクリック」が設定時間内（既定 300 秒）にあるかを探し、見つかれば新しいインプレッションが `chain_key` を引き継ぎ `hop_depth` を 1 増やします。見つからなければ深さ 0 の新しい経路として開始します。加えてブラウザ側が `sessionStorage` 経由でクリックキーを持ち越すため、同一セッション内で同じアイテムに複数回到達した場合でも対応関係が正しく補正されます。
+
+そのため `hop_depth` は「推薦を何回連続でたどったか」を、`chain_key` でのグループ化は回遊経路全体を表します。
+
+### プライバシー
+
+- セッション識別子は第一者クッキー `si_slog`（`HttpOnly` / `SameSite=Lax`、スライド式有効期限）に保存されるランダム値です。個人情報は含まず、リクエストを一続きの経路にまとめる目的にのみ使用します。無効化した場合は、IP と User-Agent から日次で入れ替わる擬似 ID を代用します（精度は落ちます）。
+- IP アドレスは既定でソルト付きハッシュとして保存します。`raw`（そのまま）と `none`（保存しない）も選べます。
+- ログイン中のユーザ ID は、明示的に有効化しない限り記録しません。
+- 明らかなボットは User-Agent により判定し、既定で除外します。
+- 保持日数を設定すると、期限切れの行は管理画面のログ画面を開いたタイミングで削除されます。
+- ハッシュ用ソルトはインストール時（およびログ有効化時）に一度だけ生成され、以後変更されません。管理画面のログ画面に、保存済み `client_ip` を生アドレスから再現する式とともに表示します。ログフォーマットを変更できない環境で、Web サーバのアクセスログと突合するための手段です。**ソルトは公開データに含めないでください**。IPv4 空間は総当たり可能な規模のため、ハッシュと同時に公開するとアドレスが復元可能になります。
+
+本番サイトで有効化する前に、プライバシーポリシー等での告知をご検討ください。
+
+### 対照群試験
+
+ログだけでは「どの推薦が選ばれたか」は分かっても、「推薦を出すこと自体が行動を変えたか」「スコアリングが単に何かを並べるより優れているか」は分かりません。前後比較に頼らず、公開サイト内で閲覧者を無作為に振り分けることでこれに答えます。
+
+| アーム | 閲覧者が見るもの | 得られる対比 |
+| --- | --- | --- |
+| `default` | 通常のスコアリング推薦 | - |
+| `random` | 見た目も件数も同じで、資料だけ無作為 | `default` との比較で、UI・位置・件数を一定にしたまま**スコアリングの寄与**が測れます。CTR の偶然水準も得られます。 |
+| `off` | 何も表示しない（ブロックごと非表示） | `default` との比較で、**機能全体が回遊に与える寄与**が測れます。 |
+
+振り分けはセッション単位かつ決定的です。セッションキーと保存済みシードから導出するため、途中で表示が変わることがなく、専用の保存領域も不要で、分析時に再計算できます。配分は相対値（例 80 / 10 / 10）。試験は**既定で無効**で、開始するまで全員が `default` になります。
+
+対照群アームは個別に有効・無効を切り替えられます。無効にしたアームは配分値にかかわらず重み 0 になり、残りで自動的に再配分されます（80/10/10 から `off` を外すと default 88.9% / random 11.1%）。管理画面のログ画面には設定値ではなく実効配分を表示します。
+
+**`random` アームだけでもアルゴリズム評価の実験としては完結します。** その方が期間も短く、影響も軽くなります（`random` の配分を上げられ、このアームの閲覧者も資料一覧自体は見られるため）。成立しないのは「機能全体が回遊を増やしたか」という問いだけで、それには推薦経由到達率（`entry_kind = similar_items`）という記述統計と、生ログによる前後比較が代替になります。
+
+比較可能性を担保している点が3つあります。
+
+- **`off` アームでもインプレッションを記録します。** 何も表示しませんがページ閲覧は記録されるため、セッションあたりのページ数・到達資料数といったセッション単位の指標がすべてのアームで揃います。これがないと対照群のセッションが不可視になります。
+- **`off` はレイアウトのスタイルシートで非表示にします**（スクリプトではなく）。読み込み中のブロックが一瞬見えてから消える、ということが起きません。
+- **シード資料の分野バケットを全アームで記録します。** これにより `cross_domain`（セレンディピティ指標）をアーム間で比較できます。
+
+管理画面にはアーム別の表を表示します：インプレッション、セッション、セッションあたりページ数・資料数、推薦経由到達率、可視化率、CTR、可視化ベース CTR、分野越え率、平均応答時間。`arm` は impressions / events / chains の各エクスポートに含まれます。
+
+分析時に持ち越すべき注意が2点あります。
+
+- 対照群は公開サービスの一部を意図的に劣化させます。配分と期間は統計上の判断だけでなく、サービス上の判断として決めてください。
+- `default` アームだけがスコアリングを実行するため `random` より遅くなります。CTR の差に応答時間の影響が混じる可能性があります。`duration_ms` をインプレッション単位で記録しているので、統制変数として条件付けできます。
+
+### 管理画面とエクスポート
+
+*管理画面 → モジュール → Similar Items logs* で以下を提供します。
+
+- **ダッシュボード**：インプレッション数、セッション数、可視化率、CTR（インプレッション基準／可視化基準）、**順位別 CTR**、**回遊深度の分布**、1 ホップ以上の経路数、分野越えクリック率、流入経路、デバイス、条件ラベル、推薦元・クリック先の上位アイテム。
+- **インプレッション一覧**と**イベント一覧**（期間・サイト・条件ラベル・デバイス・シードアイテム・セッションで絞り込み、ページ送り対応）。
+- 3 種類のデータセットの **CSV / TSV エクスポート**：
+  - `impressions` — インプレッション生データ（`results` JSON を含む）
+  - `events` — 表示・クリックの生データ
+  - `chains` — 回遊経路ごとに 1 行：`chain_key`、セッション、開始／終了、ページ数、`max_hop`、流入経路、順序付きの `item_path`（例 `10307;10791;11302`）
+
+日時はサイトのタイムゾーンで ISO 8601 として出力し、CSV には表計算ソフト向けに UTF-8 BOM を付与します。
+
+### 分析例
+
+```sql
+-- 順位別クリック数（ボット除外）
+SELECT e.target_rank, COUNT(*) AS clicks
+FROM similaritems_event e
+WHERE e.event_type = 'click' AND e.is_bot = 0
+GROUP BY e.target_rank ORDER BY e.target_rank;
+
+-- 回遊深度の分布
+SELECT hop_depth, COUNT(*) AS page_views
+FROM similaritems_impression WHERE is_bot = 0
+GROUP BY hop_depth ORDER BY hop_depth;
+
+-- 分野をまたいだクリックの割合
+SELECT AVG(cross_domain) AS cross_domain_rate
+FROM similaritems_event
+WHERE event_type = 'click' AND cross_domain IS NOT NULL AND is_bot = 0;
+```
+
+設定を比較する場合は、試行期間ごとに**条件ラベル**（例 `baseline`, `jitter-on`）を設定してください。ラベルがなくても `config_hash` が実効設定の指紋になるため、設定変更の混入を検知できます。
+
+### テーマ側の要件
+
+ありません。モジュール同梱の既定ブロックが非同期エンドポイントを使用するため、テーマを改修していなくてもログが取得できます。エンドポイントは描画済みリストの先頭に隠し要素 `<script type="application/json" data-similar-items-log>` を付加し、モジュール同梱のクライアントスクリプト（`asset/js/similar-items-log.js`）がログ有効時に公開ページへ自動で読み込まれます。返却された `html` をページに挿入するテーマであれば、そのまま正しく記録されます。リストを独自に描画するテーマは、JSON 応答の `log` キーから同じ情報を取得できます。
+
+### 注意点
+
+- `view` / `click` イベントは `navigator.sendBeacon` で送信するため、わずかな欠落は正常です。インプレッションはサーバ側で記録するため影響を受けません。
+- 微揺らぎを有効にしていると、同じシードでもリロードごとに一覧が変わります。`results` はインプレッションごとに保存されるため、順位単位の分析は正しく行えます。
+- ボット判定はヒューリスティックです。必要に応じてエクスポートに含まれる `is_bot` を使い、分析側で再フィルタしてください。
+- 流入経路はブラウザから受け取るため、`view` ビーコンが届かなかったインプレッションは `entry_kind` が空になります。`direct` と混同せず、欠測として割合を報告してください。ただし `similar_items` はクリック連鎖からサーバ側で確定するため影響を受けません。
+- サイト内遷移ではリファラは完全な URL（検索クエリ文字列を含む）ですが、外部サイトからの流入では最近のブラウザはオリジンのみを送信します。
 
 ## 主要ファイル
 
 - `src/View/Helper/SimilarItems.php`: スコアリング、種まき、多様化のコアロジック。
-- `src/Controller/RecommendController.php`: 非同期JSONエンドポイント。
+- `src/Controller/RecommendController.php`: 非同期JSONエンドポイント。インプレッションログの記録も担当。
+- `src/Log/LogService.php`: 利用ログのスキーマ、書き込み、回遊経路の解決、プライバシー処理。
+- `src/Experiment/ArmAssigner.php`: 対照群アームへのセッション単位・決定的な無作為割付。
+- `src/Controller/EventController.php`: 表示・クリックイベントを受け取る公開エンドポイント。
+- `src/Controller/Admin/LogsController.php`: ログのダッシュボード、一覧、CSV/TSV エクスポート。
+- `view/common/resource-page-blocks/similar-items.phtml`: 既定ブロック。非同期エンドポイントから推薦を取得します。
+- `asset/js/similar-items-log.js`: テーマに依存しないクライアント側ログ収集スクリプト。
+- `asset/css/similar-items.css`: 同梱ブロック用の最小限の既定スタイル。
 - `Module.php`: 設定キーと既定値を定義。
 
 ## ライセンス

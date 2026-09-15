@@ -1,0 +1,102 @@
+/**
+ * Default styling for the Similar Items block.
+ *
+ * Only loaded by the module's own block partial, so a theme that overrides
+ * `view/common/resource-page-blocks/similar-items.phtml` never pulls this in.
+ * Kept deliberately neutral: it inherits the theme's colours and type.
+ */
+
+.resource-block.similar-items .similar-items__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.resource-block.similar-items .similar-items__list > li {
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
+}
+
+.resource-block.similar-items .similar-items__list > li:last-child {
+  border-bottom: 0;
+}
+
+.resource-block.similar-items .similar-items__list a.resource-link {
+  display: flex;
+  align-items: center;
+  gap: .6em;
+  padding: .5em 0;
+  text-decoration: none;
+}
+
+.resource-block.similar-items .similar-items__list a.resource-link:hover .resource-name,
+.resource-block.similar-items .similar-items__list a.resource-link:focus .resource-name {
+  text-decoration: underline;
+}
+
+.resource-block.similar-items .similar-items__list .resource-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+/* Thumbnail. The partial adds `is-loaded` once the image actually renders, so
+   the reserved box stays empty rather than showing a broken image. */
+.resource-block.similar-items .similar-items__list .thumb-popover {
+  flex: 0 0 auto;
+  display: block;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, .05);
+  order: -1;
+}
+
+.resource-block.similar-items .similar-items__list .thumb-popover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity .2s ease-in;
+}
+
+.resource-block.similar-items .similar-items__list .thumb-popover.is-loaded img {
+  opacity: 1;
+}
+
+/* Loading and empty states. */
+.resource-block.similar-items .similar-items__loading,
+.resource-block.similar-items .similar-items__empty {
+  display: flex;
+  align-items: center;
+  gap: .5em;
+  padding: .5em 0;
+  border-bottom: 0;
+  opacity: .7;
+  font-size: .95em;
+}
+
+.resource-block.similar-items .similar-items__spinner {
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: similar-items-spin .7s linear infinite;
+}
+
+@keyframes similar-items-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resource-block.similar-items .similar-items__spinner {
+    animation: none;
+  }
+  .resource-block.similar-items .similar-items__list .thumb-popover img {
+    transition: none;
+  }
+}

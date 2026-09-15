@@ -1,0 +1,52 @@
+<?php
+/**
+ * Wrapper page for the impression / event tables.
+ *
+ * @var string $dataset
+ * @var array  $filters
+ */
+
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+$escapeAttr = $this->plugin('escapeHtmlAttr');
+
+$queryFilters = array_filter([
+    'from' => $filters['from'],
+    'to' => $filters['to'],
+    'site_slug' => $filters['site_slug'],
+    'variant' => $filters['variant'],
+    'device' => $filters['device'],
+    'seed_item_id' => $filters['seed_item_id'] ?: '',
+    'session_key' => $filters['session_key'],
+    'include_bots' => $filters['include_bots'],
+], function ($v) { return $v !== '' && $v !== null; });
+
+$title = $dataset === 'events'
+    ? $translate('Similar Items logs: events')
+    : $translate('Similar Items logs: impressions');
+?>
+
+<?= $this->pageTitle($title) ?>
+
+<style>
+  body.minimal div[role=main] { overflow: visible !important; min-height: auto !important; height: auto !important; }
+  #content { height: auto !important; min-height: auto !important; overflow: visible !important; }
+  .si-log-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .si-log-table th, .si-log-table td { border-bottom: 1px solid #e5e5e5; padding: .35rem .5rem; text-align: left; vertical-align: top; }
+  .si-log-table td.num, .si-log-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .si-log-table code { font-size: .8em; }
+  .si-scroll { overflow-x: auto; }
+  .si-pagination { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; }
+</style>
+
+<fieldset id="page-actions">
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Summary')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-impressions', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Impressions')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-events', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Events')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-export', [], ['query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => 'csv'])])) ?>"><?= $escape($translate('Export CSV')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-export', [], ['query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => 'tsv'])])) ?>"><?= $escape($translate('Export TSV')) ?></a>
+</fieldset>
+
+<div class="si-scroll">
+  <?= $this->table ?>
+</div>

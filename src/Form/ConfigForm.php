@@ -964,6 +964,270 @@ class ConfigForm extends Form {
         ],
       ]);
 
+    // ==============================
+    // Usage logging (research)
+    // ==============================
+    $this
+      ->add([
+        'type' => Fieldset::class,
+        'name' => 'similaritems_group_log',
+        'options' => [
+          // @translate
+          'label' => '利用ログ収集（研究用）',
+          'info' => '推薦の表示・閲覧・クリックを記録し、回遊状況を分析できるようにします。記録内容は管理画面「Similar Items logs」で閲覧・CSV/TSV出力できます。',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_group_log_info',
+        'type' => 'text',
+        'options' => [
+          'label' => ' ',
+          'info' => '推薦の表示・閲覧・クリックを記録し、回遊状況を分析できるようにします。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_group_log_info',
+          'style' => 'display:none;',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_enable',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => '利用ログを収集する',
+          // @translate
+          'info' => '有効にすると、推薦の生成（インプレッション）と、ブラウザからの表示・クリックイベントを専用テーブルに記録します。公開サイトでの収集開始前に、プライバシーポリシー等での告知をご検討ください。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_enable',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_exclude_bots',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => 'ボット・クローラを除外する',
+          // @translate
+          'info' => 'User-Agent による判定で、明らかな自動アクセスを記録しません。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_exclude_bots',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_session_cookie',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => 'セッション識別クッキーを使用する',
+          // @translate
+          'info' => '回遊（連続した遷移）の再構成に必要です。個人を特定しないランダム値を、第一者クッキー si_slog に保存します。無効にした場合は IP と User-Agent から日次で入れ替わる擬似 ID を用います（精度は落ちます）。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_session_cookie',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_session_ttl',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => 'セッション有効時間（秒）',
+          // @translate
+          'info' => '最終アクセスからこの時間が経過すると別セッションとして扱います。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_session_ttl',
+          'min' => 300,
+          'step' => 60,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_chain_window',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => '回遊連結の許容時間（秒）',
+          // @translate
+          'info' => '推薦クリックから次のアイテムページ表示までがこの時間内なら、同一の回遊経路として連結します。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_chain_window',
+          'min' => 30,
+          'step' => 30,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_ip_mode',
+        'type' => SelectElement::class,
+        'options' => [
+          // @translate
+          'label' => 'IP アドレスの記録方法',
+          // @translate
+          'info' => '既定はソルト付きハッシュです。生の IP を保存する場合は、個人情報の取り扱い規程に従ってください。',
+          'value_options' => [
+            'hash' => 'ハッシュ化して保存（推奨）',
+            'raw' => 'そのまま保存',
+            'none' => '保存しない',
+          ],
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_ip_mode',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_store_user',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => 'ログイン中のユーザ ID も記録する',
+          // @translate
+          'info' => '無効の場合、ログインしていても利用者 ID は記録しません。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_store_user',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_retention_days',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => 'ログ保持日数（0 で無期限）',
+          // @translate
+          'info' => '0 以外にすると、この日数を過ぎたログは削除対象になります（管理画面の削除操作時に適用）。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_retention_days',
+          'min' => 0,
+          'step' => 1,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_log_variant',
+        'type' => 'text',
+        'options' => [
+          // @translate
+          'label' => '条件ラベル（A/B 比較用）',
+          // @translate
+          'info' => '例: baseline, jitter-on など。設定期間ごとにラベルを変えると、ログを条件別に集計できます。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_variant',
+        ],
+      ]);
+
+    // ==============================
+    // Control-group trial (research)
+    // ==============================
+    $this
+      ->add([
+        'type' => Fieldset::class,
+        'name' => 'similaritems_group_experiment',
+        'options' => [
+          // @translate
+          'label' => '対照群試験（研究用）',
+          'info' => '閲覧者をセッション単位で無作為に振り分け、推薦の効果そのものを検証します。利用ログの有効化が前提です。',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_group_experiment_info',
+        'type' => 'text',
+        'options' => [
+          'label' => ' ',
+          'info' => '閲覧者をセッション単位で無作為に振り分けます。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_group_experiment_info',
+          'style' => 'display:none;',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_experiment_enable',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => '対照群試験を実施する',
+          // @translate
+          'info' => '無効の間は全員が通常の推薦を見ます。有効にすると、一部の閲覧者にはランダムな資料が表示され、一部には推薦ブロック自体が表示されなくなります。公開サービスの一部を意図的に劣化させることになるため、実施の可否と期間は運用側で判断してください。振り分けはセッション単位で固定され、同じ閲覧者の表示が途中で変わることはありません。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_experiment_enable',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_experiment_weight_default',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => '配分: 通常の推薦',
+          // @translate
+          'info' => '相対値です。80 / 10 / 10 なら約8割が通常の推薦になります。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_experiment_weight_default',
+          'min' => 0,
+          'step' => 1,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_experiment_use_random',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => 'ランダム推薦アームを使う',
+          // @translate
+          'info' => 'スコアリングの寄与を測る対照群です。見た目も件数も通常と同じで、資料だけが無作為に選ばれます。推薦システムとしての評価はこのアームだけで成立します。外すと配分は 0 になります。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_experiment_use_random',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_experiment_weight_random',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => '配分: ランダム推薦（対照群）',
+          // @translate
+          'info' => '見た目も件数も通常と同じで、資料だけを無作為に選びます。通常の推薦と比べることで、スコアリングそのものの寄与が測れます。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_experiment_weight_random',
+          'min' => 0,
+          'step' => 1,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_experiment_use_off',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => '非表示アームを使う',
+          // @translate
+          'info' => '機能そのものの有無による回遊量の差を測る対照群です。このアームの閲覧者は推薦を利用できません。外しても、ランダム推薦アームによるアルゴリズム評価には影響しません。外すと配分は 0 になります。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_experiment_use_off',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_experiment_weight_off',
+        'type' => NumberElement::class,
+        'options' => [
+          // @translate
+          'label' => '配分: 非表示（対照群）',
+          // @translate
+          'info' => '推薦ブロックを表示しません。通常の推薦と比べることで、機能の有無による回遊量の差が測れます。表示しない場合もページ閲覧はログに記録されるため、セッション単位の比較ができます。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_experiment_weight_off',
+          'min' => 0,
+          'step' => 1,
+        ],
+      ]);
+
     $inputFilter = $this->getInputFilter();
     $inputFilter
       // Section description helpers (not submitted / ignored)
@@ -990,6 +1254,29 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_limit', 'required' => FALSE])
       ->add(['name' => 'similaritems_jitter_enable', 'required' => FALSE])
       ->add(['name' => 'similaritems_jitter_pool_multiplier', 'required' => FALSE]);
+
+    // Usage logging inputs are optional.
+    $inputFilter
+      ->add(['name' => 'similaritems_group_log_info', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_enable', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_exclude_bots', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_session_cookie', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_session_ttl', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_chain_window', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_ip_mode', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_store_user', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_retention_days', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_variant', 'required' => FALSE]);
+
+    // Control-group trial inputs are optional.
+    $inputFilter
+      ->add(['name' => 'similaritems_group_experiment_info', 'required' => FALSE])
+      ->add(['name' => 'similaritems_experiment_enable', 'required' => FALSE])
+      ->add(['name' => 'similaritems_experiment_use_random', 'required' => FALSE])
+      ->add(['name' => 'similaritems_experiment_use_off', 'required' => FALSE])
+      ->add(['name' => 'similaritems_experiment_weight_default', 'required' => FALSE])
+      ->add(['name' => 'similaritems_experiment_weight_random', 'required' => FALSE])
+      ->add(['name' => 'similaritems_experiment_weight_off', 'required' => FALSE]);
 
     // Mapping inputs are optional.
     $inputFilter

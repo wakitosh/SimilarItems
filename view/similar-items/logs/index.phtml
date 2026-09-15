@@ -1,0 +1,417 @@
+<?php
+/**
+ * SimilarItems usage log dashboard.
+ *
+ * @var array $filters
+ * @var array $summary
+ * @var bool  $enabled
+ */
+
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+$escapeAttr = $this->plugin('escapeHtmlAttr');
+
+$queryFilters = [
+    'from' => $filters['from'],
+    'to' => $filters['to'],
+    'site_slug' => $filters['site_slug'],
+    'variant' => $filters['variant'],
+    'device' => $filters['device'],
+    'seed_item_id' => $filters['seed_item_id'] ?: '',
+    'session_key' => $filters['session_key'],
+    'include_bots' => $filters['include_bots'],
+];
+$queryFilters = array_filter($queryFilters, function ($v) { return $v !== '' && $v !== null; });
+
+$exportUrl = function (string $dataset, string $format) use ($queryFilters) {
+    return $this->url('admin/similar-items-logs-export', [], [
+        'query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => $format]),
+    ]);
+};
+
+$pct = function ($v) { return number_format(((float) $v) * 100, 2) . '%'; };
+$num = function ($v, int $d = 0) { return number_format((float) $v, $d); };
+?>
+
+<?= $this->pageTitle($translate('Similar Items logs')) ?>
+
+<style>
+  body.minimal div[role=main] { overflow: visible !important; min-height: auto !important; height: auto !important; }
+  #content { height: auto !important; min-height: auto !important; overflow: visible !important; }
+  .si-sections { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
+  @media (min-width: 900px) { .si-sections { grid-template-columns: 1fr 1fr; } }
+  .si-section { border: 1px solid #ddd; background: #fafafa; padding: 1rem; border-radius: 4px; }
+  .si-section h3 { margin: 0 0 .5rem; font-size: 1rem; }
+  .si-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .75rem; margin: 0 0 1rem; }
+  .si-kpi { border: 1px solid #ddd; border-radius: 4px; padding: .6rem .75rem; background: #fff; }
+  .si-kpi .si-kpi__label { display: block; font-size: .8rem; color: #666; }
+  .si-kpi .si-kpi__value { display: block; font-size: 1.35rem; font-weight: 600; line-height: 1.3; }
+  .si-kpi .si-kpi__sub { display: block; font-size: .75rem; color: #888; }
+  .si-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+  @media (min-width: 1100px) { .si-grid { grid-template-columns: 1fr 1fr; } }
+  .si-table { width: 100%; border-collapse: collapse; }
+  .si-table th, .si-table td { border-bottom: 1px solid #e5e5e5; padding: .35rem .5rem; text-align: left; font-size: .9rem; }
+  .si-table td.num, .si-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .si-bar { display: inline-block; height: .6rem; background: #6c8ebf; vertical-align: middle; }
+  .si-note { color: #666; font-size: .85rem; margin: .25rem 0 0; }
+  .si-warning { border-left: 4px solid #d08a00; background: #fff8e6; padding: .75rem 1rem; margin-bottom: 1rem; }
+</style>
+
+<?php if (!$enabled): ?>
+  <div class="si-warning">
+    <?= $escape($translate('Usage logging is currently disabled. Enable it in the SimilarItems module configuration to start collecting data.')) ?>
+  </div>
+<?php endif; ?>
+
+<fieldset id="page-actions">
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-impressions', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Impressions')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-events', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Events')) ?></a>
+  <a class="button" href="<?= $escapeAttr($exportUrl('impressions', 'csv')) ?>"><?= $escape($translate('Export impressions (CSV)')) ?></a>
+  <a class="button" href="<?= $escapeAttr($exportUrl('events', 'csv')) ?>"><?= $escape($translate('Export events (CSV)')) ?></a>
+  <a class="button" href="<?= $escapeAttr($exportUrl('chains', 'csv')) ?>"><?= $escape($translate('Export chains (CSV)')) ?></a>
+  <a class="button" href="<?= $escapeAttr($exportUrl('impressions', 'tsv')) ?>"><?= $escape($translate('Export impressions (TSV)')) ?></a>
+</fieldset>
+
+<div class="si-sections">
+  <div class="si-section">
+    <h3><?= $escape($translate('Filter')) ?></h3>
+    <form method="get" class="form" style="margin:0;">
+      <div class="field">
+        <div class="field-meta"><label for="si-from"><?= $escape($translate('Date range')) ?></label></div>
+        <div class="inputs">
+          <input type="date" id="si-from" name="from" value="<?= $escapeAttr($filters['from']) ?>">
+          &ndash;
+          <input type="date" id="si-to" name="to" value="<?= $escapeAttr($filters['to']) ?>">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label for="si-site"><?= $escape($translate('Site slug')) ?></label></div>
+        <div class="inputs"><input type="text" id="si-site" name="site_slug" value="<?= $escapeAttr($filters['site_slug']) ?>"></div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label for="si-variant"><?= $escape($translate('Variant label')) ?></label></div>
+        <div class="inputs"><input type="text" id="si-variant" name="variant" value="<?= $escapeAttr($filters['variant']) ?>"></div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label for="si-device"><?= $escape($translate('Device')) ?></label></div>
+        <div class="inputs">
+          <select id="si-device" name="device">
+            <?php foreach (['' => $translate('(any)'), 'desktop' => 'desktop', 'mobile' => 'mobile', 'tablet' => 'tablet', 'unknown' => 'unknown'] as $val => $label): ?>
+              <option value="<?= $escapeAttr((string) $val) ?>" <?= $filters['device'] === (string) $val ? 'selected' : '' ?>><?= $escape($label) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label for="si-seed"><?= $escape($translate('Seed item ID')) ?></label></div>
+        <div class="inputs"><input type="number" id="si-seed" name="seed_item_id" value="<?= $filters['seed_item_id'] ?: '' ?>"></div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label for="si-session"><?= $escape($translate('Session key')) ?></label></div>
+        <div class="inputs"><input type="text" id="si-session" name="session_key" value="<?= $escapeAttr($filters['session_key']) ?>"></div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label for="si-bots"><?= $escape($translate('Include bots')) ?></label></div>
+        <div class="inputs"><input type="checkbox" id="si-bots" name="include_bots" value="1" <?= $filters['include_bots'] ? 'checked' : '' ?>></div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label>&nbsp;</label></div>
+        <div class="inputs">
+          <button type="submit" class="button"><?= $escape($translate('Filter')) ?></button>
+          <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs')) ?>"><?= $escape($translate('Clear')) ?></a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="si-section">
+    <h3><?= $escape($translate('Delete logs')) ?></h3>
+    <form id="si-clear-form" method="post" action="<?= $escapeAttr($this->url('admin/similar-items-logs-clear')) ?>" class="form" style="margin:0;">
+      <?php if (isset($confirmForm)) { echo $this->formElement($confirmForm->get($confirmForm->getName() . '_csrf')); } ?>
+      <div class="field">
+        <div class="field-meta"><label><?= $escape($translate('Target date/time')) ?></label></div>
+        <div class="inputs">
+          <label style="margin-right:.75rem;"><input type="radio" name="mode" value="now" checked> <?= $escape($translate('Up to now')) ?></label>
+          <label><input type="radio" name="mode" value="before"> <?= $escape($translate('Before date/time')) ?></label>
+          <input type="datetime-local" name="before_datetime" id="si-before" style="margin-left:.5rem;" disabled>
+          <div style="margin-top:.5rem;"></div>
+          <label><input type="radio" name="mode" value="range"> <?= $escape($translate('Between date/times')) ?></label>
+          <input type="datetime-local" name="after_datetime" id="si-after" style="margin-left:.5rem;" disabled>
+          &ndash;
+          <input type="datetime-local" name="before_datetime_range" id="si-before-range" disabled>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label>&nbsp;</label></div>
+        <div class="inputs">
+          <button type="submit" class="button" onclick="return confirm('<?= $this->escapeJs($translate('Delete the matching impression and event logs? This cannot be undone.')) ?>');"><?= $escape($translate('Delete')) ?></button>
+          <p class="si-note"><?= $escape($translate('Export what you need before deleting: log rows are the research data.')) ?></p>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<details class="si-section" style="margin-bottom:1rem;">
+  <summary><?= $escape($translate('Joining this log to a web server access log')) ?></summary>
+  <p class="si-note" style="margin-top:.5rem;">
+    <?= $escape($translate('Client addresses are stored as a salted hash. Apply the same formula to the addresses in an access log to match its rows against these ones.')) ?>
+  </p>
+  <pre style="background:#fff; border:1px solid #ddd; padding:.6rem; overflow-x:auto;">client_ip = substr(sha256(&lt;ip&gt; . "|" . &lt;salt&gt;), 0, 64)
+
+salt = <?= $escape((string) ($salt ?? '')) ?></pre>
+  <p class="si-note">
+    <strong><?= $escape($translate('Keep the salt out of published datasets.')) ?></strong>
+    <?= $escape($translate('The IPv4 space is small enough to enumerate, so releasing the salt alongside the hashes would make the addresses recoverable. The salt is created once and never rotated: changing it would make earlier and later hashes incomparable.')) ?>
+  </p>
+</details>
+
+<div class="si-kpis">
+  <div class="si-kpi">
+    <span class="si-kpi__label"><?= $escape($translate('Impressions')) ?></span>
+    <span class="si-kpi__value"><?= $num($summary['impressions']) ?></span>
+    <span class="si-kpi__sub"><?= $escape(sprintf($translate('%s empty'), $num($summary['empty']))) ?></span>
+  </div>
+  <div class="si-kpi">
+    <span class="si-kpi__label"><?= $escape($translate('Sessions')) ?></span>
+    <span class="si-kpi__value"><?= $num($summary['sessions']) ?></span>
+    <span class="si-kpi__sub"><?= $escape(sprintf($translate('%s distinct seed items'), $num($summary['seeds']))) ?></span>
+  </div>
+  <div class="si-kpi">
+    <span class="si-kpi__label"><?= $escape($translate('Viewed (in viewport)')) ?></span>
+    <span class="si-kpi__value"><?= $num($summary['views']) ?></span>
+    <span class="si-kpi__sub"><?= $escape($pct($summary['view_rate'])) ?> <?= $escape($translate('of impressions')) ?></span>
+  </div>
+  <div class="si-kpi">
+    <span class="si-kpi__label"><?= $escape($translate('Clicks')) ?></span>
+    <span class="si-kpi__value"><?= $num($summary['clicks']) ?></span>
+    <span class="si-kpi__sub">CTR <?= $escape($pct($summary['ctr'])) ?> / <?= $escape($translate('viewed')) ?> <?= $escape($pct($summary['viewed_ctr'])) ?></span>
+  </div>
+  <div class="si-kpi">
+    <span class="si-kpi__label"><?= $escape($translate('Recommendation-driven hops')) ?></span>
+    <span class="si-kpi__value"><?= $num(array_sum(array_filter($summary['hops'], function ($n, $depth) { return $depth >= 1; }, ARRAY_FILTER_USE_BOTH))) ?></span>
+    <span class="si-kpi__sub"><?= $escape(sprintf($translate('max depth %d'), (int) $summary['max_hop'])) ?></span>
+  </div>
+  <div class="si-kpi">
+    <span class="si-kpi__label"><?= $escape($translate('Chains with ≥1 hop')) ?></span>
+    <span class="si-kpi__value"><?= $num($summary['chains_with_hop']) ?></span>
+    <span class="si-kpi__sub"><?= $escape(sprintf($translate('avg %s pages'), $num($summary['avg_chain_len'], 2))) ?></span>
+  </div>
+  <div class="si-kpi">
+    <span class="si-kpi__label"><?= $escape($translate('Cross-domain clicks')) ?></span>
+    <?php $crossTotal = $summary['cross_domain_clicks'] + $summary['same_domain_clicks']; ?>
+    <span class="si-kpi__value"><?= $crossTotal > 0 ? $escape($pct($summary['cross_domain_clicks'] / $crossTotal)) : '-' ?></span>
+    <span class="si-kpi__sub"><?= $escape(sprintf($translate('%s of %s classified clicks'), $num($summary['cross_domain_clicks']), $num($crossTotal))) ?></span>
+  </div>
+  <div class="si-kpi">
+    <span class="si-kpi__label"><?= $escape($translate('Response time')) ?></span>
+    <span class="si-kpi__value"><?= $num($summary['avg_duration_ms']) ?> ms</span>
+    <span class="si-kpi__sub"><?= $escape(sprintf($translate('avg %s candidates, %s shown'), $num($summary['avg_candidates'], 1), $num($summary['avg_results'], 2))) ?></span>
+  </div>
+</div>
+
+<?php if (!empty($arms) || !empty($allocation)): ?>
+  <div class="si-section" style="margin-bottom:1rem;">
+    <h3><?= $escape($translate('Control-group trial')) ?></h3>
+    <?php if (!empty($allocation)): ?>
+      <p class="si-note" style="margin-bottom:.5rem;">
+        <?= $escape($translate('Currently allocating:')) ?>
+        <?php $parts = []; foreach ($allocation as $armName => $share) { $parts[] = $armName . ' ' . number_format($share, 1) . '%'; } ?>
+        <strong><?= $escape(implode(' / ', $parts)) ?></strong>
+      </p>
+    <?php else: ?>
+      <p class="si-note" style="margin-bottom:.5rem;">
+        <?= $escape($translate('The trial is not running; every visitor gets the normal recommendations. The figures below are historical.')) ?>
+      </p>
+    <?php endif; ?>
+    <p class="si-note" style="margin-bottom:.5rem;">
+      <?= $escape($translate('"default vs off" shows what the feature contributes to browsing; "default vs random" shows what the scoring contributes on top of simply putting items on the page. Pages and items per session exist in every arm, including the one where nothing is displayed.')) ?>
+    </p>
+    <?php if (!empty($arms)): ?>
+    <div style="overflow-x:auto;">
+      <table class="si-table">
+        <thead>
+          <tr>
+            <th><?= $escape($translate('Arm')) ?></th>
+            <th class="num"><?= $escape($translate('Impressions')) ?></th>
+            <th class="num"><?= $escape($translate('Sessions')) ?></th>
+            <th class="num"><?= $escape($translate('Pages / session')) ?></th>
+            <th class="num"><?= $escape($translate('Items / session')) ?></th>
+            <th class="num"><?= $escape($translate('Via recommendation')) ?></th>
+            <th class="num"><?= $escape($translate('Viewed')) ?></th>
+            <th class="num">CTR</th>
+            <th class="num"><?= $escape($translate('CTR (viewed)')) ?></th>
+            <th class="num"><?= $escape($translate('Cross-domain')) ?></th>
+            <th class="num"><?= $escape($translate('ms')) ?></th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($arms as $armName => $a): ?>
+            <tr>
+              <td><strong><?= $escape($armName !== '' ? $armName : '(none)') ?></strong></td>
+              <td class="num"><?= $num($a['impressions']) ?></td>
+              <td class="num"><?= $num($a['sessions']) ?></td>
+              <td class="num"><?= $num($a['pages_per_session'], 2) ?></td>
+              <td class="num"><?= $num($a['items_per_session'], 2) ?></td>
+              <td class="num"><?= $escape($pct($a['via_rate'])) ?></td>
+              <td class="num"><?= $escape($pct($a['view_rate'])) ?></td>
+              <td class="num"><?= $escape($pct($a['ctr'])) ?></td>
+              <td class="num"><?= $escape($pct($a['viewed_ctr'])) ?></td>
+              <td class="num"><?= $a['cross_rate'] === null ? '-' : $escape($pct($a['cross_rate'])) ?></td>
+              <td class="num"><?= $num($a['avg_duration_ms']) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <p class="si-note">
+      <?= $escape($translate('The "off" arm records impressions but displays nothing, so its viewed/CTR columns are empty by construction. Export the impressions dataset for a proper statistical comparison; these figures are for monitoring.')) ?>
+    </p>
+    <?php else: ?>
+    <p class="si-note"><?= $escape($translate('No impressions recorded under any arm yet.')) ?></p>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
+<div class="si-grid">
+  <div class="si-section">
+    <h3><?= $escape($translate('Click-through rate by rank')) ?></h3>
+    <?php if (empty($summary['ranks'])): ?>
+      <p class="si-note"><?= $escape($translate('No data yet.')) ?></p>
+    <?php else: ?>
+      <?php $maxCtr = max(array_map(function ($r) { return $r['ctr']; }, $summary['ranks'])) ?: 1; ?>
+      <table class="si-table">
+        <thead><tr>
+          <th><?= $escape($translate('Rank')) ?></th>
+          <th class="num"><?= $escape($translate('Offered')) ?></th>
+          <th class="num"><?= $escape($translate('Clicks')) ?></th>
+          <th class="num">CTR</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          <?php foreach ($summary['ranks'] as $rank => $r): ?>
+            <tr>
+              <td><?= (int) $rank ?></td>
+              <td class="num"><?= $num($r['offered']) ?></td>
+              <td class="num"><?= $num($r['clicks']) ?></td>
+              <td class="num"><?= $escape($pct($r['ctr'])) ?></td>
+              <td><span class="si-bar" style="width: <?= (int) round(($r['ctr'] / $maxCtr) * 120) ?>px;"></span></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <p class="si-note"><?= $escape($translate('"Offered" counts impressions that actually contained that rank, so CTR is comparable across positions.')) ?></p>
+    <?php endif; ?>
+  </div>
+
+  <div class="si-section">
+    <h3><?= $escape($translate('Browsing depth (hops via recommendations)')) ?></h3>
+    <?php if (empty($summary['hops'])): ?>
+      <p class="si-note"><?= $escape($translate('No data yet.')) ?></p>
+    <?php else: ?>
+      <?php $maxHopN = max($summary['hops']) ?: 1; ?>
+      <table class="si-table">
+        <thead><tr>
+          <th><?= $escape($translate('Hop depth')) ?></th>
+          <th class="num"><?= $escape($translate('Page views')) ?></th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          <?php foreach ($summary['hops'] as $depth => $n): ?>
+            <tr>
+              <td><?= (int) $depth ?><?= $depth === 0 ? ' (' . $escape($translate('entry')) . ')' : '' ?></td>
+              <td class="num"><?= $num($n) ?></td>
+              <td><span class="si-bar" style="width: <?= (int) round(($n / $maxHopN) * 120) ?>px;"></span></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <p class="si-note"><?= $escape($translate('Depth 0 is an item page reached some other way; depth N means N consecutive recommendation clicks.')) ?></p>
+    <?php endif; ?>
+  </div>
+
+  <div class="si-section">
+    <h3><?= $escape($translate('How visitors arrived')) ?></h3>
+    <table class="si-table">
+      <tbody>
+        <?php foreach ($summary['entry_kinds'] as $kind => $n): ?>
+          <tr><td><?= $escape($kind !== '' ? $kind : '(unknown)') ?></td><td class="num"><?= $num($n) ?></td></tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <h3 style="margin-top:1rem;"><?= $escape($translate('Devices')) ?></h3>
+    <table class="si-table">
+      <tbody>
+        <?php foreach ($summary['devices'] as $device => $n): ?>
+          <tr><td><?= $escape($device !== '' ? $device : '(unknown)') ?></td><td class="num"><?= $num($n) ?></td></tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php if (count($summary['variants']) > 1 || (count($summary['variants']) === 1 && key($summary['variants']) !== '')): ?>
+      <h3 style="margin-top:1rem;"><?= $escape($translate('Variants')) ?></h3>
+      <table class="si-table">
+        <tbody>
+          <?php foreach ($summary['variants'] as $variant => $n): ?>
+            <tr><td><?= $escape($variant !== '' ? $variant : '(none)') ?></td><td class="num"><?= $num($n) ?></td></tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+
+  <div class="si-section">
+    <h3><?= $escape($translate('Most recommended-from items')) ?></h3>
+    <table class="si-table">
+      <thead><tr><th><?= $escape($translate('Seed item')) ?></th><th class="num"><?= $escape($translate('Impressions')) ?></th></tr></thead>
+      <tbody>
+        <?php foreach ($summary['top_seeds'] as $row): ?>
+          <tr>
+            <td>
+              <a href="<?= $escapeAttr($this->url('admin/id', ['controller' => 'item', 'id' => (int) $row['seed_item_id']])) ?>" target="_blank" rel="noopener">
+                #<?= (int) $row['seed_item_id'] ?> <?= $escape((string) ($row['title'] ?? '')) ?>
+              </a>
+            </td>
+            <td class="num"><?= $num($row['n']) ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <h3 style="margin-top:1rem;"><?= $escape($translate('Most clicked recommendations')) ?></h3>
+    <table class="si-table">
+      <thead><tr><th><?= $escape($translate('Item')) ?></th><th class="num"><?= $escape($translate('Clicks')) ?></th></tr></thead>
+      <tbody>
+        <?php foreach ($summary['top_targets'] as $row): ?>
+          <tr>
+            <td>
+              <a href="<?= $escapeAttr($this->url('admin/id', ['controller' => 'item', 'id' => (int) $row['target_item_id']])) ?>" target="_blank" rel="noopener">
+                #<?= (int) $row['target_item_id'] ?>
+              </a>
+            </td>
+            <td class="num"><?= $num($row['n']) ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var form = document.getElementById('si-clear-form');
+    if (!form) { return; }
+    var before = document.getElementById('si-before');
+    var after = document.getElementById('si-after');
+    var beforeRange = document.getElementById('si-before-range');
+    function toggle() {
+      var mode = form.querySelector('input[name="mode"]:checked');
+      var value = mode ? mode.value : 'now';
+      before.disabled = (value !== 'before');
+      after.disabled = (value !== 'range');
+      beforeRange.disabled = (value !== 'range');
+    }
+    form.querySelectorAll('input[name="mode"]').forEach(function (r) {
+      r.addEventListener('change', toggle);
+    });
+    toggle();
+  })();
+</script>
