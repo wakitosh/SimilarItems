@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.10] - 2026-09-17
+
+### EN
+
+#### Fixed
+- The module configuration and the manual still justified excluding signed-in visits by saying that staff are shown private items, which stopped being true in 0.5.9. The reason is now the one that still holds: staff browse to check the site rather than to discover, so their behaviour is not comparable, and verification clicks would otherwise land in the data.
+- Two claims about response time were stated more firmly than the evidence supports. Production showed almost no difference in response time between impressions that were reported and those that were not (1,217 ms vs 1,252 ms), so "suspect the response time" is now "worth checking, but a short visit or a failed request produces the same result".
+
+#### Added
+- The manual says that non-public items are never recommended, which is the answer to "why does my unpublished item never appear".
+- The bot note now uses what was actually measured: most requests to the recommendation endpoint come from crawlers that do execute JavaScript, and are excluded by user agent before anything is recorded.
+- "Include bots" on the log screen does nothing when bots are excluded at collection time, since no bot rows exist. The manual says so.
+
+### 日本語
+
+#### 修正
+- モジュール設定とマニュアルが、ログイン中の閲覧を除外する理由として「職員には非公開資料も推薦されるため」と説明したままでした。0.5.9 でこれは事実でなくなっています。現在も成り立つ理由（職員は発見のためではなく確認のために閲覧するので行動が比較できない、動作確認のクリックが混ざる）に書き換えました。
+- 応答時間に関する2つの記述が、根拠より強く断定していました。本番では報告のあったインプレッションと無かったものとで応答時間にほとんど差がなく（1,217 ms 対 1,252 ms）、「まず応答時間を疑う」ではなく「確認する価値はあるが、短い滞在や通信の失敗でも同じことが起きる」に改めました。
+
+#### 追加
+- 非公開資料が誰にも推薦されないことをマニュアルに明記しました（「未公開の資料が推薦に出てこない」理由になります）。
+- ボットに関する説明を実測に基づく記述にしました。推薦エンドポイントへの要求の大半は JavaScript を実行するクローラであり、記録前に User-Agent で除外しています。
+- ログ画面の「Include bots」は、収集時にボットを除外している場合はボットの記録自体が存在しないため結果が変わりません。その旨を明記しました。
+
 ## [0.5.9] - 2026-09-17
 
 ### EN
