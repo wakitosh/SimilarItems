@@ -66,17 +66,21 @@ class EventController extends AbstractActionController {
       return new JsonModel(['ok' => FALSE]);
     }
 
-    // Attach the current user only when the operator opted in; LogService
-    // drops it otherwise.
+    // Identity comes from the session, never from the payload: a client must
+    // not be able to claim to be someone, nor to claim to be anonymous and so
+    // slip past the signed-in exclusion.
+    $userId = NULL;
     try {
       $user = $this->identity();
       if ($user && method_exists($user, 'getId')) {
-        $payload['user_id'] = (int) $user->getId();
+        $userId = (int) $user->getId();
       }
     }
     catch (\Throwable $e) {
       // Anonymous visitor.
     }
+    $payload['user_id'] = $userId;
+    $payload['authenticated'] = $userId !== NULL;
 
     $ok = $this->log->recordEvent($payload);
     return new JsonModel(['ok' => $ok]);

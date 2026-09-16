@@ -6,6 +6,7 @@ namespace SimilarItems\Controller;
 
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\JsonModel;
+use SimilarItems\Api\PublicItemSearch;
 use SimilarItems\Experiment\ArmAssigner;
 use SimilarItems\Log\LogService;
 use SimilarItems\View\Helper\SimilarItems as SimilarItemsHelper;
@@ -117,7 +118,13 @@ class RecommendController extends AbstractActionController {
     }
     elseif ($arm === ArmAssigner::ARM_RANDOM) {
       // Control arm: same interface and item count, relevance removed.
-      $results = $this->randomItems($api, $similarHelper, $item, $siteIdOpt, $limit);
+      $results = $this->randomItems(
+        new PublicItemSearch($api),
+        $similarHelper,
+        $item,
+        $siteIdOpt,
+        $limit
+      );
     }
     else {
       try {
@@ -350,6 +357,7 @@ class RecommendController extends AbstractActionController {
         'tiebreak_override' => $context['tiebreak'] ?? '',
       ]),
       'user_id' => $this->currentUserId(),
+      'authenticated' => $this->currentUserId() !== NULL,
     ]);
     if (!$written) {
       return NULL;

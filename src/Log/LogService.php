@@ -291,6 +291,9 @@ SQL;
     if ($isBot && (int) ($this->settings->get('similaritems.log.exclude_bots') ?? 1) === 1) {
       return NULL;
     }
+    if ($this->isSkippedVisitor($data)) {
+      return NULL;
+    }
     try {
       $now = time();
       $key = $this->randomKey();
@@ -379,6 +382,9 @@ SQL;
     $this->ensureTables();
     $isBot = $this->isBot();
     if ($isBot && (int) ($this->settings->get('similaritems.log.exclude_bots') ?? 1) === 1) {
+      return FALSE;
+    }
+    if ($this->isSkippedVisitor($data)) {
       return FALSE;
     }
 
@@ -757,6 +763,25 @@ SQL;
    */
   public function getUserAgent(): string {
     return isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
+  }
+
+  /**
+   * Whether this visitor is excluded from the log because they are signed in.
+   *
+   * A signed-in editor or administrator can see private items, so the
+   * recommendations they are shown are drawn from a different pool than the
+   * ones the public sees. Recording those alongside visitor data mixes two
+   * populations that are not comparable, and nothing marks them apart
+   * afterwards unless user ids are being stored.
+   *
+   * @param array $data
+   *   Payload; the controller sets `authenticated` from the current identity.
+   */
+  private function isSkippedVisitor(array $data): bool {
+    if ((int) ($this->settings->get('similaritems.log.skip_authenticated') ?? 1) !== 1) {
+      return FALSE;
+    }
+    return !empty($data['authenticated']);
   }
 
   /**

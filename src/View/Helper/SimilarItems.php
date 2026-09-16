@@ -7,6 +7,7 @@ namespace SimilarItems\View\Helper;
 use Laminas\View\Helper\AbstractHelper;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Settings\Settings;
+use SimilarItems\Api\PublicItemSearch;
 
 /**
  * SimilarItems view helper: compute similar items based on settings.
@@ -58,7 +59,7 @@ class SimilarItems extends AbstractHelper {
   public function __invoke(AbstractResourceEntityRepresentation $resource, array $options = []): array {
     /** @var \Laminas\View\Renderer\PhpRenderer $view */
     $view = $this->getView();
-    $api = $view->api();
+    $api = new PublicItemSearch($view->api());
 
     // Debug can be enabled by setting.
     $debug = (int) ($this->settings->get('similaritems.debug_log') ?? 0) === 1;

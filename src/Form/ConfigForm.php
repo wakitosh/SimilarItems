@@ -1016,6 +1016,19 @@ class ConfigForm extends Form {
         ],
       ])
       ->add([
+        'name' => 'similaritems_log_skip_authenticated',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => 'ログイン中の閲覧を記録しない',
+          // @translate
+          'info' => 'ログインした職員には非公開資料も推薦されるため、一般利用者とは異なる一覧が表示されます。両者を同じログに混ぜると比較できないデータが同居するため、既定では記録しません。職員自身の利用を分析対象にする場合のみ外してください（その場合は「ログイン中のユーザ ID も記録する」も併せてご検討ください。無効のままだと、後からどれが職員の記録か判別できません）。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_log_skip_authenticated',
+        ],
+      ])
+      ->add([
         'name' => 'similaritems_log_session_cookie',
         'type' => CheckboxElement::class,
         'options' => [
@@ -1260,6 +1273,7 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_group_log_info', 'required' => FALSE])
       ->add(['name' => 'similaritems_log_enable', 'required' => FALSE])
       ->add(['name' => 'similaritems_log_exclude_bots', 'required' => FALSE])
+      ->add(['name' => 'similaritems_log_skip_authenticated', 'required' => FALSE])
       ->add(['name' => 'similaritems_log_session_cookie', 'required' => FALSE])
       ->add(['name' => 'similaritems_log_session_ttl', 'required' => FALSE])
       ->add(['name' => 'similaritems_log_chain_window', 'required' => FALSE])

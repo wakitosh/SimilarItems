@@ -234,6 +234,7 @@ class Module extends AbstractModule {
       // Usage logging (research).
       'similaritems_log_enable' => (int) ($settings->get('similaritems.log.enable') ?? 0),
       'similaritems_log_exclude_bots' => (int) ($settings->get('similaritems.log.exclude_bots') ?? 1),
+      'similaritems_log_skip_authenticated' => (int) ($settings->get('similaritems.log.skip_authenticated') ?? 1),
       'similaritems_log_session_cookie' => (int) ($settings->get('similaritems.log.session_cookie') ?? 1),
       'similaritems_log_session_ttl' => (int) ($settings->get('similaritems.log.session_ttl') ?? 1800),
       'similaritems_log_chain_window' => (int) ($settings->get('similaritems.log.chain_window') ?? 300),
@@ -334,6 +335,7 @@ class Module extends AbstractModule {
       // so that a first-party cookie is never set without a decision.
       'similaritems.log.enable' => 0,
       'similaritems.log.exclude_bots' => 1,
+      'similaritems.log.skip_authenticated' => 1,
       'similaritems.log.session_cookie' => 1,
       'similaritems.log.session_ttl' => 1800,
       'similaritems.log.chain_window' => 300,
@@ -522,6 +524,7 @@ class Module extends AbstractModule {
     $logEnable = $getInt('similaritems_log_enable', 0);
     $settings->set('similaritems.log.enable', $logEnable);
     $settings->set('similaritems.log.exclude_bots', $getInt('similaritems_log_exclude_bots', 1));
+    $settings->set('similaritems.log.skip_authenticated', $getInt('similaritems_log_skip_authenticated', 1));
     $settings->set('similaritems.log.session_cookie', $getInt('similaritems_log_session_cookie', 1));
     $settings->set('similaritems.log.session_ttl', max(300, $getInt('similaritems_log_session_ttl', 1800)));
     $settings->set('similaritems.log.chain_window', max(30, $getInt('similaritems_log_chain_window', 300)));

@@ -387,13 +387,14 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
     </table>
     <h3 style="margin-top:1rem;"><?= $escape($translate('Most clicked recommendations')) ?></h3>
     <table class="si-table">
-      <thead><tr><th><?= $escape($translate('Item')) ?></th><th class="num"><?= $escape($translate('Clicks')) ?></th></tr></thead>
+      <thead><tr><th><?= $escape($translate('Clicked item')) ?></th><th class="num"><?= $escape($translate('Clicks')) ?></th></tr></thead>
       <tbody>
         <?php foreach ($summary['top_targets'] as $row): ?>
+          <?php $title = trim((string) ($row['title'] ?? '')); ?>
           <tr>
             <td>
-              <a href="<?= $escapeAttr($this->url('admin/id', ['controller' => 'item', 'id' => (int) $row['target_item_id']])) ?>" target="_blank" rel="noopener">
-                #<?= (int) $row['target_item_id'] ?>
+              <a href="<?= $escapeAttr($this->url('admin/id', ['controller' => 'item', 'id' => (int) $row['target_item_id']])) ?>" target="_blank" rel="noopener" title="<?= $escapeAttr($title) ?>">
+                #<?= (int) $row['target_item_id'] ?><?= $title !== '' ? ' ' . $escape($title) : '' ?>
               </a>
             </td>
             <td class="num"><?= $num($row['n']) ?></td>

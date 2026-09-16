@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.9] - 2026-09-17
+
+### EN
+
+#### Changed
+- Non-public items are never recommended, to anyone. Candidate lookups previously returned whatever the current identity was allowed to read, so a signed-in editor or administrator was shown recommendations drawn from a larger pool than visitors get. The block lives on public site pages and answers "what else might a visitor want", so an item no visitor can reach is not a valid answer; showing them also misled staff reviewing the feature, who were judging a list no visitor would see. The constraint is applied at a single wrapper around the API rather than on each query, so a lookup added later to the scoring engine cannot omit it. The random control arm draws from the same restricted pool.
+
+### 日本語
+
+#### 変更
+- 非公開資料を誰に対しても推薦しないようにしました。候補の検索は従来、閲覧者の権限で読める資料をそのまま返していたため、ログインした編集者・管理者には一般利用者より広い母集団から推薦が選ばれていました。このブロックは公開サイト上にあり「一般利用者が次に見たいものは何か」に答えるものなので、誰も到達できない資料は答えになりません。職員が推薦の質を点検する際に、実際には表示されない一覧を評価してしまう問題もありました。制約は個々のクエリではなく API のラッパ1箇所で適用するため、後からスコアリングに検索を追加しても漏れません。ランダム対照群も同じ母集団から抽出します。
+
+## [0.5.8] - 2026-09-17
+
+### EN
+
+#### Added
+- Signed-in visits are excluded from the log by default (`similaritems.log.skip_authenticated`). A signed-in editor or administrator is shown recommendations drawn from a pool that includes private items, so their impressions are not comparable with a visitor's - and nothing marks them apart afterwards unless user ids are being stored. Both impressions and events are skipped; recommendations themselves are unaffected. Identity is taken from the session in the event endpoint, never from the payload, so a client cannot claim to be anonymous to get past it.
+
+### 日本語
+
+#### 追加
+- ログイン中の閲覧を既定で記録対象から外しました（`similaritems.log.skip_authenticated`）。ログインした編集者・管理者には非公開資料を含む母集団から推薦が選ばれるため、一般利用者のインプレッションとは比較できません。ユーザ ID を記録していない限り、後から両者を判別する手段もありません。インプレッション・イベントの双方を記録せず、推薦の表示自体には影響しません。イベント受付では利用者の判定をセッションから行い、送信内容からは取らないため、匿名を偽って回避することはできません。
+
+## [0.5.7] - 2026-09-17
+
+### EN
+
+#### Fixed
+- "Most clicked recommendations" showed bare item ids. Click events deliberately record only the id, so the titles for that short list are now looked up for display. They are read from the resource table rather than through the API, because the API filters by visibility and would have made non-public items look deleted.
+
+#### Changed
+- The manual now explains what a beacon is and why it matters: impressions are recorded by the server, but whether the block reached the screen and which link was pressed are only knowable inside the visitor's browser, so a small script reports them. Beacons are not guaranteed to arrive, which is why the visibility rate and both click-through rates are lower bounds while the impression count is not affected.
+
+### 日本語
+
+#### 修正
+- 「Most clicked recommendations」がアイテム ID しか表示していませんでした。クリックイベントは意図的に ID のみを記録しているため、この短い一覧に限り表示時にタイトルを引くようにしました。API ではなく resource テーブルから読みます。API は公開範囲で絞り込むため、非公開アイテムが削除済みのように見えてしまうからです。
+
+#### 変更
+- マニュアルに「ビーコン」の説明を追加しました。インプレッションはサーバが自分で記録できるが、ブロックが画面に入ったか・どのリンクが押されたかは閲覧者の画面の中でしか分からないため、小さなスクリプトが知らせている、という仕組みと、ビーコンは確実には届かないので可視化率・CTR はいずれも下限値であり、インプレッション数は影響を受けないこと。
+
 ## [0.5.6] - 2026-09-16
 
 ### EN

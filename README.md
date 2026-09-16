@@ -9,6 +9,7 @@ The display is controlled by the active theme, while all recommendation logic is
 - **Configurable Scoring Engine**: Fine-tune recommendation relevance using multiple weighted signals (Author ID, Authorized name, Subject, Series title, Publisher, Domain buckets, Item sets, etc.). Weights can be positive (boost) or negative (penalty).
 - **Async Loading**: Recommendations are loaded via a JSON API after the main page content, preventing slow page loads.
 - **Advanced Serendipity Control**: Promote diversity by penalizing items from the same series (BibID) and same base title, with final-stage diversification by base title.
+- **Public Items Only**: Non-public items are never recommended, whoever is looking. The block answers what a visitor might want next, so an item no visitor can reach is not a valid answer - and staff reviewing the feature see the same list visitors do.
 - **Smart Candidate Expansion**: Expands the candidate pool using item sets and mapped properties (Author/Subject/Series/Publisher), with an internal hard cap to keep performance predictable.
 - **Multi-match Bonus (Optional)**: When enabled, multi-valued properties add extra score based on how many distinct values match between the seed item and each candidate, with a configurable decay rate.
 - **Title Normalization**: Intelligently groups items by their base title, ignoring volume numbers and separators (e.g., "Title, Vol. 1" and "Title, Vol. 2" are treated as having the same base title).
@@ -430,6 +431,7 @@ MIT
 - **設定可能なスコアリングエンジン**: 著者ID・典拠形著者名・主題・シリーズタイトル・出版者・分野バケット・アイテムセットなど複数のシグナルに重みを付けて、推奨の関連性を細かく調整できます。
 - **非同期読み込み**: メインコンテンツの表示後にJSON API経由で推奨リストを読み込むため、ページの表示速度が低下しません。
 - **高度なセレンディピティ制御**: 同一シリーズ（BibID）および同一ベースタイトルのアイテムにペナルティを与え、最終段階でベースタイトルの多様性を優先することで、表示のバラエティを高めます。
+- **公開資料のみを推薦**: 誰が閲覧していても、非公開資料は推薦されません。このブロックは「一般利用者が次に見たいものは何か」に答えるため、誰も到達できない資料は答えにならないからです。職員が点検する際も、一般利用者と同じ一覧が表示されます。
 - **スマートな候補拡張**: アイテムセットや、著者・主題・シリーズ・出版者などマッピングされたプロパティを使って候補の母集団を広げつつ、内部的な候補数上限によりパフォーマンスを一定に保ちます。
 - **一致回数ボーナス（オプション）**: 有効化すると、多値プロパティについて「いくつの値が一致したか」に応じて追加スコアを与えます（減衰率は設定可能）。
 - **タイトル正規化**: 巻数や区切り文字を無視してベースタイトルを賢く判定（例：「タイトル, 上巻」と「タイトル, 下巻」は同じベースタイトルとして扱われます）。

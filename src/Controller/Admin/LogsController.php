@@ -821,6 +821,13 @@ class LogsController extends AbstractActionController {
       . ' AND event_type = ? AND target_item_id IS NOT NULL GROUP BY target_item_id ORDER BY n DESC LIMIT 20',
       array_merge($evtParams, ['click'])
     );
+    // Click events carry no title: only the clicked item's id is recorded, so
+    // that the log does not go stale when an item is retitled. The short list
+    // shown here is looked up instead.
+    $titles = $this->lookupItemTitles(array_column($out['top_targets'], 'target_item_id'));
+    foreach ($out['top_targets'] as $i => $row) {
+      $out['top_targets'][$i]['title'] = $titles[(int) $row['target_item_id']] ?? '';
+    }
 
     return $out;
   }
@@ -902,6 +909,43 @@ class LogsController extends AbstractActionController {
       $clauses[] = 'is_bot = 0';
     }
     return ['WHERE ' . implode(' AND ', $clauses), $params];
+  }
+
+  /**
+   * Display titles for a handful of item ids.
+   *
+   * @param array $ids
+   *   Item ids.
+   *
+   * @return array<int,string>
+   *   Item id => title, omitting items that no longer exist.
+   */
+  private function lookupItemTitles(array $ids): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+    if (!$ids) {
+      return [];
+    }
+    // Read the denormalised title straight from the resource table rather than
+    // through the API: this page is admin-only, and the API would silently drop
+    // items that are not public, leaving them looking deleted.
+    $titles = [];
+    try {
+      $placeholders = implode(',', array_fill(0, count($ids), '?'));
+      $rows = $this->conn->fetchAllAssociative(
+        'SELECT id, title FROM resource WHERE id IN (' . $placeholders . ')',
+        $ids
+      );
+      foreach ($rows as $row) {
+        $title = trim((string) ($row['title'] ?? ''));
+        if ($title !== '') {
+          $titles[(int) $row['id']] = $title;
+        }
+      }
+    }
+    catch (\Throwable $e) {
+      // A missing title is not worth failing the dashboard over.
+    }
+    return $titles;
   }
 
   /**
