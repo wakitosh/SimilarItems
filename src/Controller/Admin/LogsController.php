@@ -376,6 +376,7 @@ class LogsController extends AbstractActionController {
         'empties' => (int) $row['empties'],
         'views' => 0,
         'never_seen' => 0,
+        'not_reported' => 0,
         'clicks' => 0,
         'cross' => 0,
         'same' => 0,
@@ -430,6 +431,7 @@ class LogsController extends AbstractActionController {
     }
 
     foreach ($rows as $arm => $r) {
+      $rows[$arm]['not_reported'] = max(0, $r['impressions'] - $r['views'] - $r['never_seen']);
       $rows[$arm]['pages_per_session'] = $r['sessions'] > 0 ? $r['impressions'] / $r['sessions'] : 0.0;
       $rows[$arm]['ctr'] = $r['impressions'] > 0 ? $r['clicks'] / $r['impressions'] : 0.0;
       $rows[$arm]['viewed_ctr'] = $r['views'] > 0 ? $r['clicks'] / $r['views'] : 0.0;
@@ -468,6 +470,7 @@ class LogsController extends AbstractActionController {
       'avg_results' => 0.0,
       'views' => 0,
       'never_seen' => 0,
+      'not_reported' => 0,
       'clicks' => 0,
       'ctr' => 0.0,
       'viewed_ctr' => 0.0,
@@ -534,8 +537,14 @@ class LogsController extends AbstractActionController {
         $out['clicks'] = (int) $row['n'];
       }
     }
+    // Impressions split into three, and they must add up: seen, reported as
+    // never on screen, and never reported at all. The third happens when the
+    // visitor leaves before the block is rendered, so the client never gets
+    // the chance to observe it.
+    $out['not_reported'] = max(0, $out['impressions'] - $out['views'] - $out['never_seen']);
     if ($out['impressions'] > 0) {
       $out['ctr'] = $out['clicks'] / $out['impressions'];
+      // A lower bound: the unreported impressions may or may not have been seen.
       $out['view_rate'] = $out['views'] / $out['impressions'];
     }
     if ($out['views'] > 0) {

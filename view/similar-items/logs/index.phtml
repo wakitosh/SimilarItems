@@ -186,6 +186,9 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
       <?php if (!empty($summary['never_seen'])): ?>
         &middot; <?= $escape(sprintf($translate('%s never on screen'), $num($summary['never_seen']))) ?>
       <?php endif; ?>
+      <?php if (!empty($summary['not_reported'])): ?>
+        &middot; <?= $escape(sprintf($translate('%s not reported'), $num($summary['not_reported']))) ?>
+      <?php endif; ?>
     </span>
   </div>
   <div class="si-kpi">

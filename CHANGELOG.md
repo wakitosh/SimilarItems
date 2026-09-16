@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.5] - 2026-09-16
+
+### EN
+
+#### Fixed
+- The Viewed card reported only two of the three possible outcomes, so the figures did not add up to the impression count. An impression whose browser never reported at all - typically because the visitor left before the block was rendered, so the client never had anything to observe - fell into neither "viewed" nor "never on screen". The count is now shown as `N not reported`, on the summary card and in the per-arm table, and the three add up to the impression total. The manual explains the split and notes that the visibility rate is therefore a lower bound, and that a large unreported count points at the response time.
+
+### 日本語
+
+#### 修正
+- Viewed カードが3区分のうち2つしか表示しておらず、合計がインプレッション数と一致しませんでした。ブラウザから報告が届かなかったインプレッション（多くは推薦の計算が終わる前に離脱され、クライアントが観測対象を認識できなかったもの）が、「可視化」にも「画面に入らなかった」にも入っていませんでした。`N not reported` として概況カードとアーム別表に表示し、3区分の合計がインプレッション数と一致するようにしました。マニュアルにも区分の説明を追加し、可視化率が下限値であること、not reported が多い場合は応答時間を疑うべきことを明記しました。
+
 ## [0.5.4] - 2026-09-16
 
 ### EN

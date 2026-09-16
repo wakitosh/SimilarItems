@@ -116,10 +116,33 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
     <td class="si-label">Viewed (in viewport)</td>
     <td>
       <strong>ブロックが実際に画面に入った</strong>回数。「表示された」とは違います。
-      副題の <code>N never on screen</code> は、ブロックが描画されたのに一度も画面に
-      入らないまま離脱された回数です。<br>
-      この2つを分けることがこの画面の要点です。推薦がクリックされないとき、
-      「見たけれど選ばれなかった」のか「そもそも見られていない」のかで打つ手が変わります。
+      推薦がクリックされないとき、「見たけれど選ばれなかった」のか「そもそも見られていない」のかで
+      打つ手が変わるため、これを分けて数えています。<br>
+      <strong>インプレッションは必ず次の3つに分かれ、合計は Impressions と一致します。</strong>
+      副題には後ろの2つを表示しています。
+      <table style="margin-top:.5rem;">
+        <tr><th>区分</th><th>意味</th></tr>
+        <tr>
+          <td class="si-label">Viewed</td>
+          <td>ブロックが画面に入った</td>
+        </tr>
+        <tr>
+          <td class="si-label">never on screen</td>
+          <td>描画されたが、一度も画面に入らないまま離脱された（<strong>報告あり</strong>）</td>
+        </tr>
+        <tr>
+          <td class="si-label">not reported</td>
+          <td>
+            ブラウザから報告が届かなかった。多くは<strong>推薦の計算が終わる前に離脱された</strong>
+            ケースで、ブロックが描画されていないためクライアントが観測対象として認識できません。
+            通信の失敗やブラウザの強制終了でも起こります。
+          </td>
+        </tr>
+      </table>
+      <strong>not reported が多いときは応答時間を疑ってください。</strong>
+      この区分は見られたかどうか不明なので、可視化率（副題の％）は
+      <strong>下限値</strong>として読みます。not reported の件数は、
+      ビーコン欠落率のおおよその目安にもなります。
     </td>
   </tr>
   <tr>
@@ -306,7 +329,8 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   <li><strong>ビーコンの欠測がある。</strong>
     表示・クリックはブラウザから送るため、一定の割合で届きません。
     インプレッションはサーバ側で記録するので影響を受けません。
-    (unknown) の割合が欠測のおおよその目安になります。</li>
+    欠測の量は Viewed カードの <code>not reported</code>、
+    流入経路の <code>(unknown)</code> の2か所に現れます。</li>
   <li><strong>応答時間と可視化率は連動します。</strong>
     推薦の計算が遅い資料ほど、ブロックが出る前に離脱されます。
     資料ごとの比較をするときは計算時間を考慮してください。</li>
