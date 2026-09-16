@@ -45,6 +45,7 @@ $title = $dataset === 'events'
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-events', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Events')) ?></a>
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-export', [], ['query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => 'csv'])])) ?>"><?= $escape($translate('Export CSV')) ?></a>
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-export', [], ['query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => 'tsv'])])) ?>"><?= $escape($translate('Export TSV')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-help')) ?>"><?= $escape($translate('How to read this page')) ?></a>
 </fieldset>
 
 <div class="si-scroll">

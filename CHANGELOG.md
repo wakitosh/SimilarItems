@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.4] - 2026-09-16
+
+### EN
+
+#### Added
+- A manual for the log dashboard, reachable from every log page ("How to read this page", `/admin/similar-items/logs/help`). It explains what each figure counts and how to read it: the distinction between rendered and actually seen, the two click-through rates and when to use each, why the rank table divides by the impressions that actually offered that rank, what the browsing-depth figures mean, what each entry channel means and why an unclassified one must not be read as "direct", what the control arms compare, and the caveats that matter when interpreting small samples, missing beacons and bot filtering. Written to be readable before any data has been collected.
+
+### 日本語
+
+#### 追加
+- ログ画面の読み方マニュアルを追加しました。各ログ画面から「How to read this page」で開けます（`/admin/similar-items/logs/help`）。各数値が何を数えているかと読み方を説明します：「表示された」と「実際に見られた」の違い、2種類の CTR の使い分け、順位別表の分母が「その順位を実際に提示した回数」である理由、回遊深度の意味、流入経路の各値と「未判定」を `direct` と混同してはいけない理由、対照群アームが何を比較しているか、少数サンプル・ビーコン欠測・ボット判定に関する注意。データが1件も無い状態でも読めるように書いてあります。
+
 ## [0.5.3] - 2026-09-16
 
 ### EN

@@ -364,6 +364,8 @@ Two caveats worth carrying into the analysis:
 
 Timestamps are exported as ISO 8601 in the site's configured time zone, and CSV carries a UTF-8 BOM for spreadsheet software.
 
+Every log page links to **How to read this page** (`/admin/similar-items/logs/help`), a manual covering what each figure counts, the distinction between rendered and actually seen, when to use each of the two click-through rates, and the caveats that matter when interpreting the numbers.
+
 ### Example analysis
 
 ```sql
@@ -779,6 +781,8 @@ A/Bテストや診断用途として、クエリパラメータで一部の設�
   - `chains` — 回遊経路ごとに 1 行：`chain_key`、セッション、開始／終了、ページ数、`max_hop`、流入経路、順序付きの `item_path`（例 `10307;10791;11302`）
 
 日時はサイトのタイムゾーンで ISO 8601 として出力し、CSV には表計算ソフト向けに UTF-8 BOM を付与します。
+
+各ログ画面から **「How to read this page」**（`/admin/similar-items/logs/help`）を開けます。各数値が何を数えているか、「表示された」と「実際に見られた」の違い、2 種類の CTR の使い分け、解釈上の注意をまとめたマニュアルです。
 
 ### 分析例
 

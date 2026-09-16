@@ -70,6 +70,7 @@ $num = function ($v, int $d = 0) { return number_format((float) $v, $d); };
   <a class="button" href="<?= $escapeAttr($exportUrl('events', 'csv')) ?>"><?= $escape($translate('Export events (CSV)')) ?></a>
   <a class="button" href="<?= $escapeAttr($exportUrl('chains', 'csv')) ?>"><?= $escape($translate('Export chains (CSV)')) ?></a>
   <a class="button" href="<?= $escapeAttr($exportUrl('impressions', 'tsv')) ?>"><?= $escape($translate('Export impressions (TSV)')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-help')) ?>"><?= $escape($translate('How to read this page')) ?></a>
 </fieldset>
 
 <div class="si-sections">

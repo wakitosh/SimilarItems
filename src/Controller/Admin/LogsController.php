@@ -87,6 +87,18 @@ class LogsController extends AbstractActionController {
   }
 
   /**
+   * How to read the dashboard.
+   *
+   * Static, so it stays readable when there is no data yet and can be sent to
+   * someone who does not have access to the admin interface.
+   */
+  public function helpAction() {
+    $vm = new ViewModel();
+    $vm->setTemplate('similar-items/logs/help');
+    return $vm;
+  }
+
+  /**
    * Paginated impression list.
    */
   public function impressionsAction() {

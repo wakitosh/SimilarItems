@@ -1,0 +1,354 @@
+<?php
+/**
+ * Manual for the Similar Items logs dashboard.
+ *
+ * Static by design: it has to be readable before any data exists, and it has
+ * to be sendable to someone who cannot open the admin interface.
+ */
+
+$translate = $this->plugin('translate');
+$escape = $this->plugin('escapeHtml');
+$escapeAttr = $this->plugin('escapeHtmlAttr');
+?>
+
+<?= $this->pageTitle($translate('Similar Items logs: how to read this page')) ?>
+
+<style>
+  body.minimal div[role=main] { overflow: visible !important; min-height: auto !important; height: auto !important; }
+  #content { height: auto !important; min-height: auto !important; overflow: visible !important; }
+  .si-doc { max-width: 60rem; line-height: 1.75; }
+  .si-doc h3 { margin: 2rem 0 .5rem; padding-bottom: .3rem; border-bottom: 2px solid #ddd; font-size: 1.15rem; }
+  .si-doc h4 { margin: 1.3rem 0 .4rem; font-size: 1rem; }
+  .si-doc p { margin: .5rem 0; }
+  .si-doc table { width: 100%; border-collapse: collapse; margin: .6rem 0 1rem; }
+  .si-doc th, .si-doc td { border: 1px solid #e0e0e0; padding: .45rem .6rem; text-align: left; vertical-align: top; font-size: .92rem; }
+  .si-doc th { background: #f4f4f4; white-space: nowrap; }
+  .si-doc code { background: #f4f4f4; padding: .1em .35em; border-radius: 3px; font-size: .9em; }
+  .si-doc .si-label { white-space: nowrap; font-weight: 600; }
+  .si-doc .si-note { border-left: 4px solid #6c8ebf; background: #f2f6fb; padding: .7rem 1rem; margin: .8rem 0; }
+  .si-doc .si-warn { border-left: 4px solid #d08a00; background: #fff8e6; padding: .7rem 1rem; margin: .8rem 0; }
+  .si-doc ul { margin: .4rem 0 .8rem 1.3rem; }
+  .si-doc li { margin: .2rem 0; }
+  .si-toc { border: 1px solid #ddd; background: #fafafa; border-radius: 4px; padding: .8rem 1rem; }
+  .si-toc ul { margin: .3rem 0 0 1.2rem; }
+</style>
+
+<fieldset id="page-actions">
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs')) ?>"><?= $escape($translate('Back to the logs')) ?></a>
+</fieldset>
+
+<div class="si-doc">
+
+<p>
+  「Similar Items logs」は、類似アイテム推薦が<strong>実際にどう使われているか</strong>を記録した画面です。
+  このページでは、各数値が何を数えていて、どう読むべきかを説明します。
+</p>
+
+<div class="si-toc">
+  <strong>目次</strong>
+  <ul>
+    <li><a href="#si-what">1. 何が記録されているか</a></li>
+    <li><a href="#si-kpi">2. 上部の指標カード</a></li>
+    <li><a href="#si-arms">3. 対照群試験（Control-group trial）</a></li>
+    <li><a href="#si-rank">4. 順位別クリック率</a></li>
+    <li><a href="#si-depth">5. 回遊深度</a></li>
+    <li><a href="#si-entry">6. 流入経路とデバイス</a></li>
+    <li><a href="#si-top">7. 上位アイテム</a></li>
+    <li><a href="#si-filter">8. 絞り込みと一覧</a></li>
+    <li><a href="#si-export">9. エクスポート</a></li>
+    <li><a href="#si-caveat">10. 数字を読むときの注意</a></li>
+    <li><a href="#si-ops">11. 運用（削除・突合・プライバシー）</a></li>
+  </ul>
+</div>
+
+<h3 id="si-what">1. 何が記録されているか</h3>
+
+<p>記録は2種類あります。</p>
+
+<table>
+  <tr>
+    <th>インプレッション<br>(impression)</th>
+    <td>
+      推薦を1回返すごとに1行。ブロックを含む資料ページが表示されるたびに必ず作られるので、
+      <strong>資料ページの閲覧記録としても使えます</strong>。
+      シード資料（どの資料を見ていたか）、提示した資料の順位・スコア・分野・発火シグナル、
+      候補数、計算時間などを持ちます。
+    </td>
+  </tr>
+  <tr>
+    <th>イベント<br>(event)</th>
+    <td>
+      ブラウザから届く記録。<code>view</code>（ブロックが画面に入った／入らないまま離脱した）と
+      <code>click</code>（推薦が開かれた）の2種類。
+      クリックには順位・スコア・分野・滞留時間が付きます。
+    </td>
+  </tr>
+</table>
+
+<div class="si-note">
+  <strong>ボットはほとんど混入しません。</strong>
+  記録の条件が「JavaScript が実行され、ブロックが画面に入り、ビーコンが届く」であるため、
+  クローラはインプレッションまでしか到達しません。加えて User-Agent による判定で明らかな
+  ボットは記録自体を除外しています（設定で変更可）。
+  Web サーバのアクセスログと比べて、この画面の数字は<strong>人間の利用に近い</strong>と考えて構いません。
+</div>
+
+<h3 id="si-kpi">2. 上部の指標カード</h3>
+
+<table>
+  <tr><th>画面のラベル</th><th>意味と読み方</th></tr>
+  <tr>
+    <td class="si-label">Impressions</td>
+    <td>
+      推薦を返した回数。副題の <code>N empty</code> は<strong>推薦が0件だった回数</strong>で、
+      推薦エンジンがその資料をカバーできなかったことを示します。
+      これが多い場合はメタデータが薄い資料が多いか、重み設定が厳しすぎます。
+    </td>
+  </tr>
+  <tr>
+    <td class="si-label">Sessions</td>
+    <td>
+      異なり閲覧セッション数。副題は異なりシード資料数。
+      1セッションは最終アクセスから既定30分で切れます（設定で変更可）。
+    </td>
+  </tr>
+  <tr>
+    <td class="si-label">Viewed (in viewport)</td>
+    <td>
+      <strong>ブロックが実際に画面に入った</strong>回数。「表示された」とは違います。
+      副題の <code>N never on screen</code> は、ブロックが描画されたのに一度も画面に
+      入らないまま離脱された回数です。<br>
+      この2つを分けることがこの画面の要点です。推薦がクリックされないとき、
+      「見たけれど選ばれなかった」のか「そもそも見られていない」のかで打つ手が変わります。
+    </td>
+  </tr>
+  <tr>
+    <td class="si-label">Clicks</td>
+    <td>
+      推薦が開かれた回数。副題に<strong>2種類の CTR</strong> が出ます。
+      <ul>
+        <li><code>CTR</code> … クリック ÷ インプレッション。露出全体に対する反応率。</li>
+        <li><code>among viewed</code> … クリック ÷ 可視化。<strong>実際に見た人の中での反応率</strong>。
+          推薦の「中身の良さ」を見たいときはこちらを使います。</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td class="si-label">Recommendation-driven hops</td>
+    <td>
+      推薦をたどって到達した資料ページの数。副題は最大の連鎖深度。
+      「推薦がどれだけ回遊を生んでいるか」の直接的な数字です。
+    </td>
+  </tr>
+  <tr>
+    <td class="si-label">Chains with ≥1 hop</td>
+    <td>
+      1回以上推薦をたどった経路の数。副題はその経路の平均ページ数。
+    </td>
+  </tr>
+  <tr>
+    <td class="si-label">Cross-domain clicks</td>
+    <td>
+      クリック先が<strong>シード資料の分野の外</strong>だった割合。分野は設定の
+      「分野バケット規則」で決まります。セレンディピティ（意外な発見）の指標です。
+      分野が判定できない資料は分母から外れるため、副題に「分類できたクリック数」を併記しています。
+    </td>
+  </tr>
+  <tr>
+    <td class="si-label">Response time</td>
+    <td>
+      推薦の計算にかかった平均時間。副題は平均候補数と平均提示件数。
+      <strong>遅いほどブロックが出るのが遅れ、見られる前に離脱されます。</strong>
+      可視化率が低いときは、まずここを疑ってください。
+    </td>
+  </tr>
+</table>
+
+<h3 id="si-arms">3. 対照群試験（Control-group trial）</h3>
+
+<p>
+  推薦の効果を検証するために、閲覧者をセッション単位で無作為に振り分ける機能です。
+  <strong>既定では実施していません</strong>。実施していないときは「The trial is not running」と表示され、
+  全員が通常の推薦を見ています。
+</p>
+
+<table>
+  <tr><th>アーム</th><th>閲覧者が見るもの</th><th>比較して分かること</th></tr>
+  <tr>
+    <td class="si-label">default</td>
+    <td>通常のスコアリング推薦</td>
+    <td>―</td>
+  </tr>
+  <tr>
+    <td class="si-label">random</td>
+    <td>見た目も件数も同じで、資料だけ無作為</td>
+    <td>
+      default と比べると、<strong>スコアリングの寄与</strong>が分かります。
+      画面・位置・件数を一定にして関連性だけを取り除いているためです。
+      CTR の「偶然の水準」もここで得られます。
+    </td>
+  </tr>
+  <tr>
+    <td class="si-label">off</td>
+    <td>ブロックを表示しない</td>
+    <td>
+      default と比べると、<strong>機能そのものが回遊に与える寄与</strong>が分かります。
+    </td>
+  </tr>
+</table>
+
+<p>表の各列は上部カードと同じ定義です。加えて次の2列があります。</p>
+
+<ul>
+  <li><strong>Pages / session、Items / session</strong> …
+    セッションあたりの資料ページ閲覧数と異なり資料数。
+    <strong>全アームで比較できる唯一の指標</strong>です。
+    <code>off</code> でも「表示しないが閲覧は記録する」ようにしているため、ここだけは揃います。</li>
+  <li><strong>Via recommendation</strong> … そのアームの閲覧のうち、推薦をたどって到達した割合。</li>
+</ul>
+
+<div class="si-note">
+  <code>off</code> アームの Viewed・CTR 列が空なのは仕様です。表示していないので、
+  見ることもクリックすることもできません。
+</div>
+
+<h3 id="si-rank">4. 順位別クリック率（Click-through rate by rank）</h3>
+
+<p>
+  <strong>Offered</strong> は「その順位が実際に提示されたインプレッション数」です。
+  提示件数は資料によって変わるため、全インプレッションを分母にすると下位の順位が不当に低く出ます。
+  実際に提示された回数を分母にすることで、<strong>順位どうしを対等に比較できます</strong>。
+</p>
+<p>
+  上位ほど CTR が高いのは自然です（位置バイアス）。
+  順位付けが機能しているかどうかは、対照群試験の <code>random</code> アームと
+  比べて初めて判定できます。ランダムでは順位別 CTR がほぼ平坦になるはずだからです。
+</p>
+
+<h3 id="si-depth">5. 回遊深度（Browsing depth）</h3>
+
+<table>
+  <tr><th>深度</th><th>意味</th></tr>
+  <tr><td class="si-label">0 (entry)</td><td>推薦以外の経路で到達した資料ページ（検索、外部リンク、直接など）</td></tr>
+  <tr><td class="si-label">N</td><td>推薦を<strong>N回連続</strong>でたどって到達したページ</td></tr>
+</table>
+
+<p>
+  連鎖は、クリックの記録と次のページ表示をセッション単位で突き合わせて復元しています。
+  深度が1で止まるか、2・3と続くかで「推薦が一度きりの寄り道か、回遊を生んでいるか」が分かります。
+</p>
+
+<h3 id="si-entry">6. 流入経路とデバイス</h3>
+
+<table>
+  <tr><th>値</th><th>意味</th></tr>
+  <tr><td class="si-label">similar_items</td><td>推薦をクリックして到達（サーバ側でクリック連鎖から確定）</td></tr>
+  <tr><td class="si-label">internal</td><td>同じサイト内の別ページから到達（検索結果、一覧など）</td></tr>
+  <tr><td class="si-label">search_engine</td><td>検索エンジンから到達</td></tr>
+  <tr><td class="si-label">social</td><td>SNS・チャットサービス等から到達</td></tr>
+  <tr><td class="si-label">external</td><td>その他の外部サイトから到達</td></tr>
+  <tr><td class="si-label">direct</td><td>リファラなし（ブックマーク、URL直接入力、リファラ抑制など）</td></tr>
+  <tr><td class="si-label">(unknown)</td><td><strong>判定できていない</strong>。下記参照</td></tr>
+</table>
+
+<div class="si-warn">
+  <strong>(unknown) を direct と混同しないでください。</strong>
+  流入経路はブラウザが送る参照元にもとづいて確定します。ブロックが描画される前に
+  離脱されるなどしてビーコンが届かなかった場合、経路は未判定のままになります。
+  <strong>欠測として割合を報告してください。</strong>
+  なお <code>similar_items</code> だけはサーバ側で確定するため、この影響を受けません。
+</div>
+
+<h3 id="si-top">7. 上位アイテム</h3>
+
+<ul>
+  <li><strong>Most recommended-from items</strong> … 推薦の起点になった回数が多い資料。
+    よく見られている資料と考えて差し支えありません。</li>
+  <li><strong>Most clicked recommendations</strong> … 推薦としてクリックされた回数が多い資料。
+    「他の資料からの導線で発見されている資料」です。</li>
+</ul>
+<p>資料IDのリンクから管理画面の資料ページへ移動できます。</p>
+
+<h3 id="si-filter">8. 絞り込みと一覧</h3>
+
+<p>
+  左上の「Filter」で期間・サイト・条件ラベル・デバイス・シード資料・セッションを指定できます。
+  <strong>Include bots</strong> にチェックを入れると、ボットと判定された記録も集計に含めます
+  （既定は除外）。
+</p>
+<p>
+  「Impressions」「Events」ボタンで生の一覧を見られます。
+  インプレッション一覧の<strong>セッション欄のリンクをクリックすると、そのセッションだけに絞り込めます</strong>。
+  1人の閲覧者がどう辿ったかを追うのに便利です。
+</p>
+
+<h3 id="si-export">9. エクスポート</h3>
+
+<table>
+  <tr><th>データセット</th><th>内容</th></tr>
+  <tr><td class="si-label">impressions</td><td>インプレッションの生データ。提示した資料の順位・スコア・分野・シグナルを含む JSON 列付き</td></tr>
+  <tr><td class="si-label">events</td><td>表示・クリックの生データ</td></tr>
+  <tr><td class="si-label">chains</td><td>回遊経路ごとに1行。開始・終了、ページ数、最大深度、流入経路、
+    たどった資料IDの並び（<code>10307;10791;11302</code> の形式）</td></tr>
+</table>
+
+<div class="si-note">
+  <strong>この画面の数字は監視用です。</strong>
+  検定や統計的な比較は、CSV を出力して別途行ってください。
+  日時はサイトのタイムゾーンで ISO 8601 形式、CSV には表計算ソフト向けに BOM が付きます。
+</div>
+
+<h3 id="si-caveat">10. 数字を読むときの注意</h3>
+
+<ul>
+  <li><strong>件数が少ないうちは読まない。</strong>
+    数十件程度の CTR はほぼ偶然の範囲です。数百件たまってから傾向を見てください。</li>
+  <li><strong>ビーコンの欠測がある。</strong>
+    表示・クリックはブラウザから送るため、一定の割合で届きません。
+    インプレッションはサーバ側で記録するので影響を受けません。
+    (unknown) の割合が欠測のおおよその目安になります。</li>
+  <li><strong>応答時間と可視化率は連動します。</strong>
+    推薦の計算が遅い資料ほど、ブロックが出る前に離脱されます。
+    資料ごとの比較をするときは計算時間を考慮してください。</li>
+  <li><strong>ボット判定は完全ではありません。</strong>
+    User-Agent を偽装するクローラは残ります。エクスポートにはボット判定の列が含まれるので、
+    必要なら分析側で条件を変えて再集計できます。</li>
+  <li><strong>微揺らぎ（jitter）を有効にしている場合</strong>、同じ資料でも表示のたびに一覧が変わります。
+    提示内容はインプレッションごとに保存しているため、順位単位の集計は正しく行えます。</li>
+</ul>
+
+<h3 id="si-ops">11. 運用（削除・突合・プライバシー）</h3>
+
+<h4>ログの削除</h4>
+<p>
+  ログ画面の「Delete logs」から、現在まで・指定日時以前・期間指定で削除できます。
+  <strong>削除前に必要なデータをエクスポートしてください。</strong>元に戻せません。
+  設定で保持日数を指定している場合は、この画面を開いたときに期限切れの記録が削除されます。
+</p>
+
+<h4>アクセスログとの突合</h4>
+<p>
+  送信元アドレスはソルト付きハッシュで保存しています。Web サーバのアクセスログ側の
+  アドレスに同じ計算を適用すれば、両者を対応づけられます。
+  計算式とソルトはログ画面の「Joining this log to a web server access log」に表示されます。
+</p>
+<div class="si-warn">
+  <strong>ソルトは公開データに含めないでください。</strong>
+  IPv4 アドレスは総当たりできる規模なので、ハッシュと一緒に公開すると
+  元のアドレスが復元可能になります。
+</div>
+
+<h4>プライバシー</h4>
+<ul>
+  <li>セッションの識別には、個人情報を含まないランダム値を第一者クッキーに保存しています。
+    回遊経路の復元にのみ使用します。</li>
+  <li>送信元アドレスは既定でハッシュ化。そのまま保存・保存しない、も選べます。</li>
+  <li>ログイン中の利用者IDは、明示的に有効化しない限り記録しません。</li>
+  <li>収集内容の詳細と設定は、モジュール設定画面の「利用ログ収集（研究用）」にあります。</li>
+</ul>
+
+<p style="margin-top:2rem;">
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs')) ?>"><?= $escape($translate('Back to the logs')) ?></a>
+</p>
+
+</div>

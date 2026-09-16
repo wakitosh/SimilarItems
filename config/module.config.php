@@ -121,6 +121,17 @@ return [
               ],
             ],
           ],
+          'similar-items-logs-help' => [
+            'type' => Segment::class,
+            'options' => [
+              'route' => '/similar-items/logs/help',
+              'defaults' => [
+                '__NAMESPACE__' => 'SimilarItems\\Controller\\Admin',
+                'controller' => LogsController::class,
+                'action' => 'help',
+              ],
+            ],
+          ],
           'similar-items-logs-impressions' => [
             'type' => Segment::class,
             'options' => [
