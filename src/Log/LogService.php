@@ -405,6 +405,14 @@ SQL;
       return FALSE;
     }
 
+    // A block written off as "not seen" when the visitor switched tabs may
+    // still be scrolled to afterwards. Correct the earlier row rather than
+    // rejecting the report, otherwise the visibility rate is biased downwards.
+    if ($type === 'view' && !empty($data['visible'])
+      && $this->upgradeViewToVisible($impressionKey, $this->normalizeDuration($data['dwell_ms'] ?? NULL))) {
+      return TRUE;
+    }
+
     // Guard against duplicate/abusive submissions.
     if (!$this->acceptEvent($type, $impressionKey)) {
       return FALSE;
@@ -462,7 +470,8 @@ SQL;
       $this->applyClientReferrer(
         (int) $impression['id'],
         is_string($data['ref']) ? $data['ref'] : '',
-        $impression['entry_kind'] ?? NULL
+        $impression['entry_kind'] ?? NULL,
+        array_key_exists('internal', $data) ? !empty($data['internal']) : NULL
       );
     }
 
@@ -554,7 +563,7 @@ SQL;
    * An impression already attributed to a recommendation click keeps that
    * attribution: the chain is a stronger signal than the referrer.
    */
-  private function applyClientReferrer(int $impressionId, string $referrer, ?string $currentEntryKind): void {
+  private function applyClientReferrer(int $impressionId, string $referrer, ?string $currentEntryKind, ?bool $sameOrigin = NULL): void {
     if ($currentEntryKind === 'similar_items') {
       return;
     }
@@ -565,7 +574,7 @@ SQL;
         [
           'referrer' => $this->clip($referrer, 1024),
           'referrer_host' => $this->clip($this->hostOf($referrer), 190),
-          'entry_kind' => $this->classifyReferrer($referrer),
+          'entry_kind' => $this->classifyReferrer($referrer, $sameOrigin),
         ],
         ['id' => $impressionId]
       );
@@ -791,7 +800,7 @@ SQL;
    * Expects the browser-reported document.referrer. An empty value means a
    * direct visit (typed URL, bookmark, or a referrer stripped by policy).
    */
-  private function classifyReferrer(string $referrer): string {
+  private function classifyReferrer(string $referrer, ?bool $sameOrigin = NULL): string {
     if ($referrer === '') {
       return 'direct';
     }
@@ -799,11 +808,13 @@ SQL;
     if ($host === NULL) {
       return 'external';
     }
-    $selfHost = isset($_SERVER['HTTP_HOST']) ? strtolower((string) $_SERVER['HTTP_HOST']) : '';
-    if ($selfHost !== '' && strpos($selfHost, ':') !== FALSE) {
-      $selfHost = (string) strstr($selfHost, ':', TRUE);
+    // The browser's own judgement wins. Behind a reverse proxy the server does
+    // not necessarily see the host the visitor used, so comparing against
+    // HTTP_HOST silently files every internal navigation as external.
+    if ($sameOrigin === TRUE) {
+      return 'internal';
     }
-    if ($selfHost !== '' && $host === $selfHost) {
+    if ($sameOrigin !== FALSE && in_array($host, $this->getSelfHosts(), TRUE)) {
       return 'internal';
     }
     if (preg_match('/(google|bing|yahoo|duckduckgo|baidu|yandex|ecosia|naver)\./i', $host)) {
@@ -813,6 +824,61 @@ SQL;
       return 'social';
     }
     return 'external';
+  }
+
+  /**
+   * Hostnames that count as this site, proxy-aware.
+   *
+   * @return string[]
+   *   Lowercased hostnames without a port.
+   */
+  private function getSelfHosts(): array {
+    $hosts = [];
+    foreach (['HTTP_X_FORWARDED_HOST', 'HTTP_HOST', 'SERVER_NAME'] as $key) {
+      if (empty($_SERVER[$key])) {
+        continue;
+      }
+      $value = strtolower((string) $_SERVER[$key]);
+      // X-Forwarded-Host may carry a list; the first entry is the original.
+      if (strpos($value, ',') !== FALSE) {
+        $value = trim(explode(',', $value)[0]);
+      }
+      if (strpos($value, ':') !== FALSE) {
+        $value = (string) strstr($value, ':', TRUE);
+      }
+      if ($value !== '') {
+        $hosts[$value] = TRUE;
+      }
+    }
+    return array_keys($hosts);
+  }
+
+  /**
+   * Promote an existing "not seen" view row to visible.
+   *
+   * @return bool
+   *   TRUE when a row was corrected, FALSE when there was nothing to correct.
+   */
+  private function upgradeViewToVisible(string $impressionKey, ?int $dwellMs): bool {
+    try {
+      $row = $this->conn->fetchAssociative(
+        'SELECT id FROM ' . self::TABLE_EVENT . ' '
+        . 'WHERE impression_key = ? AND event_type = ? AND was_visible = 0 LIMIT 1',
+        [$impressionKey, 'view']
+      );
+      if (!$row) {
+        return FALSE;
+      }
+      $update = ['was_visible' => 1];
+      if ($dwellMs !== NULL) {
+        $update['dwell_ms'] = $dwellMs;
+      }
+      $this->conn->update(self::TABLE_EVENT, $update, ['id' => (int) $row['id']]);
+      return TRUE;
+    }
+    catch (\Throwable $e) {
+      return FALSE;
+    }
   }
 
   /**

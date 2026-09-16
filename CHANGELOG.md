@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.3] - 2026-09-16
+
+### EN
+
+#### Fixed
+- Internal navigation was filed as `external`. The self-host comparison used `HTTP_HOST`, which behind a reverse proxy is not the host the visitor used, so every in-site referrer failed the check - 39% of the first day's impressions were mislabelled and not one `internal` row was produced. The browser now reports whether the referrer is same-origin, which is the only reliable judgement, and the server-side fallback also considers `X-Forwarded-Host`. Existing rows can be corrected in place from the stored `referrer_host`.
+- Visibility tracking died permanently once a block was written off as "not seen". Switching tabs fires `visibilitychange`, which flushed a `was_visible = 0` view and set the sent flag, so a visitor who came back and scrolled to the block was still recorded as never having seen it - and any subsequent click reported `was_visible = 0` with no `visible_ms`, which cannot happen in reality. Production showed 7 such clicks on the first day. The observer now keeps running, records the moment of first visibility regardless, and sends a follow-up that upgrades the earlier row; the server applies the upgrade instead of rejecting the duplicate.
+
+### 日本語
+
+#### 修正
+- サイト内遷移が `external` に分類されていました。自ホスト判定に `HTTP_HOST` を使っていましたが、リバースプロキシ経由では閲覧者が実際に使ったホストと一致しないため、サイト内リファラがすべて判定に失敗していました（初日のインプレッションの 39% が誤分類され、`internal` は 1 件も生成されず）。リファラが同一オリジンかどうかはブラウザだけが確実に判定できるため、その結果を送信する方式に変更し、サーバ側のフォールバックでも `X-Forwarded-Host` を見るようにしました。既存の行は保存済みの `referrer_host` から補正できます。
+- 一度「未可視」と記録されると、以後の可視化追跡が永久に止まっていました。タブ切替で `visibilitychange` が発火すると `was_visible = 0` の view を確定送信して送信済みフラグが立つため、閲覧者が戻ってブロックまでスクロールしても「見ていない」ままになり、その後のクリックが `was_visible = 0`・`visible_ms` なしで記録されていました（現実にはあり得ない組み合わせで、本番初日に 7 件発生）。監視を継続し、初回可視時刻は送信状況にかかわらず記録し、先の行を訂正する追送を行うようにしました。サーバ側は重複として拒否せず訂正を適用します。
+
 ## [0.5.2] - 2026-09-15
 
 ### EN

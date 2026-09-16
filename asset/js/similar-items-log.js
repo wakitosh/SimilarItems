@@ -182,7 +182,7 @@
     }
     block.viewSent = true;
     var now = Date.now();
-    if (visible) {
+    if (visible && !block.visibleAt) {
       block.visibleAt = now;
     }
     send(block.meta.endpoint, {
@@ -194,10 +194,32 @@
       // useless for attribution; only the page knows where the visitor came
       // from. Empty means a direct visit.
       ref: String(document.referrer || '').slice(0, 1024),
+      // Whether the referrer is this same site. Only the browser can judge
+      // this reliably: behind a reverse proxy the server does not necessarily
+      // see the host the visitor actually used.
+      internal: sameOrigin(document.referrer) ? 1 : 0,
       visible: visible ? 1 : 0,
       dwell_ms: now - block.renderedAt
     });
     block.from = null;
+  }
+
+  /**
+   * Report that a block reached the screen after it was already written off.
+   *
+   * Switching tabs fires visibilitychange, which flushes a "not seen" view. The
+   * visitor may well come back and scroll to the block, so that first report has
+   * to be correctable; otherwise the visibility rate is biased downwards and any
+   * later click looks like a click on something never displayed.
+   */
+  function sendVisibleUpgrade(block) {
+    send(block.meta.endpoint, {
+      type: 'view',
+      impression: block.meta.impression,
+      key: randomKey(),
+      visible: 1,
+      dwell_ms: block.visibleAt - block.renderedAt
+    });
   }
 
   function observeVisibility(block) {
@@ -207,14 +229,38 @@
     }
     var io = new IntersectionObserver(function (entries) {
       for (var i = 0; i < entries.length; i++) {
-        if (entries[i].isIntersecting) {
-          io.disconnect();
-          sendView(block, true);
-          return;
+        if (!entries[i].isIntersecting) {
+          continue;
         }
+        io.disconnect();
+        // Record the moment regardless of whether a view was already
+        // reported, so that a later click carries a correct visible_ms.
+        if (!block.visibleAt) {
+          block.visibleAt = Date.now();
+        }
+        if (block.viewSent) {
+          sendVisibleUpgrade(block);
+        } else {
+          sendView(block, true);
+        }
+        return;
       }
     }, { threshold: 0.4 });
     io.observe(block.container);
+  }
+
+  /**
+   * Whether a URL is on this same origin. Empty or unparsable means no.
+   */
+  function sameOrigin(url) {
+    if (!url) {
+      return false;
+    }
+    try {
+      return new URL(url, window.location.href).origin === window.location.origin;
+    } catch (e) {
+      return false;
+    }
   }
 
   /**
