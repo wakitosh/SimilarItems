@@ -179,6 +179,175 @@ class LogsController extends AbstractActionController {
   }
 
   /**
+   * Delete the impressions selected on the impression list, with their events.
+   *
+   * Deleting an impression that other impressions were chained to would leave
+   * them pointing at a row that no longer exists, so the affected chains are
+   * rebuilt afterwards rather than left dangling.
+   */
+  public function deleteAction() {
+    $this->log->ensureTables();
+    $request = $this->getRequest();
+    $isPost = method_exists($request, 'isPost')
+      ? $request->isPost()
+      : (strtoupper((string) $request->getMethod()) === 'POST');
+    if (!$isPost) {
+      return $this->redirectToImpressions();
+    }
+    $form = $this->getForm(ConfirmForm::class);
+    $form->setData($this->params()->fromPost());
+    if (!$form->isValid()) {
+      $this->messenger()->addError($this->translate('Security token is invalid.'));
+      return $this->redirectToImpressions();
+    }
+
+    $ids = $this->params()->fromPost('impression_ids', []);
+    $ids = is_array($ids) ? array_values(array_unique(array_filter(array_map('intval', $ids)))) : [];
+    if (!$ids) {
+      $this->messenger()->addWarning($this->translate('No impression was selected.'));
+      return $this->redirectToImpressions();
+    }
+
+    try {
+      $placeholders = implode(',', array_fill(0, count($ids), '?'));
+      $rows = $this->conn->fetchAllAssociative(
+        'SELECT id, impression_key, chain_key FROM ' . LogService::TABLE_IMPRESSION
+        . ' WHERE id IN (' . $placeholders . ')',
+        $ids
+      );
+      if (!$rows) {
+        $this->messenger()->addWarning($this->translate('The selected impressions no longer exist.'));
+        return $this->redirectToImpressions();
+      }
+      $keys = array_column($rows, 'impression_key');
+      $chains = array_values(array_unique(array_filter(array_column($rows, 'chain_key'))));
+
+      $keyPlaceholders = implode(',', array_fill(0, count($keys), '?'));
+      $events = (int) $this->conn->executeStatement(
+        'DELETE FROM ' . LogService::TABLE_EVENT . ' WHERE impression_key IN (' . $keyPlaceholders . ')',
+        $keys
+      );
+      $deleted = (int) $this->conn->executeStatement(
+        'DELETE FROM ' . LogService::TABLE_IMPRESSION . ' WHERE id IN (' . $placeholders . ')',
+        $ids
+      );
+      $repaired = $this->rebuildChains($chains);
+
+      $message = sprintf(
+        $this->translate('Deleted %1$d impression(s) and %2$d event(s).'),
+        $deleted,
+        $events
+      );
+      if ($repaired > 0) {
+        $message .= ' ' . sprintf(
+          $this->translate('%d impression(s) that followed a deleted one were detached and their chains recomputed.'),
+          $repaired
+        );
+      }
+      $this->messenger()->addSuccess($message);
+    }
+    catch (\Throwable $e) {
+      $this->messenger()->addError($this->translate('Failed to delete: ') . $e->getMessage());
+    }
+    return $this->redirectToImpressions();
+  }
+
+  /**
+   * Recompute chain position for the impressions left in the given chains.
+   *
+   * An impression whose parent is gone becomes a chain root again; the ones
+   * below it keep their links but have their depth and chain key recomputed.
+   * Impressions are always created after their parent, so processing them in
+   * id order means a parent is resolved before its children.
+   *
+   * @param string[] $chainKeys
+   *   Chains touched by the deletion.
+   *
+   * @return int
+   *   Number of impressions detached from a deleted parent.
+   */
+  private function rebuildChains(array $chainKeys): int {
+    if (!$chainKeys) {
+      return 0;
+    }
+    $detached = 0;
+    $placeholders = implode(',', array_fill(0, count($chainKeys), '?'));
+    $rows = $this->conn->fetchAllAssociative(
+      'SELECT id, impression_key, parent_event_id, parent_impression_id, chain_key, hop_depth, entry_kind '
+      . 'FROM ' . LogService::TABLE_IMPRESSION . ' WHERE chain_key IN (' . $placeholders . ') ORDER BY id ASC',
+      $chainKeys
+    );
+    // Resolved position of every impression seen so far in these chains.
+    $resolved = [];
+    foreach ($rows as $row) {
+      $id = (int) $row['id'];
+      $parentId = $row['parent_impression_id'] !== NULL ? (int) $row['parent_impression_id'] : 0;
+      $parent = $parentId && isset($resolved[$parentId]) ? $resolved[$parentId] : NULL;
+      if (!$parent && $parentId) {
+        // The parent is outside these chains; it may still exist.
+        $exists = (int) $this->conn->fetchOne(
+          'SELECT COUNT(*) FROM ' . LogService::TABLE_IMPRESSION . ' WHERE id = ?',
+          [$parentId]
+        );
+        if ($exists) {
+          $parentRow = $this->conn->fetchAssociative(
+            'SELECT chain_key, hop_depth FROM ' . LogService::TABLE_IMPRESSION . ' WHERE id = ?',
+            [$parentId]
+          );
+          $parent = [
+            'chain_key' => (string) $parentRow['chain_key'],
+            'hop_depth' => (int) $parentRow['hop_depth'],
+          ];
+        }
+      }
+
+      if ($parent) {
+        $chainKey = $parent['chain_key'];
+        $hopDepth = $parent['hop_depth'] + 1;
+        $update = [];
+      }
+      else {
+        // Root again: the link that explained how the visitor got here is gone.
+        $chainKey = (string) $row['impression_key'];
+        $hopDepth = 0;
+        $update = [
+          'parent_event_id' => NULL,
+          'parent_impression_id' => NULL,
+        ];
+        if ($parentId) {
+          $detached++;
+          if ($row['entry_kind'] === 'similar_items') {
+            $update['entry_kind'] = NULL;
+          }
+        }
+      }
+
+      if ($update
+        || (string) $row['chain_key'] !== $chainKey
+        || (int) $row['hop_depth'] !== $hopDepth) {
+        $update['chain_key'] = $chainKey;
+        $update['hop_depth'] = $hopDepth;
+        $this->conn->update(LogService::TABLE_IMPRESSION, $update, ['id' => $id]);
+      }
+      $resolved[$id] = ['chain_key' => $chainKey, 'hop_depth' => $hopDepth];
+    }
+    return $detached;
+  }
+
+  /**
+   * Return to the impression list, keeping the current filters and page.
+   */
+  private function redirectToImpressions() {
+    $query = array_filter(
+      $this->params()->fromPost('return', []),
+      function ($v) {
+        return $v !== '' && $v !== NULL;
+      }
+    );
+    return $this->redirect()->toRoute('admin/similar-items-logs-impressions', [], ['query' => $query]);
+  }
+
+  /**
    * Delete logs, either everything up to now or within a date range.
    */
   public function clearAction() {
@@ -278,6 +447,7 @@ class LogsController extends AbstractActionController {
       'perPage' => $perPage,
       'total' => $total,
       'filters' => $filters,
+      'confirmForm' => $this->getForm(ConfirmForm::class),
     ]);
     $request = $this->getRequest();
     $isAjax = (int) $this->params()->fromQuery('ajax', 0) === 1

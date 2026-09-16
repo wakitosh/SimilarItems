@@ -165,6 +165,17 @@ return [
               ],
             ],
           ],
+          'similar-items-logs-delete' => [
+            'type' => Segment::class,
+            'options' => [
+              'route' => '/similar-items/logs/delete',
+              'defaults' => [
+                '__NAMESPACE__' => 'SimilarItems\\Controller\\Admin',
+                'controller' => LogsController::class,
+                'action' => 'delete',
+              ],
+            ],
+          ],
           'similar-items-logs-clear' => [
             'type' => Segment::class,
             'options' => [

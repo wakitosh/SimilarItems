@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.6] - 2026-09-16
+
+### EN
+
+#### Added
+- Selective deletion on the impression list: tick the rows to remove and press "Delete selected". The events attached to those impressions are removed with them. POST only, CSRF protected, with a confirmation prompt, and the current filters and page are preserved on return.
+  - Deleting an impression that others were chained to would leave them pointing at a row that no longer exists, so the affected chains are rebuilt afterwards: an impression whose parent is gone becomes a chain root again (its `parent_event_id`, `parent_impression_id` and `chain_key` are reset, `hop_depth` returns to 0, and an `entry_kind` of `similar_items` becomes unknown because the link that explained it is gone), and everything below it has its depth and chain key recomputed. The result message says how many were detached.
+
+### 日本語
+
+#### 追加
+- インプレッション一覧に選択削除を追加しました。削除したい行をチェックして「Delete selected」を押します。対象インプレッションに紐づくイベントも一緒に削除されます。POST 限定・CSRF 保護・確認ダイアログ付きで、戻り先では絞り込み条件とページが維持されます。
+  - 連鎖の親にあたるインプレッションを削除すると、子が存在しない行を指したままになるため、影響を受けた連鎖を削除後に再構築します。親を失ったインプレッションは再び連鎖の起点になり（`parent_event_id`・`parent_impression_id`・`chain_key` を再設定、`hop_depth` は 0 に戻し、`entry_kind` が `similar_items` だったものは根拠が失われるため未判定に）、その下流は深度と連鎖キーを再計算します。切り離された件数は結果メッセージに表示します。
+
 ## [0.5.5] - 2026-09-16
 
 ### EN

@@ -52,9 +52,28 @@ $sessionUrl = function (string $key) use ($baseQuery) {
 
 <p><?= $escape(sprintf($translate('%d impressions'), $total)) ?></p>
 
+<form method="post" id="si-delete-form"
+      action="<?= $escapeAttr($this->url('admin/similar-items-logs-delete')) ?>">
+  <?php if (isset($confirmForm)) { echo $this->formElement($confirmForm->get($confirmForm->getName() . '_csrf')); } ?>
+  <?php foreach ($baseQuery as $k => $v): ?>
+    <input type="hidden" name="return[<?= $escapeAttr((string) $k) ?>]" value="<?= $escapeAttr((string) $v) ?>">
+  <?php endforeach; ?>
+  <input type="hidden" name="return[page]" value="<?= (int) $page ?>">
+
+  <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.5rem;">
+    <button type="submit" class="button" id="si-delete-button" disabled
+            onclick="return confirm('<?= $this->escapeJs($translate('Delete the selected impressions and their events? This cannot be undone.')) ?>');">
+      <?= $escape($translate('Delete selected')) ?>
+    </button>
+    <span id="si-delete-count" style="color:#666; font-size:.9rem;"></span>
+  </div>
+
 <table class="si-log-table">
   <thead>
     <tr>
+      <th style="width:1.8rem;">
+        <input type="checkbox" id="si-check-all" title="<?= $escapeAttr($translate('Select all on this page')) ?>">
+      </th>
       <th><?= $escape($translate('ID')) ?></th>
       <th><?= $escape($translate('Time')) ?></th>
       <th><?= $escape($translate('Seed item')) ?></th>
@@ -71,7 +90,7 @@ $sessionUrl = function (string $key) use ($baseQuery) {
   </thead>
   <tbody>
     <?php if (empty($rows)): ?>
-      <tr><td colspan="12"><?= $escape($translate('No logs yet.')) ?></td></tr>
+      <tr><td colspan="13"><?= $escape($translate('No logs yet.')) ?></td></tr>
     <?php else: ?>
       <?php foreach ($rows as $r): ?>
         <?php
@@ -81,6 +100,7 @@ $sessionUrl = function (string $key) use ($baseQuery) {
         $sessionKey = (string) ($r['session_key'] ?? '');
         ?>
         <tr<?= !empty($r['is_bot']) ? ' style="opacity:.55;"' : '' ?>>
+          <td><input type="checkbox" class="si-check" name="impression_ids[]" value="<?= (int) $r['id'] ?>"></td>
           <td><?= (int) $r['id'] ?></td>
           <td><?= $escape($fmt($r['created_at'] ?? 0)) ?></td>
           <td>
@@ -119,6 +139,33 @@ $sessionUrl = function (string $key) use ($baseQuery) {
     <?php endif; ?>
   </tbody>
 </table>
+</form>
+
+<script>
+  (function () {
+    var form = document.getElementById('si-delete-form');
+    if (!form) { return; }
+    var all = document.getElementById('si-check-all');
+    var boxes = Array.prototype.slice.call(form.querySelectorAll('.si-check'));
+    var button = document.getElementById('si-delete-button');
+    var count = document.getElementById('si-delete-count');
+    var label = <?= json_encode($translate('%d selected'), JSON_UNESCAPED_UNICODE) ?>;
+    function refresh() {
+      var n = boxes.filter(function (b) { return b.checked; }).length;
+      button.disabled = (n === 0);
+      count.textContent = n ? label.replace('%d', n) : '';
+      if (all) { all.checked = (n > 0 && n === boxes.length); }
+    }
+    boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+    if (all) {
+      all.addEventListener('change', function () {
+        boxes.forEach(function (b) { b.checked = all.checked; });
+        refresh();
+      });
+    }
+    refresh();
+  })();
+</script>
 
 <div class="si-pagination">
   <a class="button <?= $page <= 1 ? 'disabled' : '' ?>" href="<?= $escapeAttr($pageUrl(1)) ?>"><?= $escape($translate('First')) ?></a>
