@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.11] - 2026-09-17
+
+### EN
+
+#### Fixed
+- Recommendations took about 16 seconds for signed-in staff while anonymous visitors were served in about one second. 0.5.9 kept non-public items out of the results by adding `is_public` to every item query. For an anonymous visitor that term is a duplicate: Omeka's visibility filter has already placed `is_public = 1` in the JOIN condition, so the query plan is unaffected. For a user holding `view-all` that filter is switched off, the term lands alone in the WHERE clause, and MySQL chooses a far worse plan - 3.0 s against 0.12 s for a single property lookup on the production catalogue. The engine issues one such lookup per mapped value on the seed item, so the cost multiplied by five to fifty. Non-public items are now removed from the results instead of from the query, which reaches the same answer: measured at 24.4x faster over fourteen real lookups, with identical result sets in thirteen of them.
+- The exception is a lookup that fills its 200-row limit. Filtering after the query can leave fewer than 200 candidates where filtering inside it would have returned 200 public ones. On the production catalogue 17 of 36,252 items attached to the public sites are non-public, so at most a handful of candidates are lost from a pool that feeds a list of five. No non-public item can reach the results either way.
+
+#### Notes
+- Public visitors were never affected. Across the 177 impressions recorded since 0.5.9 the median response was 1,116 ms and the slowest 6,348 ms, with none above 10 s. Signed-in visits are not recorded, so no collected usage data contains the slow responses.
+
+### 日本語
+
+#### 修正
+- ログイン中の職員に対して推薦が約16秒かかっていました（匿名の閲覧者は約1秒）。0.5.9 は非公開資料を結果から除くために、すべての資料検索へ `is_public` を追加していました。匿名の閲覧者ではこれは重複した条件です。Omeka の可視性フィルタが既に JOIN 条件へ `is_public = 1` を入れているため、実行計画は変わりません。しかし `view-all` を持つ利用者ではそのフィルタが無効化されるため、この条件が単独で WHERE 句に残り、MySQL がはるかに悪い実行計画を選びます（本番目録で単一のプロパティ検索が 0.12 秒に対し 3.0 秒）。推薦1回はシード資料のマップ値数だけ検索を発行するので、この差が5〜50倍に積み上がっていました。非公開資料の除外を、クエリ条件ではなく取得後の除外に変更しました。結果は同じです。実在する14件の検索で 24.4 倍速くなり、うち13件は結果集合が完全に一致しました。
+- 例外は、200件の上限に達する検索です。取得後に除外すると、クエリ内で除外した場合に得られたはずの「公開200件」より候補が少なくなります。本番目録では公開サイトに紐づく36,252件のうち非公開は17件なので、5件の一覧を作るための候補プールから失われるのは多くても数件です。いずれの方式でも非公開資料が結果に現れることはありません。
+
+#### 備考
+- 一般の閲覧者は影響を受けていません。0.5.9 以降に記録された177件のインプレッションで、応答時間は中央値 1,116 ms、最大 6,348 ms、10秒を超えたものはありません。ログイン中の閲覧は記録対象外のため、収集済みの利用ログにこの遅延は含まれていません。
+
 ## [0.5.10] - 2026-09-17
 
 ### EN
