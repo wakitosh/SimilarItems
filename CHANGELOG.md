@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.12] - 2026-09-19
+
+### EN
+
+#### Changed
+- Candidate lookups are about 1.9x faster. Omeka counts every search with a second query that has no LIMIT, and builds a representation for every row it returns. The engine reads only the rows and never the total, so both were being paid for nothing: on the production catalogue the count alone was a third to a half of the whole response (2,668 ms of 5,956 ms for a seed item with 51 mapped values). Each lookup now asks for bare ids, then loads exactly that set, and the count is deferred to a caller that actually asks for one. Measured over the gathering phase: 1.81x, 1.84x and 1.90x on three seed items spanning the cost range, returning the same items in the same order in every case.
+- Searches asking for a single row are passed through unchanged. Those exist to read a total, which is what the arm assignment samples against, so splitting them would only move the cost they exist to pay.
+
+### 日本語
+
+#### 変更
+- 候補検索が約1.9倍速くなりました。Omeka は検索のたびに LIMIT のない2本目のクエリで総件数を数え、返す行すべてについて表現オブジェクトを構築します。推薦エンジンは行の中身しか読まず総件数を一度も参照していないため、どちらも無駄でした。本番目録では総件数の算出だけで応答全体の3分の1から半分を占めていました（マップ値51件の資料で 5,956 ms 中 2,668 ms）。各検索はまずIDのみを取得し、そのIDの集合だけを読み込む形に変えました。総件数は実際に必要とする呼び出し元のために遅延評価されます。コストの幅を代表する3資料で候補収集の位相を実測し、1.81倍・1.84倍・1.90倍。いずれも同じ資料が同じ順序で返ることを確認しています。
+- 1件だけを求める検索は従来どおりそのまま通します。これは総件数を読むためのもので、アーム割り当ての標本抽出がそれを使っています。分割しても、その検索が払うべきコストを移動させるだけです。
+
 ## [0.5.11] - 2026-09-17
 
 ### EN
