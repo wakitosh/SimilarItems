@@ -16,6 +16,20 @@
  * A click key is stored in sessionStorage so the next page can tell the server
  * which recommendation led there; this makes the browsing chain exact even when
  * two visits to the same item happen in one session.
+ *
+ * One impression may be shown in several places on a page (the sidebar list,
+ * the row below the viewer, the floating button). similar-items-blocks.js then
+ * registers the impression once through window.SimilarItemsLog.register(), with
+ * every place listed. The impression counts as seen when the first of them is
+ * seen, and each event says which place it came from. A place registered as
+ * "manual" is seen when it announces so (the floating panel being opened), not
+ * when it is on screen.
+ *
+ *  - exposure : which ranks reached the screen, item by item (half of an
+ *               entry visible). Unlike `view`, which uses 40% of the block's
+ *               box and so means different things for blocks of different
+ *               heights, this rule is the same for every placement. Sent when
+ *               the first item is seen, and again on leaving if more were.
  */
 (function () {
   'use strict';
@@ -123,44 +137,54 @@
    */
   var blocks = [];
 
-  function register(metaEl) {
-    if (metaEl.__siLogBound) {
-      return;
-    }
-    metaEl.__siLogBound = true;
+  var registered = {};
 
-    var meta;
-    try {
-      meta = JSON.parse(metaEl.textContent || '{}');
-    } catch (e) {
+  /**
+   * Start tracking one impression.
+   *
+   * @param {Object} meta
+   *   The metadata the recommendation endpoint returned.
+   * @param {Array} targets
+   *   Places the list is shown: {el, placement, mode: 'viewport'|'manual'}.
+   */
+  function registerMeta(meta, targets) {
+    if (!meta || !meta.impression || !meta.endpoint || registered[meta.impression]) {
       return;
     }
-    if (!meta || !meta.impression || !meta.endpoint) {
+    var places = [];
+    for (var i = 0; i < (targets || []).length; i++) {
+      if (targets[i] && targets[i].el) {
+        places.push(targets[i]);
+      }
+    }
+    if (!places.length) {
       return;
     }
-
-    var container = metaEl.closest('[data-similar-items]')
-      || metaEl.closest('.similar-items')
-      || metaEl.parentElement;
-    if (!container) {
-      return;
-    }
+    registered[meta.impression] = true;
 
     // Control arm "off". The layout stylesheet normally hides the block before
     // it paints; this is the fallback for pages that stylesheet did not reach.
     // The impression is already recorded server side, so nothing more to do.
     if (meta.hide) {
-      container.hidden = true;
-      container.style.display = 'none';
+      places.forEach(function (place) {
+        place.el.hidden = true;
+        place.el.style.display = 'none';
+      });
       return;
     }
 
     var block = {
       meta: meta,
-      container: container,
+      places: places,
       renderedAt: Date.now(),
       visibleAt: 0,
+      visiblePlacement: null,
       viewSent: false,
+      ranksSeen: {},
+      ranksSent: 0,
+      itemsSeenAt: 0,
+      itemsSeenPlacement: null,
+      exposureTimer: 0,
       byUrl: {},
       byId: {},
       from: takePendingClick()
@@ -173,7 +197,119 @@
     });
     blocks.push(block);
 
-    observeVisibility(block);
+    places.forEach(function (place) {
+      if (place.mode === 'manual') {
+        watchShown(block, place);
+      }
+      else {
+        observeVisibility(block, place);
+      }
+      observeItems(block, place);
+    });
+  }
+
+  function countKeys(obj) {
+    var n = 0;
+    for (var k in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, k)) {
+        n++;
+      }
+    }
+    return n;
+  }
+
+  function sendExposure(block) {
+    if (block.exposureTimer) {
+      clearTimeout(block.exposureTimer);
+      block.exposureTimer = 0;
+    }
+    var n = countKeys(block.ranksSeen);
+    if (!n || n === block.ranksSent) {
+      return;
+    }
+    block.ranksSent = n;
+    var ranks = [];
+    for (var r in block.ranksSeen) {
+      if (Object.prototype.hasOwnProperty.call(block.ranksSeen, r)) {
+        ranks.push(parseInt(r, 10));
+      }
+    }
+    send(block.meta.endpoint, {
+      type: 'exposure',
+      impression: block.meta.impression,
+      ranks: ranks,
+      placement: block.itemsSeenPlacement,
+      ms: block.itemsSeenAt - block.renderedAt
+    });
+  }
+
+  /**
+   * Watch each recommended entry: a rank counts as seen once half of it is on
+   * screen. The list is rendered in rank order, so position gives the rank.
+   */
+  function observeItems(block, place) {
+    if (!('IntersectionObserver' in window)) {
+      return;
+    }
+    var entries = place.el.querySelectorAll('li.resource');
+    if (!entries.length) {
+      return;
+    }
+    var io = new IntersectionObserver(function (changes) {
+      for (var i = 0; i < changes.length; i++) {
+        if (!changes[i].isIntersecting) {
+          continue;
+        }
+        var rank = parseInt(changes[i].target.getAttribute('data-si-rank'), 10);
+        io.unobserve(changes[i].target);
+        if (!rank || block.ranksSeen[rank]) {
+          continue;
+        }
+        block.ranksSeen[rank] = true;
+        if (!block.itemsSeenAt) {
+          block.itemsSeenAt = Date.now();
+          block.itemsSeenPlacement = place.placement || null;
+        }
+        // Batch entries that appear together (a list scrolled into view).
+        if (!block.exposureTimer) {
+          block.exposureTimer = setTimeout(function () {
+            sendExposure(block);
+          }, 400);
+        }
+      }
+    }, { threshold: 0.5 });
+    for (var i = 0; i < entries.length; i++) {
+      entries[i].setAttribute('data-si-rank', String(i + 1));
+      io.observe(entries[i]);
+    }
+  }
+
+  /**
+   * Legacy path: a payload script injected into the page with the list.
+   */
+  function register(metaEl) {
+    if (metaEl.__siLogBound) {
+      return;
+    }
+    metaEl.__siLogBound = true;
+
+    var meta;
+    try {
+      meta = JSON.parse(metaEl.textContent || '{}');
+    } catch (e) {
+      return;
+    }
+    var container = metaEl.closest('[data-similar-items]')
+      || metaEl.closest('.similar-items')
+      || metaEl.parentElement;
+    if (!container) {
+      return;
+    }
+    registerMeta(meta, [{
+      el: container,
+      placement: container.getAttribute('data-si-placement') || '',
+      mode: 'viewport'
+    }]);
   }
 
   function sendView(block, visible) {
@@ -199,6 +335,8 @@
       // see the host the visitor actually used.
       internal: sameOrigin(document.referrer) ? 1 : 0,
       visible: visible ? 1 : 0,
+      // Where it was seen. A view written off as never seen has no place.
+      placement: visible ? block.visiblePlacement : null,
       dwell_ms: now - block.renderedAt
     });
     block.from = null;
@@ -218,13 +356,43 @@
       impression: block.meta.impression,
       key: randomKey(),
       visible: 1,
+      placement: block.visiblePlacement,
       dwell_ms: block.visibleAt - block.renderedAt
     });
   }
 
-  function observeVisibility(block) {
-    if (!('IntersectionObserver' in window)) {
+  /**
+   * The first time any place of the impression is seen.
+   */
+  function markVisible(block, place) {
+    if (block.visibleAt) {
+      return;
+    }
+    // Record the moment regardless of whether a view was already reported,
+    // so that a later click carries a correct visible_ms.
+    block.visibleAt = Date.now();
+    block.visiblePlacement = place.placement || null;
+    if (block.viewSent) {
+      sendVisibleUpgrade(block);
+    } else {
       sendView(block, true);
+    }
+  }
+
+  /**
+   * A place that is seen when it says so (the floating panel being opened).
+   */
+  function watchShown(block, place) {
+    var handler = function () {
+      place.el.removeEventListener('similaritems:shown', handler);
+      markVisible(block, place);
+    };
+    place.el.addEventListener('similaritems:shown', handler);
+  }
+
+  function observeVisibility(block, place) {
+    if (!('IntersectionObserver' in window)) {
+      markVisible(block, place);
       return;
     }
     var io = new IntersectionObserver(function (entries) {
@@ -233,20 +401,11 @@
           continue;
         }
         io.disconnect();
-        // Record the moment regardless of whether a view was already
-        // reported, so that a later click carries a correct visible_ms.
-        if (!block.visibleAt) {
-          block.visibleAt = Date.now();
-        }
-        if (block.viewSent) {
-          sendVisibleUpgrade(block);
-        } else {
-          sendView(block, true);
-        }
+        markVisible(block, place);
         return;
       }
     }, { threshold: 0.4 });
-    io.observe(block.container);
+    io.observe(place.el);
   }
 
   /**
@@ -268,8 +427,10 @@
    */
   function blockFor(node) {
     for (var i = 0; i < blocks.length; i++) {
-      if (blocks[i].container.contains(node)) {
-        return blocks[i];
+      for (var j = 0; j < blocks[i].places.length; j++) {
+        if (blocks[i].places[j].el.contains(node)) {
+          return { block: blocks[i], place: blocks[i].places[j] };
+        }
       }
     }
     return null;
@@ -280,10 +441,11 @@
     if (!anchor) {
       return;
     }
-    var block = blockFor(anchor);
-    if (!block) {
+    var found = blockFor(anchor);
+    if (!found) {
       return;
     }
+    var block = found.block;
     var href = anchor.getAttribute('href');
     if (!href || href === '#') {
       return;
@@ -301,6 +463,7 @@
       impression: block.meta.impression,
       key: key,
       item_id: itemId,
+      placement: found.place.placement || null,
       visible: block.visibleAt ? 1 : 0,
       dwell_ms: now - block.renderedAt,
       visible_ms: block.visibleAt ? (now - block.visibleAt) : null
@@ -315,6 +478,7 @@
       if (!blocks[i].viewSent) {
         sendView(blocks[i], false);
       }
+      sendExposure(blocks[i]);
     }
   }
 
@@ -325,7 +489,16 @@
     }
   }
 
+  window.SimilarItemsLog = {
+    register: registerMeta
+  };
+
   function init() {
+    var pending = window.__similarItemsPending || [];
+    window.__similarItemsPending = [];
+    for (var p = 0; p < pending.length; p++) {
+      registerMeta(pending[p][0], pending[p][1]);
+    }
     scan(document);
     // The list is injected asynchronously, so watch for it.
     if ('MutationObserver' in window) {

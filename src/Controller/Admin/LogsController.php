@@ -474,13 +474,13 @@ class LogsController extends AbstractActionController {
       [$where, $params] = $this->buildWhere($filters, 'impressions');
       $sql = 'SELECT chain_key, MIN(session_key) AS session_key, MIN(created_at) AS started_at, '
         . 'MAX(created_at) AS ended_at, COUNT(*) AS impressions, MAX(hop_depth) AS max_hop, '
-        . 'MIN(variant) AS variant, MIN(arm) AS arm, MIN(entry_kind) AS entry_kind, MIN(device) AS device, '
+        . 'MIN(variant) AS variant, MIN(arm) AS arm, MIN(placement) AS placement, MIN(entry_kind) AS entry_kind, MIN(device) AS device, '
         . 'GROUP_CONCAT(seed_item_id ORDER BY hop_depth ASC, created_at ASC SEPARATOR ";") AS item_path '
         . 'FROM ' . LogService::TABLE_IMPRESSION . ' ' . $where
         . ' GROUP BY chain_key ORDER BY started_at DESC';
       $cols = [
         'chain_key', 'session_key', 'started_at', 'ended_at', 'impressions',
-        'max_hop', 'variant', 'arm', 'entry_kind', 'device', 'item_path',
+        'max_hop', 'variant', 'arm', 'placement', 'entry_kind', 'device', 'item_path',
       ];
       return [$this->safeFetchAll($sql, $params), $cols];
     }
@@ -492,7 +492,7 @@ class LogsController extends AbstractActionController {
     $cols = $isEvents
       ? [
         'id', 'created_at', 'event_key', 'event_type', 'impression_id', 'impression_key',
-        'session_key', 'visitor_key', 'user_id', 'site_slug', 'variant', 'arm', 'seed_item_id',
+        'session_key', 'visitor_key', 'user_id', 'site_slug', 'variant', 'arm', 'placement', 'seed_item_id',
         'target_item_id', 'target_rank', 'target_score', 'target_signals', 'target_bucket',
         'cross_domain', 'dwell_ms', 'visible_ms', 'was_visible', 'device', 'is_bot', 'client_ip',
       ]
@@ -500,7 +500,8 @@ class LogsController extends AbstractActionController {
         'id', 'created_at', 'impression_key', 'session_key', 'visitor_key', 'user_id',
         'site_slug', 'locale', 'seed_item_id', 'seed_item_title', 'seed_buckets',
         'seed_item_sets', 'requested_limit', 'result_count', 'candidate_count',
-        'duration_ms', 'is_empty', 'variant', 'arm', 'config_hash', 'tiebreak', 'jitter',
+        'duration_ms', 'is_empty', 'variant', 'arm', 'placement', 'ranks_seen', 'items_seen_ms',
+        'items_seen_placement', 'config_hash', 'tiebreak', 'jitter',
         'parent_event_id', 'parent_impression_id', 'chain_key', 'hop_depth', 'entry_kind',
         'referrer_host', 'device', 'is_bot', 'client_ip', 'results',
       ];
@@ -659,6 +660,8 @@ class LogsController extends AbstractActionController {
       'top_seeds' => [],
       'top_targets' => [],
       'variants' => [],
+      'placements' => [],
+      'seen_in' => [],
     ];
     if (!$this->conn) {
       return $out;
@@ -784,6 +787,73 @@ class LogsController extends AbstractActionController {
     ) as $row) {
       $out['entry_kinds'][(string) ($row['entry_kind'] ?? '')] = (int) $row['n'];
     }
+    // Where the recommendations were shown, and how often they were seen
+    // there. This is the comparison the placement trial is about: the sidebar
+    // list was measured to reach the screen on about one page view in seven.
+    // "Seen" is a visible view; for the floating button that means the panel
+    // was opened, since the button itself is always on screen.
+    foreach ($this->safeFetchAll(
+      'SELECT COALESCE(i.placement, \'\') AS placement, i.device AS device, COUNT(*) AS n, '
+      . 'COALESCE(SUM(v.seen), 0) AS seen, COALESCE(SUM(c.clicks), 0) AS clicks, '
+      . 'SUM(i.ranks_seen IS NOT NULL AND i.ranks_seen <> \'\') AS items_seen, '
+      . 'SUM(i.ranks_seen IS NOT NULL) AS items_measured '
+      . 'FROM ' . $imp . ' i '
+      . 'LEFT JOIN (SELECT impression_key, MAX(was_visible) AS seen FROM ' . $evt
+      . ' WHERE event_type = \'view\' GROUP BY impression_key) v ON v.impression_key = i.impression_key '
+      . 'LEFT JOIN (SELECT impression_key, COUNT(*) AS clicks FROM ' . $evt
+      . ' WHERE event_type = \'click\' GROUP BY impression_key) c ON c.impression_key = i.impression_key '
+      . $impWhere . ' GROUP BY COALESCE(i.placement, \'\'), i.device',
+      $impParams
+    ) as $row) {
+      $key = (string) $row['placement'];
+      if (!isset($out['placements'][$key])) {
+        $out['placements'][$key] = ['n' => 0, 'seen' => 0, 'items_seen' => 0, 'clicks' => 0, 'devices' => []];
+      }
+      $n = (int) $row['n'];
+      $seen = (int) $row['seen'];
+      $itemsSeen = (int) $row['items_seen'];
+      $clicks = (int) $row['clicks'];
+      $out['placements'][$key]['n'] += $n;
+      $out['placements'][$key]['seen'] += $seen;
+      $out['placements'][$key]['items_seen'] += $itemsSeen;
+      $out['placements'][$key]['clicks'] += $clicks;
+      $out['placements'][$key]['devices'][(string) ($row['device'] ?? '')] = [
+        'n' => $n,
+        'seen' => $seen,
+        'items_seen' => $itemsSeen,
+        'clicks' => $clicks,
+      ];
+    }
+    uasort($out['placements'], function ($a, $b) {
+      return $b['n'] <=> $a['n'];
+    });
+    // buildWhere() may return a bare "WHERE " when no filter applies.
+    $andWhere = function (string $where): string {
+      return (trim($where) === '' || trim($where) === 'WHERE') ? 'WHERE ' : $where . ' AND ';
+    };
+    // When one page shows several blocks: in which of them a recommended item
+    // was first seen, and which of them the clicks came from.
+    foreach ($this->safeFetchAll(
+      'SELECT items_seen_placement AS placement, COUNT(*) AS n FROM ' . $imp . ' '
+      . $andWhere($impWhere) . 'items_seen_placement IS NOT NULL '
+      . 'GROUP BY items_seen_placement',
+      $impParams
+    ) as $row) {
+      $out['seen_in'][(string) $row['placement']] = ['seen' => (int) $row['n'], 'clicks' => 0];
+    }
+    foreach ($this->safeFetchAll(
+      'SELECT placement, COUNT(*) AS n FROM ' . $evt . ' '
+      . $andWhere($evtWhere) . 'event_type = \'click\' AND placement IS NOT NULL '
+      . 'GROUP BY placement',
+      $evtParams
+    ) as $row) {
+      $key = (string) $row['placement'];
+      if (!isset($out['seen_in'][$key])) {
+        $out['seen_in'][$key] = ['seen' => 0, 'clicks' => 0];
+      }
+      $out['seen_in'][$key]['clicks'] = (int) $row['n'];
+    }
+
     foreach ($this->safeFetchAll(
       'SELECT device, COUNT(*) AS n FROM ' . $imp . ' ' . $impWhere . ' GROUP BY device ORDER BY n DESC',
       $impParams

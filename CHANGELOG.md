@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-09-30
+
+### EN
+
+#### Added
+- Two resource page blocks, so that the placement of the recommendations can be tried out and compared. The sidebar list was measured to reach the screen on about one page view in seven (15.3% over ten days), and on phones one in fourteen, because it comes after the viewer and, on phones, after the whole of the metadata.
+  - **Similar items (row below the viewer)** (`similarItemsStrip`): five recommendations in one row, for the full-width region directly after the viewer. On narrow screens it wraps to three columns rather than scrolling sideways, so every item is on the page when the block is.
+  - **Similar items (floating button)** (`similarItemsFloating`): a character fixed to the bottom-right corner of the window shows a panel with the recommendations. With a mouse the panel opens when the pointer rests on the character (120 ms, so a pointer crossing the corner does not open it) and closes when the pointer leaves the character and the panel (after 250 ms, so the pointer can cross the gap between them). Touch has no hover, so a tap opens and closes it; the keyboard uses Enter or Space. Escape and a click outside close it in every case. A hover never moves the focus. It appears once the list has loaded and never when there is nothing to recommend. It takes no room in the page flow; assign it to the main region, which exists on every item page (a block in a sidebar creates the column, so a sidebar holding only this block would narrow the page for nothing).
+- The usage log records where the recommendations were shown (`placement`: `sidebar`, `strip`, `floating`) on the impression, and on each event the block it came from.
+- The usage log records which recommended items reached the screen, item by item (`ranks_seen`, `items_seen_ms`, `items_seen_placement` on the impression): a rank counts once at least half of its entry was on screen. This is the measure to compare placements with. The existing `view` rule (40% of the block's box) means different things for blocks of different heights: a 640 px sidebar list needs 256 px on screen, a 125 px row below the viewer only its heading. On a 1440 × 900 window that row counted as seen on page load with nothing done, and when the floating panel was opened first the page was still credited to the row. The `view` rule is unchanged and kept, so that the sidebar figures stay comparable with the data collected so far.
+- The log screen shows a table by placement and device: impressions, items seen and their rate, the legacy on-screen rate, clicks, and clicks per items seen. On pages showing several blocks, it also shows in which block an item was first seen and which blocks the clicks came from. The manual has a section on it.
+
+#### Changed
+- All Similar Items blocks on a page are served by one request (`asset/js/similar-items-blocks.js`), and a page view is one impression however many blocks show it. Previously each block fetched for itself, so two blocks on one page would have counted the page twice, with two different jitter draws. The module's default sidebar template uses the shared loader; themes that override it should too (see the theme's 1.5.0).
+- Visibility of the sidebar list is measured exactly as before: the same element, the same 40% threshold, the same timing.
+
+#### Upgrade notes
+- Upgrade the module before, or together with, a theme that uses the shared loader. A theme that references `similar-items-blocks.js` on a module older than 0.6.0 finds no such file, and its list never loads.
+- The new columns are added automatically on the first request after the upgrade. Rows written before it have no placement and no item-level exposure; before 0.6.0 the only block was the sidebar list.
+
+### 日本語
+
+#### 追加
+- 推薦の配置を試して比較できるよう、資料ページのブロックを2種類追加しました。サイドバーの推薦は、画面に入るのがページ表示の約7回に1回（10日間で15.3%）、スマホでは約14回に1回でした。ビューアの下、スマホではメタデータ全体のさらに後ろに位置するためです。
+  - **Similar items (row below the viewer)**（`similarItemsStrip`）：推薦5件を1列に並べます。ビューア直後の全幅領域に置く想定です。狭い画面では横スクロールではなく3列に折り返すので、ブロックが画面にあれば全件がページ上にあります。
+  - **Similar items (floating button)**（`similarItemsFloating`）：画面右下に固定したキャラクターから推薦のパネルを出します。マウスではキャラクターの上にポインタを止めると開き（0.12秒。通りすがりのポインタでは開きません）、キャラクターとパネルの外へ出ると閉じます（0.25秒の猶予。両者の間の隙間を渡れるようにするため）。タッチ操作にはマウスオーバーがないため、タップで開閉します。キーボードでは Enter または Space で開きます。Esc キーとパネル外のクリックでは、どの操作でも閉じます。マウスオーバーでフォーカスを移すことはありません。一覧の読み込み後に現れ、推薦がない資料では現れません。ページの流れの中では場所を取らないので、どの資料ページにもあるメイン領域に割り当ててください（サイドバーはブロックが1つあると列が作られるため、このブロックだけを置くと本文が無駄に狭くなります）。
+- 利用ログに、推薦を表示した場所（`placement`：`sidebar`・`strip`・`floating`）をインプレッションに、各イベントにはどのブロックからのものかを記録します。
+- 利用ログに、どの推薦項目が画面に入ったかを1件ずつ記録します（インプレッションの `ranks_seen`・`items_seen_ms`・`items_seen_placement`）。項目の半分以上が画面に入ると、その順位を見られたと数えます。**配置の比較にはこれを使います。** 従来の `view` の規則（ブロックの箱の40%）は、ブロックの高さで意味が変わります。高さ640 pxのサイドバーは256 px入る必要があるのに対し、高さ125 pxのビューア下の列は見出しだけで成立します。1440×900の画面では、何も操作しないうちにビューア下の列が「見られた」と記録され、フローティングのパネルを先に開いた場合も列の手柄になっていました。`view` の規則は変えずに残しています。サイドバーの数字をこれまでのデータと比べられるようにするためです。
+- ログ画面に、表示場所と端末別の表を追加しました（インプレッション、項目が見られた数と割合、従来の画面到達率、クリック、項目が見られたあたりのクリック）。複数のブロックがあるページについては、どのブロックで最初に項目が見られたか、どのブロックからクリックされたかも示します。マニュアルに節を追加しました。
+
+#### 変更
+- 1ページにあるすべての推薦ブロックを1回の取得でまかない（`asset/js/similar-items-blocks.js`）、ブロックがいくつあってもページ表示1回をインプレッション1件とします。これまでは各ブロックが個別に取得していたため、同じページに2つ置くとページが2回数えられ、ゆらぎの抽選も2回別々に行われていました。モジュール既定のサイドバー用テンプレートは共通の取得処理を使います。これを上書きしているテーマも同様にしてください（テーマ 1.5.0 を参照）。
+- サイドバーの推薦の画面到達の計測は、従来とまったく同じです（同じ要素、同じ40%のしきい値、同じタイミング）。
+
+#### 更新時の注意
+- 共通の取得処理を使うテーマより先に、または同時にモジュールを更新してください。0.6.0 より前のモジュールには `similar-items-blocks.js` が存在しないため、テーマだけを先に更新すると推薦が読み込まれません。
+- 新しい列は更新後の最初のリクエストで自動的に追加されます。それ以前の行には表示場所も項目単位の記録もありません。0.6.0 より前のブロックはサイドバーだけでした。
+
 ## [0.5.12] - 2026-09-19
 
 ### EN

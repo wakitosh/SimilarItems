@@ -1,0 +1,42 @@
+<?php
+/**
+ * Similar Items: one row of five below the viewer (module default view).
+ *
+ * Designed for the full-width region directly after the viewer. Five items is
+ * the point: the row stays one line high on a desktop screen, so it does not
+ * push the metadata further down than one row does. On narrow screens it wraps
+ * to three columns rather than scrolling sideways, so that every item is on the
+ * page when the block is, and none is hidden behind a scroll.
+ *
+ * A theme providing the same partial path overrides this file entirely.
+ */
+
+include __DIR__ . '/_similar-items-context.php';
+if ($itemId <= 0) {
+    return;
+}
+$escape = $this->plugin('escapeHtml');
+$escapeAttr = $this->plugin('escapeHtmlAttr');
+$stripLimit = 5;
+
+$this->headLink()->appendStylesheet($this->assetUrl('css/similar-items-blocks.css', 'SimilarItems'));
+?>
+<section class="resource-block similar-items-strip"
+     data-similar-items
+     data-si-placement="strip"
+     data-si-empty="hide"
+     data-item-id="<?php echo $itemId; ?>"
+     data-limit="<?php echo $stripLimit; ?>"
+     data-endpoint="<?php echo $escapeAttr($endpointUrl); ?>"
+     data-site-slug="<?php echo $escapeAttr($siteSlug); ?>"
+     aria-labelledby="similar-items-strip-title-<?php echo $itemId; ?>">
+  <div class="similar-items-strip__head">
+    <h3 class="block-title similar-items-strip__title" id="similar-items-strip-title-<?php echo $itemId; ?>"><?php echo $escape($heading); ?></h3>
+    <span class="similar-items-strip__note"><?php echo $escape($bubbleText); ?></span>
+  </div>
+  <ul class="similar-items-strip__list" data-si-list aria-busy="true">
+    <?php for ($i = 0; $i < $stripLimit; $i++): ?>
+      <li class="similar-items-strip__placeholder" aria-hidden="true"><span></span></li>
+    <?php endfor; ?>
+  </ul>
+</section>

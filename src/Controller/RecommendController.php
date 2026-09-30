@@ -75,6 +75,9 @@ class RecommendController extends AbstractActionController {
     // Item set influence tuning for trials.
     $itemSetsWeightParam = $this->params()->fromQuery('item_sets_weight', NULL);
     $itemSetsSeedOnly = (int) $this->params()->fromQuery('item_sets_seed_only', 0) === 1;
+    // Which blocks on the page will show this list (sidebar, strip, floating).
+    // Blocks on one page share a single request, so this can name several.
+    $placement = (string) $this->params()->fromQuery('placement', '');
     if ($id <= 0) {
       return new JsonModel(['html' => '']);
     }
@@ -212,6 +215,7 @@ class RecommendController extends AbstractActionController {
         ? $similarHelper->getLastStats()
         : ['seed_buckets' => $this->seedBuckets($similarHelper, $item)],
       'arm' => $arm,
+      'placement' => $placement,
       'tiebreak' => $tiebreak,
       'item_sets_weight' => $itemSetsWeightParam,
       'item_sets_seed_only' => $itemSetsSeedOnly,
@@ -351,6 +355,7 @@ class RecommendController extends AbstractActionController {
       'tiebreak' => (string) ($stats['tiebreak'] ?? ($context['tiebreak'] ?? '')),
       'jitter' => (int) ($stats['jitter'] ?? 0),
       'arm' => (string) ($context['arm'] ?? ArmAssigner::ARM_DEFAULT),
+      'placement' => (string) ($context['placement'] ?? ''),
       'config_hash' => $this->log->computeConfigHash([
         'item_sets_weight' => $context['item_sets_weight'] ?? NULL,
         'item_sets_seed_only' => !empty($context['item_sets_seed_only']) ? 1 : 0,

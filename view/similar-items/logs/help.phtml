@@ -31,6 +31,9 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   .si-doc li { margin: .2rem 0; }
   .si-toc { border: 1px solid #ddd; background: #fafafa; border-radius: 4px; padding: .8rem 1rem; }
   .si-toc ul { margin: .3rem 0 0 1.2rem; }
+  .si-doc-table { border-collapse: collapse; margin: .5rem 0 1rem; }
+  .si-doc-table th, .si-doc-table td { border: 1px solid #ddd; padding: .3rem .6rem; text-align: left; vertical-align: top; }
+  .si-doc-table th { background: #f3f3f3; }
 </style>
 
 <fieldset id="page-actions">
@@ -50,14 +53,15 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
     <li><a href="#si-what">1. 何が記録されているか</a>（ビーコンとは）</li>
     <li><a href="#si-kpi">2. 上部の指標カード</a></li>
     <li><a href="#si-arms">3. 対照群試験（Control-group trial）</a></li>
-    <li><a href="#si-rank">4. 順位別クリック率</a></li>
-    <li><a href="#si-depth">5. 回遊深度</a></li>
-    <li><a href="#si-entry">6. 流入経路とデバイス</a></li>
-    <li><a href="#si-top">7. 上位アイテム</a></li>
-    <li><a href="#si-filter">8. 絞り込みと一覧</a></li>
-    <li><a href="#si-export">9. エクスポート</a></li>
-    <li><a href="#si-caveat">10. 数字を読むときの注意</a></li>
-    <li><a href="#si-ops">11. 運用（削除・突合・プライバシー）</a></li>
+    <li><a href="#si-place">4. 表示場所別（ブロックの配置）</a></li>
+    <li><a href="#si-rank">5. 順位別クリック率</a></li>
+    <li><a href="#si-depth">6. 回遊深度</a></li>
+    <li><a href="#si-entry">7. 流入経路とデバイス</a></li>
+    <li><a href="#si-top">8. 上位アイテム</a></li>
+    <li><a href="#si-filter">9. 絞り込みと一覧</a></li>
+    <li><a href="#si-export">10. エクスポート</a></li>
+    <li><a href="#si-caveat">11. 数字を読むときの注意</a></li>
+    <li><a href="#si-ops">12. 運用（削除・突合・プライバシー）</a></li>
   </ul>
 </div>
 
@@ -288,7 +292,55 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   見ることもクリックすることもできません。
 </div>
 
-<h3 id="si-rank">4. 順位別クリック率（Click-through rate by rank）</h3>
+<h3 id="si-place">4. 表示場所別（Where recommendations were shown）</h3>
+
+<p>
+  推薦は3種類のブロックで表示できます。資料ページのブロック設定（サイト管理 → テーマ → リソースページの設定）で割り当てます。
+</p>
+<table class="si-doc-table">
+  <thead><tr><th>記録上の名前</th><th>ブロック名</th><th>推奨する領域</th><th>「見られた」の意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>sidebar</code></td><td>Similar items</td><td>右サイドバー</td><td>推薦項目が画面に入った</td></tr>
+    <tr><td><code>strip</code></td><td>Similar items (row below the viewer)</td><td>全幅メイン（ビューアの直後）</td><td>推薦項目が画面に入った</td></tr>
+    <tr><td><code>floating</code></td><td>Similar items (floating button)</td><td>メイン（末尾）</td><td>パネルが開かれ、推薦項目が画面に入った</td></tr>
+  </tbody>
+</table>
+<p>
+  フローティングボタンは画面右下に固定され、ページの流れの中では場所を取りません。割り当てた領域は「描画されるかどうか」だけを決めます。
+  <strong>メイン領域を推奨する</strong>のは、どの資料ページにも必ずある領域だからです。
+  右サイドバーは、ブロックが1つでもあると列そのものが作られるため、フローティングボタンだけを置くと空の列ができて本文が狭くなります。
+</p>
+
+<h4>Items seen（推薦項目が見られた）— 配置の比較にはこれを使う</h4>
+<p>
+  推薦された各項目について、<strong>その半分以上が画面に入ったか</strong>を1件ずつ記録します。
+  1件でも見られたインプレッションを「Items seen」と数えます。
+  どのブロックでも同じ規則なので、配置どうしを対等に比較できます。
+  フローティングボタンの場合、項目はパネルの中にあるため、<strong>パネルを開かない限り見られたことになりません</strong>。
+  マウスではキャラクターの上にポインタを0.12秒止めるとパネルが開くので、その時点で見られたと数えます（通りすがりのポインタでは開きません）。スマホではタップで開きます。
+</p>
+<p>
+  あわせて、どの順位が見られたか（<code>ranks_seen</code>）、最初に見られるまでの時間（<code>items_seen_ms</code>）、
+  最初に見られたブロック（<code>items_seen_placement</code>）がインプレッションに残ります。
+  順位ごとの露出が分かるので、位置バイアスの分析に使えます。0.6.0 から記録しており、それ以前の行は空です。
+</p>
+
+<h4>Block on screen (legacy) — 以前からの指標</h4>
+<p>
+  0.6.0 より前から使っている「ブロックの箱の40%が画面に入った」です。サイドバーの数字を過去のデータと比べるために残しています。
+  ただし<strong>配置の比較には使えません</strong>。箱の高さによって意味が変わるからです。
+  高さ640 pxのサイドバーは256 px入る必要があるのに対し、高さ125 pxのビューア下の列は、見出しが画面の下端にのぞくだけで成立します。
+  開発環境での試験では、何も操作しないページで「ビューア下の列が見られた」と記録されました。
+</p>
+
+<h4>1ページに複数のブロックがあるとき</h4>
+<p>
+  推薦の取得は1ページにつき1回で、<strong>インプレッションも1件</strong>です。同じ推薦がすべてのブロックに表示されます。
+  表では <code>strip + floating</code> のように組み合わせとして1行になり、下の表で「最初に見られたブロック」と「クリックされたブロック」を分けて示します。
+  配置の効果を比較する試験では、1ページに1種類のブロックだけを出してください。
+</p>
+
+<h3 id="si-rank">5. 順位別クリック率（Click-through rate by rank）</h3>
 
 <p>
   <strong>Offered</strong> は「その順位が実際に提示されたインプレッション数」です。
@@ -301,7 +353,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   比べて初めて判定できます。ランダムでは順位別 CTR がほぼ平坦になるはずだからです。
 </p>
 
-<h3 id="si-depth">5. 回遊深度（Browsing depth）</h3>
+<h3 id="si-depth">6. 回遊深度（Browsing depth）</h3>
 
 <table>
   <tr><th>深度</th><th>意味</th></tr>
@@ -314,7 +366,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   深度が1で止まるか、2・3と続くかで「推薦が一度きりの寄り道か、回遊を生んでいるか」が分かります。
 </p>
 
-<h3 id="si-entry">6. 流入経路とデバイス</h3>
+<h3 id="si-entry">7. 流入経路とデバイス</h3>
 
 <table>
   <tr><th>値</th><th>意味</th></tr>
@@ -335,7 +387,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   なお <code>similar_items</code> だけはサーバ側で確定するため、この影響を受けません。
 </div>
 
-<h3 id="si-top">7. 上位アイテム</h3>
+<h3 id="si-top">8. 上位アイテム</h3>
 
 <ul>
   <li><strong>Most recommended-from items</strong> … 推薦の起点になった回数が多い資料。
@@ -345,7 +397,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 </ul>
 <p>資料IDのリンクから管理画面の資料ページへ移動できます。</p>
 
-<h3 id="si-filter">8. 絞り込みと一覧</h3>
+<h3 id="si-filter">9. 絞り込みと一覧</h3>
 
 <p>
   左上の「Filter」で期間・サイト・条件ラベル・デバイス・シード資料・セッションを指定できます。
@@ -359,7 +411,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   1人の閲覧者がどう辿ったかを追うのに便利です。
 </p>
 
-<h3 id="si-export">9. エクスポート</h3>
+<h3 id="si-export">10. エクスポート</h3>
 
 <table>
   <tr><th>データセット</th><th>内容</th></tr>
@@ -375,7 +427,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   日時はサイトのタイムゾーンで ISO 8601 形式、CSV には表計算ソフト向けに BOM が付きます。
 </div>
 
-<h3 id="si-caveat">10. 数字を読むときの注意</h3>
+<h3 id="si-caveat">11. 数字を読むときの注意</h3>
 
 <ul>
   <li><strong>件数が少ないうちは読まない。</strong>
@@ -396,7 +448,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
     提示内容はインプレッションごとに保存しているため、順位単位の集計は正しく行えます。</li>
 </ul>
 
-<h3 id="si-ops">11. 運用（削除・突合・プライバシー）</h3>
+<h3 id="si-ops">12. 運用（削除・突合・プライバシー）</h3>
 
 <h4>ログの削除</h4>
 <p>

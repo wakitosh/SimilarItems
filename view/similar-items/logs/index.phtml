@@ -339,6 +339,96 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
     <?php endif; ?>
   </div>
 
+  <?php if (!empty($summary['placements'])): ?>
+  <?php
+    $placementLabels = [
+      '' => $translate('Not recorded (before 0.6.0: sidebar list)'),
+      'sidebar' => $translate('Sidebar list'),
+      'strip' => $translate('Row below the viewer'),
+      'floating' => $translate('Floating button'),
+    ];
+    $placementLabel = function (string $key) use ($placementLabels) {
+      if (isset($placementLabels[$key])) {
+        return $placementLabels[$key];
+      }
+      $parts = [];
+      foreach (explode(',', $key) as $one) {
+        $parts[] = $placementLabels[$one] ?? $one;
+      }
+      return implode(' + ', $parts);
+    };
+    $ratio = function (int $part, int $whole) use ($pct) {
+      return $whole > 0 ? $pct($part / $whole) : '–';
+    };
+  ?>
+  <div class="si-section" style="grid-column: 1 / -1;">
+    <h3><?= $escape($translate('Where recommendations were shown')) ?></h3>
+    <table class="si-table">
+      <thead>
+        <tr>
+          <th><?= $escape($translate('Placement')) ?></th>
+          <th><?= $escape($translate('Device')) ?></th>
+          <th class="num"><?= $escape($translate('Impressions')) ?></th>
+          <th class="num"><?= $escape($translate('Items seen')) ?></th>
+          <th class="num"><?= $escape($translate('Items seen rate')) ?></th>
+          <th class="num"><?= $escape($translate('Block on screen (legacy)')) ?></th>
+          <th class="num"><?= $escape($translate('Clicks')) ?></th>
+          <th class="num"><?= $escape($translate('Clicks per items seen')) ?></th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($summary['placements'] as $key => $p): ?>
+          <tr>
+            <td><strong><?= $escape($placementLabel((string) $key)) ?></strong></td>
+            <td><?= $escape($translate('all')) ?></td>
+            <td class="num"><?= $num($p['n']) ?></td>
+            <td class="num"><?= $num($p['items_seen']) ?></td>
+            <td class="num"><strong><?= $ratio($p['items_seen'], $p['n']) ?></strong></td>
+            <td class="num"><?= $ratio($p['seen'], $p['n']) ?></td>
+            <td class="num"><?= $num($p['clicks']) ?></td>
+            <td class="num"><?= $ratio($p['clicks'], $p['items_seen']) ?></td>
+          </tr>
+          <?php foreach ($p['devices'] as $device => $d): ?>
+            <tr>
+              <td></td>
+              <td><?= $escape($device !== '' ? $device : '(unknown)') ?></td>
+              <td class="num"><?= $num($d['n']) ?></td>
+              <td class="num"><?= $num($d['items_seen']) ?></td>
+              <td class="num"><?= $ratio($d['items_seen'], $d['n']) ?></td>
+              <td class="num"><?= $ratio($d['seen'], $d['n']) ?></td>
+              <td class="num"><?= $num($d['clicks']) ?></td>
+              <td class="num"><?= $ratio($d['clicks'], $d['items_seen']) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <p class="si-note"><?= $escape($translate('Items seen: at least one recommended entry was half on screen. This is the measure to compare placements with: the same rule holds for every block, and for the floating button it can only happen while the panel is open. Recorded from 0.6.0; earlier rows have no value and appear as not seen here.')) ?></p>
+    <p class="si-note"><?= $escape($translate('Block on screen (legacy): 40% of the block was on screen, the rule used before 0.6.0. It is kept so the sidebar figures stay comparable with earlier data, but it favours short blocks (the row below the viewer counts as seen when only its heading shows) and does not apply to the floating button, where it records the panel being opened.')) ?></p>
+    <p class="si-note"><?= $escape($translate('One page view is one impression even when a page shows several blocks; such pages are listed under the combination.')) ?></p>
+    <?php
+      $multi = FALSE;
+      foreach (array_keys($summary['placements']) as $key) {
+        if (strpos((string) $key, ',') !== FALSE) {
+          $multi = TRUE;
+        }
+      }
+    ?>
+    <?php if ($multi && !empty($summary['seen_in'])): ?>
+      <h3 style="margin-top:1rem;"><?= $escape($translate('On pages with several blocks: which block')) ?></h3>
+      <table class="si-table">
+        <thead><tr><th><?= $escape($translate('Block')) ?></th><th class="num"><?= $escape($translate('First item seen here')) ?></th><th class="num"><?= $escape($translate('Clicks')) ?></th></tr></thead>
+        <tbody>
+          <?php foreach ($summary['seen_in'] as $key => $row): ?>
+            <?php if ($key === '') { continue; } ?>
+            <tr><td><?= $escape($placementLabel((string) $key)) ?></td><td class="num"><?= $num($row['seen']) ?></td><td class="num"><?= $num($row['clicks']) ?></td></tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
   <div class="si-section">
     <h3><?= $escape($translate('How visitors arrived')) ?></h3>
     <table class="si-table">

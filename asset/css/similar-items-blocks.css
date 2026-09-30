@@ -1,0 +1,418 @@
+/**
+ * Similar Items: row below the viewer, and floating button.
+ *
+ * Styled against both list markups: the module's default list partial
+ * (li.resource > a.resource-link) and the list override of themes that render
+ * a thumbnail and a title (li.similar-item > a.similar-item__link).
+ */
+
+/* ------------------------------------------------------------------ */
+/* Row below the viewer                                                */
+/* ------------------------------------------------------------------ */
+
+.similar-items-strip {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem 0.875rem;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+}
+
+.similar-items-strip[hidden] {
+  display: none;
+}
+
+.similar-items-strip__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 0.625rem;
+}
+
+.similar-items-strip__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.similar-items-strip__note {
+  color: #666;
+  font-size: 0.8125rem;
+}
+
+.similar-items-strip__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .similar-items-strip__list {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.similar-items-strip__list > li {
+  margin: 0;
+  min-width: 0;
+}
+
+.similar-items-strip__list a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.similar-items-strip__list a:hover .similar-item__title,
+.similar-items-strip__list a:focus-visible .similar-item__title,
+.similar-items-strip__list a:hover .resource-name {
+  text-decoration: underline;
+}
+
+.similar-items-strip .similar-item__thumb {
+  display: block;
+  width: 100%;
+  max-width: 120px;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+
+.similar-items-strip .similar-item__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.similar-items-strip .similar-item__title,
+.similar-items-strip .resource-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #1779ba;
+}
+
+/* Wide screens: thumbnail beside the title, so the row stays one short line. */
+@media (min-width: 1024px) {
+  .similar-items-strip__list a {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
+
+  .similar-items-strip .similar-item__thumb {
+    flex: 0 0 64px;
+    width: 64px;
+  }
+
+  .similar-items-strip .similar-item__title,
+  .similar-items-strip .resource-name {
+    -webkit-line-clamp: 3;
+    font-size: 0.875rem;
+  }
+}
+
+/* The module's default list has a hover popover; the row has no room for it. */
+.similar-items-strip .thumb-popover {
+  display: none;
+}
+
+/* Placeholders keep the row's height while loading (no layout shift). */
+.similar-items-strip__placeholder span {
+  display: block;
+  height: 64px;
+  background: linear-gradient(90deg, #f0f0f0 0%, #f7f7f7 50%, #f0f0f0 100%);
+  background-size: 200% 100%;
+  border-radius: 3px;
+  animation: similar-items-shimmer 1.4s linear infinite;
+}
+
+@keyframes similar-items-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Floating button                                                     */
+/* ------------------------------------------------------------------ */
+
+.similar-items-fab {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 900;
+}
+
+.similar-items-fab[hidden] {
+  display: none;
+}
+
+.similar-items-fab.is-ready {
+  animation: similar-items-fab-in 0.3s ease-out;
+}
+
+@keyframes similar-items-fab-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+.similar-items-fab__toggle {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.similar-items-fab__toggle:focus-visible {
+  outline: 3px solid #1779ba;
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+/* Themes commonly style every <button> (fill, gradient, shadow, focus colour).
+   Neither of these buttons is a button in that visual sense, so the theme's
+   look is undone here, in every state, with enough specificity to win. */
+.similar-items-fab .similar-items-fab__toggle,
+.similar-items-fab .similar-items-fab__toggle:hover,
+.similar-items-fab .similar-items-fab__toggle:focus,
+.similar-items-fab .similar-items-fab__toggle:active,
+.similar-items-fab .similar-items-fab__close,
+.similar-items-fab .similar-items-fab__close:focus,
+.similar-items-fab .similar-items-fab__close:active {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  text-shadow: none;
+  min-height: 0;
+  color: inherit;
+}
+
+.similar-items-fab .similar-items-fab__close {
+  color: #555;
+  border-radius: 50%;
+}
+
+.similar-items-fab .similar-items-fab__close:hover,
+.similar-items-fab .similar-items-fab__close:focus-visible {
+  background: #eee;
+}
+
+.similar-items-fab .similar-items-fab__close:focus-visible {
+  outline: 2px solid #1779ba;
+  outline-offset: 1px;
+}
+
+/* The character. Themes replace the image here. */
+.similar-items-fab__icon {
+  display: block;
+  width: 64px;
+  height: 96px;
+  background: url("../img/similar-items-fab.svg") center bottom / contain no-repeat;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+  transition: transform 0.15s ease-out;
+}
+
+.similar-items-fab__toggle:hover .similar-items-fab__icon,
+.similar-items-fab__toggle:focus-visible .similar-items-fab__icon,
+.similar-items-fab.is-open .similar-items-fab__icon {
+  transform: translateY(-3px);
+}
+
+.similar-items-fab__bubble {
+  position: relative;
+  margin-bottom: 56px;
+  padding: 0.375rem 0.625rem;
+  background: #fff;
+  border: 1px solid #c8c8c8;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  color: #333;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.similar-items-fab__bubble::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  background: #fff;
+  border-right: 1px solid #c8c8c8;
+  border-top: 1px solid #c8c8c8;
+  transform: rotate(45deg);
+}
+
+/* Fade the bubble out while the panel is open, but keep its box. Removing it
+   (display: none) would pull the ground from under a pointer resting on it:
+   the pointer would then be outside the block, the panel would close, the
+   bubble would come back under the pointer and open it again, in a loop. An
+   element at opacity 0 still takes the pointer, so the pointer stays inside. */
+.similar-items-fab__bubble {
+  transition: opacity 0.15s ease-out;
+}
+
+.similar-items-fab.is-open .similar-items-fab__bubble {
+  opacity: 0;
+}
+
+.similar-items-fab__panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  padding: 0.75rem 0.875rem 0.875rem;
+  background: #fff;
+  border: 1px solid #c8c8c8;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.similar-items-fab__panel[hidden] {
+  display: none;
+}
+
+/* An invisible bridge over the gap below the panel, so a pointer moving from
+   the character up to the panel stays over the block the whole way. */
+.similar-items-fab__panel::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 12px;
+}
+
+.similar-items-fab__panel:focus {
+  outline: none;
+}
+
+.similar-items-fab__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.similar-items-fab__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.similar-items-fab__close {
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  color: #555;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.similar-items-fab__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.similar-items-fab__list > li {
+  margin: 0;
+  padding: 0.375rem 0;
+  border-top: 1px solid #eee;
+}
+
+.similar-items-fab__list > li:first-child {
+  border-top: 0;
+}
+
+.similar-items-fab__list a {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: #1779ba;
+  text-decoration: none;
+}
+
+.similar-items-fab__list a:hover,
+.similar-items-fab__list a:focus-visible {
+  text-decoration: underline;
+}
+
+.similar-items-fab .similar-item__thumb {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+
+.similar-items-fab .similar-item__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.similar-items-fab .similar-item__title,
+.similar-items-fab .resource-name {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.similar-items-fab .thumb-popover {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .similar-items-fab__bubble {
+    display: none;
+  }
+
+  .similar-items-fab__icon {
+    width: 52px;
+    height: 78px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .similar-items-fab.is-ready,
+  .similar-items-strip__placeholder span {
+    animation: none;
+  }
+
+  .similar-items-fab__icon,
+  .similar-items-fab__bubble {
+    transition: none;
+  }
+}
+
+@media print {
+  .similar-items-fab {
+    display: none !important;
+  }
+}

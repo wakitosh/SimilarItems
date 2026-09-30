@@ -19,6 +19,8 @@ use SimilarItems\Log\LogService;
 use SimilarItems\Service\Log\LogServiceFactory;
 use SimilarItems\Service\ViewHelper\SimilarItemsFactory;
 use SimilarItems\Site\ResourcePageBlockLayout\SimilarItems as SimilarItemsBlock;
+use SimilarItems\Site\ResourcePageBlockLayout\SimilarItemsFloating as SimilarItemsFloatingBlock;
+use SimilarItems\Site\ResourcePageBlockLayout\SimilarItemsStrip as SimilarItemsStripBlock;
 use SimilarItems\View\Helper\SimilarItems as SimilarItemsHelper;
 
 return [
@@ -204,6 +206,8 @@ return [
     'invokables' => [
       // Register as "similarItems" to match theme's default placement key.
       'similarItems' => SimilarItemsBlock::class,
+      'similarItemsStrip' => SimilarItemsStripBlock::class,
+      'similarItemsFloating' => SimilarItemsFloatingBlock::class,
     ],
   ],
   'view_manager' => [

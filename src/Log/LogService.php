@@ -149,9 +149,14 @@ class LogService {
     $added = [
       self::TABLE_IMPRESSION => [
         'arm' => "ALTER TABLE `%s` ADD COLUMN `arm` VARCHAR(16) DEFAULT NULL AFTER `variant`, ADD KEY `idx_arm` (`arm`)",
+        'placement' => "ALTER TABLE `%s` ADD COLUMN `placement` VARCHAR(64) DEFAULT NULL AFTER `arm`, ADD KEY `idx_placement` (`placement`)",
+        'ranks_seen' => "ALTER TABLE `%s` ADD COLUMN `ranks_seen` VARCHAR(64) DEFAULT NULL AFTER `placement`",
+        'items_seen_ms' => "ALTER TABLE `%s` ADD COLUMN `items_seen_ms` INT UNSIGNED DEFAULT NULL AFTER `ranks_seen`",
+        'items_seen_placement' => "ALTER TABLE `%s` ADD COLUMN `items_seen_placement` VARCHAR(16) DEFAULT NULL AFTER `items_seen_ms`",
       ],
       self::TABLE_EVENT => [
         'arm' => "ALTER TABLE `%s` ADD COLUMN `arm` VARCHAR(16) DEFAULT NULL AFTER `variant`, ADD KEY `idx_arm` (`arm`)",
+        'placement' => "ALTER TABLE `%s` ADD COLUMN `placement` VARCHAR(16) DEFAULT NULL AFTER `arm`, ADD KEY `idx_placement` (`placement`)",
       ],
     ];
     foreach ($added as $table => $columns) {
@@ -202,6 +207,10 @@ CREATE TABLE IF NOT EXISTS `similaritems_impression` (
   `results` MEDIUMTEXT,
   `variant` VARCHAR(64) DEFAULT NULL,
   `arm` VARCHAR(16) DEFAULT NULL,
+  `placement` VARCHAR(64) DEFAULT NULL,
+  `ranks_seen` VARCHAR(64) DEFAULT NULL,
+  `items_seen_ms` INT UNSIGNED DEFAULT NULL,
+  `items_seen_placement` VARCHAR(16) DEFAULT NULL,
   `config_hash` CHAR(12) DEFAULT NULL,
   `tiebreak` VARCHAR(32) DEFAULT NULL,
   `jitter` TINYINT(1) NOT NULL DEFAULT 0,
@@ -224,6 +233,7 @@ CREATE TABLE IF NOT EXISTS `similaritems_impression` (
   KEY `idx_chain` (`chain_key`),
   KEY `idx_variant` (`variant`),
   KEY `idx_arm` (`arm`),
+  KEY `idx_placement` (`placement`),
   KEY `idx_is_bot` (`is_bot`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 SQL;
@@ -242,6 +252,7 @@ CREATE TABLE IF NOT EXISTS `similaritems_event` (
   `site_slug` VARCHAR(190) DEFAULT NULL,
   `variant` VARCHAR(64) DEFAULT NULL,
   `arm` VARCHAR(16) DEFAULT NULL,
+  `placement` VARCHAR(16) DEFAULT NULL,
   `seed_item_id` INT UNSIGNED DEFAULT NULL,
   `target_item_id` INT UNSIGNED DEFAULT NULL,
   `target_rank` SMALLINT UNSIGNED DEFAULT NULL,
@@ -261,6 +272,7 @@ CREATE TABLE IF NOT EXISTS `similaritems_event` (
   KEY `idx_created_at` (`created_at`),
   KEY `idx_event_type` (`event_type`),
   KEY `idx_arm` (`arm`),
+  KEY `idx_placement` (`placement`),
   KEY `idx_impression_key` (`impression_key`),
   KEY `idx_session_created` (`session_key`, `created_at`),
   KEY `idx_target_item` (`target_item_id`),
@@ -331,6 +343,7 @@ SQL;
           : (string) $results,
         'variant' => $this->clip($data['variant'] ?? $this->getVariant(), 64),
         'arm' => $this->clip($data['arm'] ?? NULL, 16),
+        'placement' => $this->normalizePlacements($data['placement'] ?? NULL),
         'config_hash' => $this->clip($data['config_hash'] ?? NULL, 12),
         'tiebreak' => $this->clip($data['tiebreak'] ?? NULL, 32),
         'jitter' => !empty($data['jitter']) ? 1 : 0,
@@ -389,7 +402,7 @@ SQL;
     }
 
     $type = strtolower(trim((string) ($data['type'] ?? '')));
-    if (!in_array($type, self::EVENT_TYPES, TRUE)) {
+    if (!in_array($type, self::EVENT_TYPES, TRUE) && $type !== 'exposure') {
       return FALSE;
     }
     $impressionKey = $this->normalizeKey($data['impression'] ?? NULL);
@@ -399,7 +412,7 @@ SQL;
 
     try {
       $impression = $this->conn->fetchAssociative(
-        'SELECT id, impression_key, session_key, site_slug, seed_item_id, seed_buckets, variant, arm, chain_key, hop_depth, parent_event_id, entry_kind, results '
+        'SELECT id, impression_key, session_key, site_slug, seed_item_id, seed_buckets, variant, arm, chain_key, hop_depth, parent_event_id, entry_kind, results, result_count, ranks_seen, items_seen_ms '
         . 'FROM ' . self::TABLE_IMPRESSION . ' WHERE impression_key = ? LIMIT 1',
         [$impressionKey]
       );
@@ -411,11 +424,16 @@ SQL;
       return FALSE;
     }
 
+    if ($type === 'exposure') {
+      return $this->recordExposure($impression, $data);
+    }
+
     // A block written off as "not seen" when the visitor switched tabs may
     // still be scrolled to afterwards. Correct the earlier row rather than
     // rejecting the report, otherwise the visibility rate is biased downwards.
+    $placement = $this->normalizePlacement($data['placement'] ?? NULL);
     if ($type === 'view' && !empty($data['visible'])
-      && $this->upgradeViewToVisible($impressionKey, $this->normalizeDuration($data['dwell_ms'] ?? NULL))) {
+      && $this->upgradeViewToVisible($impressionKey, $this->normalizeDuration($data['dwell_ms'] ?? NULL), $placement)) {
       return TRUE;
     }
 
@@ -440,6 +458,10 @@ SQL;
       'site_slug' => $this->clip($impression['site_slug'] ?? NULL, 190),
       'variant' => $this->clip($impression['variant'] ?? NULL, 64),
       'arm' => $this->clip($impression['arm'] ?? NULL, 16),
+      // Which of the blocks on the page this event came from: the one that
+      // reached the screen first, or the one the link was clicked in. A view
+      // written off as never seen has none.
+      'placement' => $placement,
       'seed_item_id' => (int) ($impression['seed_item_id'] ?? 0),
       'target_item_id' => $targetItemId > 0 ? $targetItemId : NULL,
       // Rank/score are taken from the stored impression, never from the
@@ -879,12 +901,70 @@ SQL;
   }
 
   /**
+   * Record which recommended items reached the screen.
+   *
+   * The `view` event says whether the block reached the screen: 40% of the
+   * block's box. That rule means different things for blocks of different
+   * heights (a 640 px sidebar list needs 256 px on screen, a 125 px row only
+   * its heading), so it cannot compare placements. This records the items
+   * themselves instead: a rank counts once at least half of its entry was on
+   * screen. The same rule then holds for every placement, including the
+   * floating panel, whose items are only on screen while it is open.
+   *
+   * Stored on the impression, merged with what earlier reports said.
+   */
+  private function recordExposure(array $impression, array $data): bool {
+    $max = max(1, min(50, (int) ($impression['result_count'] ?? 0)));
+    $ranks = [];
+    foreach (explode(',', (string) ($impression['ranks_seen'] ?? '')) as $known) {
+      if ((int) $known >= 1 && (int) $known <= $max) {
+        $ranks[(int) $known] = TRUE;
+      }
+    }
+    $before = count($ranks);
+    foreach ((array) ($data['ranks'] ?? []) as $rank) {
+      $rank = is_numeric($rank) ? (int) $rank : 0;
+      if ($rank >= 1 && $rank <= $max) {
+        $ranks[$rank] = TRUE;
+      }
+    }
+    if (!$ranks) {
+      return FALSE;
+    }
+    ksort($ranks);
+    $update = [];
+    if (count($ranks) !== $before) {
+      $update['ranks_seen'] = implode(',', array_keys($ranks));
+    }
+    if ($impression['items_seen_ms'] === NULL) {
+      $ms = $this->normalizeDuration($data['ms'] ?? NULL);
+      if ($ms !== NULL) {
+        $update['items_seen_ms'] = $ms;
+      }
+      $placement = $this->normalizePlacement($data['placement'] ?? NULL);
+      if ($placement !== NULL) {
+        $update['items_seen_placement'] = $placement;
+      }
+    }
+    if (!$update) {
+      return TRUE;
+    }
+    try {
+      $this->conn->update(self::TABLE_IMPRESSION, $update, ['id' => (int) $impression['id']]);
+      return TRUE;
+    }
+    catch (\Throwable $e) {
+      return FALSE;
+    }
+  }
+
+  /**
    * Promote an existing "not seen" view row to visible.
    *
    * @return bool
    *   TRUE when a row was corrected, FALSE when there was nothing to correct.
    */
-  private function upgradeViewToVisible(string $impressionKey, ?int $dwellMs): bool {
+  private function upgradeViewToVisible(string $impressionKey, ?int $dwellMs, ?string $placement = NULL): bool {
     try {
       $row = $this->conn->fetchAssociative(
         'SELECT id FROM ' . self::TABLE_EVENT . ' '
@@ -897,6 +977,9 @@ SQL;
       $update = ['was_visible' => 1];
       if ($dwellMs !== NULL) {
         $update['dwell_ms'] = $dwellMs;
+      }
+      if ($placement !== NULL) {
+        $update['placement'] = $placement;
       }
       $this->conn->update(self::TABLE_EVENT, $update, ['id' => (int) $row['id']]);
       return TRUE;
@@ -1036,6 +1119,51 @@ SQL;
   /**
    * Truncate a value for a VARCHAR column.
    */
+  /**
+   * One placement name, as sent by the browser with an event.
+   *
+   * Placement names are short identifiers chosen by the block templates
+   * (sidebar, strip, floating). Anything else is dropped rather than stored,
+   * since the value comes from the client.
+   */
+  private function normalizePlacement($value): ?string {
+    if (!is_string($value)) {
+      return NULL;
+    }
+    $value = strtolower(trim($value));
+    return preg_match('/^[a-z][a-z0-9_-]{0,15}$/', $value) ? $value : NULL;
+  }
+
+  /**
+   * The placements present on the page, as a comma-separated list.
+   *
+   * One page view is one impression however many blocks show it, so the
+   * impression records every placement it was rendered into. Order is kept as
+   * given (the page order of the blocks); duplicates are removed.
+   */
+  public function normalizePlacements($value): ?string {
+    if (is_array($value)) {
+      $parts = $value;
+    }
+    elseif (is_string($value)) {
+      $parts = explode(',', $value);
+    }
+    else {
+      return NULL;
+    }
+    $clean = [];
+    foreach ($parts as $part) {
+      $one = $this->normalizePlacement($part);
+      if ($one !== NULL && !in_array($one, $clean, TRUE)) {
+        $clean[] = $one;
+      }
+      if (count($clean) >= 4) {
+        break;
+      }
+    }
+    return $clean ? implode(',', $clean) : NULL;
+  }
+
   private function clip($value, int $max): ?string {
     if ($value === NULL) {
       return NULL;

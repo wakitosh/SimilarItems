@@ -1,0 +1,60 @@
+<?php
+/**
+ * Similar Items: floating button (module default view).
+ *
+ * A character fixed to the bottom-right corner opens a panel with the
+ * recommendations. It stays hidden until the list has loaded and is never
+ * shown when there is nothing to recommend. The block takes no room in the
+ * page flow; the script moves it to <body> so that the region it was assigned
+ * to cannot affect its fixed positioning.
+ *
+ * For the usage log it counts as seen when the panel is opened, not when the
+ * button is on screen: the button always is.
+ *
+ * A theme providing the same partial path overrides this file entirely. The
+ * character image is set from CSS (.similar-items-fab__icon); a theme replaces
+ * the module's generic icon there.
+ */
+
+include __DIR__ . '/_similar-items-context.php';
+if ($itemId <= 0) {
+    return;
+}
+$escape = $this->plugin('escapeHtml');
+$escapeAttr = $this->plugin('escapeHtmlAttr');
+$panelId = 'similar-items-fab-panel-' . $itemId;
+$titleId = 'similar-items-fab-title-' . $itemId;
+$closeLabel = $isJa ? '閉じる' : 'Close';
+$toggleLabel = $heading . ($bubbleText !== '' ? ' — ' . $bubbleText : '');
+
+$this->headLink()->appendStylesheet($this->assetUrl('css/similar-items-blocks.css', 'SimilarItems'));
+?>
+<div class="similar-items-fab"
+     data-similar-items
+     data-si-placement="floating"
+     data-si-visibility="manual"
+     data-si-empty="hide"
+     data-item-id="<?php echo $itemId; ?>"
+     data-limit="<?php echo (int) $moduleLimit; ?>"
+     data-endpoint="<?php echo $escapeAttr($endpointUrl); ?>"
+     data-site-slug="<?php echo $escapeAttr($siteSlug); ?>"
+     hidden>
+  <div class="similar-items-fab__panel" id="<?php echo $panelId; ?>" data-si-fab-panel
+       role="dialog" aria-modal="false" aria-labelledby="<?php echo $titleId; ?>" tabindex="-1" hidden>
+    <div class="similar-items-fab__head">
+      <h2 class="similar-items-fab__title" id="<?php echo $titleId; ?>"><?php echo $escape($heading); ?></h2>
+      <button type="button" class="similar-items-fab__close" data-si-fab-close aria-label="<?php echo $escapeAttr($closeLabel); ?>">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    <ul class="similar-items-fab__list" data-si-list aria-busy="true"></ul>
+  </div>
+  <button type="button" class="similar-items-fab__toggle" data-si-fab-toggle
+          aria-expanded="false" aria-controls="<?php echo $panelId; ?>"
+          aria-label="<?php echo $escapeAttr($toggleLabel); ?>">
+    <?php if ($bubbleText !== ''): ?>
+      <span class="similar-items-fab__bubble" aria-hidden="true"><?php echo $escape($bubbleText); ?></span>
+    <?php endif; ?>
+    <span class="similar-items-fab__icon" aria-hidden="true"></span>
+  </button>
+</div>
