@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2026-10-09
+
+### EN
+
+#### Fixed
+- The placement preview (`?si_placement=…`) did nothing when typed at the end of an item URL that carries a Mirador deep link (`#canvas=…`). Everything after `#` is the fragment, which the browser never sends, so the parameter never reached the server. The shared loader now moves a valid `si_placement` found in the fragment into the query string and reloads once, so the preview works wherever it is typed. The fragment is left without it, so this cannot loop. For visitors who are not signed in the server still ignores the parameter.
+- The same URL also left the viewer loading forever; that part is fixed in the theme (1.5.1), which read the appended text as part of the canvas id.
+
+### 日本語
+
+#### 修正
+- Mirador のディープリンク（`#canvas=…`）が付いた資料ページの URL の末尾に配置のプレビュー（`?si_placement=…`）を付けても、効きませんでした。`#` 以降はフラグメントで、ブラウザはサーバに送らないため、パラメータがサーバに届いていませんでした。共通の読み込み処理が、フラグメント内に有効な `si_placement` を見つけるとクエリ側へ移して一度だけ開き直すようにしたので、どこに書いても効きます。移した後のフラグメントには残らないため、繰り返し開き直すことはありません。ログインしていない閲覧者に対しては、これまでどおりサーバがパラメータを無視します。
+- 同じ URL でビューアが読み込み中のまま止まる問題は、テーマ側（1.5.1）で直しました。テーマが、末尾に付け足された文字列までキャンバスIDの一部として読んでいたためです。
+
 ## [0.7.0] - 2026-10-08
 
 ### EN

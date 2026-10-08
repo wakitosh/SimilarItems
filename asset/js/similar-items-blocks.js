@@ -347,7 +347,39 @@
     });
   }
 
+  /**
+   * Move a placement preview typed after the fragment into the query string.
+   *
+   * Item pages often carry a Mirador deep link (#canvas=...). A preview
+   * parameter added at the end of such a URL lands in the fragment, which the
+   * browser never sends: the server cannot see it, and the viewer reads it as
+   * part of the canvas id. Reloading with the parameter moved before the
+   * fragment makes it work wherever it was typed. Only a valid placement name
+   * is moved, and the fragment is left without it, so this cannot loop.
+   *
+   * @return {boolean}
+   *   TRUE when the page is being reloaded.
+   */
+  function relocatePreviewParam() {
+    var hash = String(window.location.hash || '');
+    var m = hash.match(/([#?&])si_placement=(sidebar|strip|floating)(?=&|$)/);
+    if (!m || !window.URLSearchParams) {
+      return false;
+    }
+    var params = new URLSearchParams(window.location.search);
+    params.set('si_placement', m[2]);
+    var rest = hash.replace(m[0], m[1] === '#' ? '#' : '').replace(/^#&/, '#');
+    if (rest === '#') {
+      rest = '';
+    }
+    window.location.replace(window.location.pathname + '?' + params.toString() + rest);
+    return true;
+  }
+
   function init() {
+    if (relocatePreviewParam()) {
+      return;
+    }
     var groups = {};
     var order = [];
     each(document.querySelectorAll(BLOCK_SELECTOR), function (block) {
