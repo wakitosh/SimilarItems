@@ -20,8 +20,9 @@ $queryFilters = [
     'seed_item_id' => $filters['seed_item_id'] ?: '',
     'session_key' => $filters['session_key'],
     'include_bots' => $filters['include_bots'],
+    'trial' => $filters['trial'] ?? 0,
 ];
-$queryFilters = array_filter($queryFilters, function ($v) { return $v !== '' && $v !== null; });
+$queryFilters = array_filter($queryFilters, function ($v) { return $v !== '' && $v !== null && $v !== 0; });
 
 $exportUrl = function (string $dataset, string $format) use ($queryFilters) {
     return $this->url('admin/similar-items-logs-export', [], [
@@ -114,6 +115,10 @@ $num = function ($v, int $d = 0) { return number_format((float) $v, $d); };
       <div class="field">
         <div class="field-meta"><label for="si-bots"><?= $escape($translate('Include bots')) ?></label></div>
         <div class="inputs"><input type="checkbox" id="si-bots" name="include_bots" value="1" <?= $filters['include_bots'] ? 'checked' : '' ?>></div>
+      </div>
+      <div class="field">
+        <div class="field-meta"><label for="si-trial"><?= $escape($translate('Placement trial only')) ?></label></div>
+        <div class="inputs"><input type="checkbox" id="si-trial" name="trial" value="1" <?= !empty($filters['trial']) ? 'checked' : '' ?>></div>
       </div>
       <div class="field">
         <div class="field-meta"><label>&nbsp;</label></div>
@@ -218,6 +223,90 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
     <span class="si-kpi__sub"><?= $escape(sprintf($translate('avg %s candidates, %s shown'), $num($summary['avg_candidates'], 1), $num($summary['avg_results'], 2))) ?></span>
   </div>
 </div>
+
+<?php
+  $pt = $placementTrial ?? null;
+  $ptLabels = ['sidebar' => '右サイドバーの一覧', 'strip' => 'ビューア下の列', 'floating' => '右下のフローティング'];
+  $ptStates = ['off' => '無効', 'scheduled' => '開始待ち', 'active' => '実施中', 'ended' => '終了'];
+  $ptTime = function (int $ts) {
+      if ($ts <= 0) { return ''; }
+      try {
+          $tz = new \DateTimeZone((string) ($this->setting('time_zone') ?: date_default_timezone_get()));
+      } catch (\Throwable $e) {
+          $tz = new \DateTimeZone(date_default_timezone_get());
+      }
+      return (new \DateTimeImmutable('@' . $ts))->setTimezone($tz)->format('Y-m-d H:i');
+  };
+  $ptRate = function (int $part, int $whole) use ($pct) { return $whole > 0 ? $pct($part / $whole) : '–'; };
+?>
+<?php if ($pt && ($pt['state'] !== 'off' || $pt['total'] > 0)): ?>
+  <div class="si-section" style="margin-bottom:1rem;">
+    <h3><?= $escape('配置試験') ?></h3>
+    <p class="si-note" style="margin-bottom:.5rem;">
+      状態：<strong><?= $escape($ptStates[$pt['state']] ?? $pt['state']) ?></strong>
+      ／ 期間：<?= $escape(($ptTime($pt['start']) ?: '有効にした時点') . ' 〜 ' . ($ptTime($pt['end']) ?: '終了日時なし')) ?>
+      <?php if (empty($filters['trial'])): ?>
+        ／ <a href="<?= $escapeAttr($this->url('admin/similar-items-logs', [], ['query' => array_merge($queryFilters, ['trial' => 1])])) ?>">この画面全体を試験対象だけに絞る</a>
+      <?php endif; ?>
+    </p>
+    <?php if ($pt['total'] > 0): ?>
+      <table class="si-table">
+        <thead>
+          <tr>
+            <th>割り当てられた配置</th><th>端末</th>
+            <th class="num">インプレッション</th>
+            <th class="num">項目が見られた</th><th class="num">見られた率</th>
+            <th class="num">クリック</th><th class="num">インプレッションあたり</th><th class="num">見られたあたり</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($pt['arms'] as $arm => $a): ?>
+            <tr>
+              <td><strong><?= $escape($ptLabels[$arm] ?? $arm) ?></strong></td><td>全体</td>
+              <td class="num"><?= $num($a['n']) ?></td>
+              <td class="num"><?= $num($a['items_seen']) ?></td>
+              <td class="num"><strong><?= $ptRate($a['items_seen'], $a['n']) ?></strong></td>
+              <td class="num"><?= $num($a['clicks']) ?></td>
+              <td class="num"><?= $ptRate($a['clicks'], $a['n']) ?></td>
+              <td class="num"><?= $ptRate($a['clicks'], $a['items_seen']) ?></td>
+            </tr>
+            <?php foreach ($a['devices'] as $device => $d): ?>
+              <tr>
+                <td></td><td><?= $escape($device !== '' ? $device : '(unknown)') ?></td>
+                <td class="num"><?= $num($d['n']) ?></td>
+                <td class="num"><?= $num($d['items_seen']) ?></td>
+                <td class="num"><?= $ptRate($d['items_seen'], $d['n']) ?></td>
+                <td class="num"><?= $num($d['clicks']) ?></td>
+                <td class="num"><?= $ptRate($d['clicks'], $d['n']) ?></td>
+                <td class="num"><?= $ptRate($d['clicks'], $d['items_seen']) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php if ($pt['srm']): ?>
+        <?php $srmBad = $pt['srm']['p'] !== null && $pt['srm']['p'] < 0.001; ?>
+        <p class="si-note" style="margin-top:.5rem;<?= $srmBad ? 'color:#b00;font-weight:bold;' : '' ?>">
+          振り分けの偏りの点検：χ² = <?= $num($pt['srm']['chi2'], 2) ?>（自由度 <?= (int) $pt['srm']['df'] ?>）、p = <?= $pt['srm']['p'] === null ? '–' : $escape(number_format($pt['srm']['p'], 4)) ?>。
+          <?php if ($srmBad): ?>
+            群の大きさが等分から大きくずれています。ある配置でだけページ閲覧が記録されていない可能性があります（ブロックの割り当て漏れ、表示の不具合など）。原因が分かるまで比較の結果は信用できません。
+          <?php else: ?>
+            群の大きさは等分からの偶然のずれの範囲です。
+          <?php endif; ?>
+        </p>
+      <?php endif; ?>
+      <?php if ($pt['mismatch'] > 0): ?>
+        <p class="si-note">割り当てと実際に表示された配置が食い違うインプレッション：<?= $num($pt['mismatch']) ?> 件（全 <?= $num($pt['total']) ?> 件）。少数ならキャッシュされたページや別タブでの設定変更、多ければブロックの割り当てを確認してください。</p>
+      <?php endif; ?>
+      <p class="si-note">
+        「項目が見られた」は推薦項目の半分以上が画面に入ったインプレッション、「見られた率」はその割合で、試験の主要な指標です。
+        比較は割り当てられた配置で行います（実際に表示された配置ではなく）。ログイン中の閲覧とボットは含みません。
+      </p>
+    <?php else: ?>
+      <p class="si-note">試験対象のインプレッションはまだありません。</p>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
 
 <?php if (!empty($arms) || !empty($allocation)): ?>
   <div class="si-section" style="margin-bottom:1rem;">

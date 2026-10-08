@@ -8,6 +8,7 @@ use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\JsonModel;
 use SimilarItems\Api\PublicItemSearch;
 use SimilarItems\Experiment\ArmAssigner;
+use SimilarItems\Experiment\PlacementAssigner;
 use SimilarItems\Log\LogService;
 use SimilarItems\View\Helper\SimilarItems as SimilarItemsHelper;
 
@@ -33,7 +34,13 @@ class RecommendController extends AbstractActionController {
   /**
    * Constructor.
    */
-  public function __construct(LogService $log, ArmAssigner $arms) {
+  /**
+   * Placement trial assignment.
+   */
+  private ?PlacementAssigner $placements;
+
+  public function __construct(LogService $log, ArmAssigner $arms, ?PlacementAssigner $placements = NULL) {
+    $this->placements = $placements;
     $this->log = $log;
     $this->arms = $arms;
   }
@@ -356,6 +363,10 @@ class RecommendController extends AbstractActionController {
       'jitter' => (int) ($stats['jitter'] ?? 0),
       'arm' => (string) ($context['arm'] ?? ArmAssigner::ARM_DEFAULT),
       'placement' => (string) ($context['placement'] ?? ''),
+      // Placement trial: the arm this visitor was assigned to (intention to
+      // treat), next to `placement`, which is what the page actually rendered.
+      'placement_arm' => $this->placements ? $this->placements->assignedArm() : NULL,
+      'placement_unit' => $this->placements ? $this->placements->unitHash() : NULL,
       'config_hash' => $this->log->computeConfigHash([
         'item_sets_weight' => $context['item_sets_weight'] ?? NULL,
         'item_sets_seed_only' => !empty($context['item_sets_seed_only']) ? 1 : 0,

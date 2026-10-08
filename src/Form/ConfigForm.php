@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SimilarItems\Form;
 
 use Laminas\Form\Element\Checkbox as CheckboxElement;
+use Laminas\Form\Element\DateTimeLocal as DateTimeLocalElement;
 use Laminas\Form\Element\Number as NumberElement;
 use Laminas\Form\Element\Select as SelectElement;
 use Laminas\Form\Element\Textarea as TextareaElement;
@@ -1241,6 +1242,107 @@ class ConfigForm extends Form {
         ],
       ]);
 
+    // ==============================
+    // Placement trial (research)
+    // ==============================
+    $this
+      ->add([
+        'type' => Fieldset::class,
+        'name' => 'similaritems_group_placement',
+        'options' => [
+          // @translate
+          'label' => '配置試験（研究用）',
+          'info' => '推薦ブロックの3種類の配置（右サイドバーの一覧・ビューア下の列・右下のフローティング）を、閲覧者ごとに無作為に1つだけ表示して比較します。利用ログの有効化が前提です。',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_placement_trial_enable',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => '配置試験を実施する',
+          // @translate
+          'info' => '有効にすると、下の期間中は閲覧者ごとに1種類のブロックだけが表示されます。振り分けは閲覧者単位で固定され（ブラウザの cookie、60日間）、同じ人には毎回同じ配置が出ます。期間の前後は「期間外に表示する配置」だけが表示されます。無効の間は、サイトに割り当てたブロックがすべて表示されます。試験の前に、公開サイトの資料ページに3種類のブロックをすべて割り当ててください。',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_placement_trial_enable',
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_placement_trial_start',
+        'type' => DateTimeLocalElement::class,
+        'options' => [
+          // @translate
+          'label' => '開始日時',
+          // @translate
+          'info' => 'サイトのタイムゾーンで指定します。空欄なら、有効にした時点から始まります。',
+          'format' => 'Y-m-d\TH:i',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_placement_trial_start',
+          'step' => 60,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_placement_trial_end',
+        'type' => DateTimeLocalElement::class,
+        'options' => [
+          // @translate
+          'label' => '終了日時',
+          // @translate
+          'info' => 'この日時になると試験を終え、「期間外に表示する配置」に戻ります。空欄なら、無効にするまで続きます。',
+          'format' => 'Y-m-d\TH:i',
+        ],
+        'attributes' => [
+          'id' => 'similaritems_placement_trial_end',
+          'step' => 60,
+        ],
+      ])
+      ->add([
+        'name' => 'similaritems_placement_trial_use_sidebar',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => '右サイドバーの一覧を試験に含める',
+          'info' => '従来の配置です。他の2種類の比較対象になります。',
+        ],
+        'attributes' => ['id' => 'similaritems_placement_trial_use_sidebar'],
+      ])
+      ->add([
+        'name' => 'similaritems_placement_trial_use_strip',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => 'ビューア下の列を試験に含める',
+        ],
+        'attributes' => ['id' => 'similaritems_placement_trial_use_strip'],
+      ])
+      ->add([
+        'name' => 'similaritems_placement_trial_use_floating',
+        'type' => CheckboxElement::class,
+        'options' => [
+          // @translate
+          'label' => '右下のフローティングを試験に含める',
+        ],
+        'attributes' => ['id' => 'similaritems_placement_trial_use_floating'],
+      ])
+      ->add([
+        'name' => 'similaritems_placement_trial_fallback',
+        'type' => SelectElement::class,
+        'options' => [
+          // @translate
+          'label' => '期間外に表示する配置',
+          // @translate
+          'info' => '試験を有効にしたまま、開始前と終了後に全員へ表示する配置です。',
+          'value_options' => [
+            'sidebar' => '右サイドバーの一覧',
+            'strip' => 'ビューア下の列',
+            'floating' => '右下のフローティング',
+          ],
+        ],
+        'attributes' => ['id' => 'similaritems_placement_trial_fallback'],
+      ]);
+
     $inputFilter = $this->getInputFilter();
     $inputFilter
       // Section description helpers (not submitted / ignored)
@@ -1291,6 +1393,16 @@ class ConfigForm extends Form {
       ->add(['name' => 'similaritems_experiment_weight_default', 'required' => FALSE])
       ->add(['name' => 'similaritems_experiment_weight_random', 'required' => FALSE])
       ->add(['name' => 'similaritems_experiment_weight_off', 'required' => FALSE]);
+
+    // Placement trial inputs are optional; the dates are parsed on save.
+    $inputFilter
+      ->add(['name' => 'similaritems_placement_trial_enable', 'required' => FALSE])
+      ->add(['name' => 'similaritems_placement_trial_start', 'required' => FALSE, 'validators' => []])
+      ->add(['name' => 'similaritems_placement_trial_end', 'required' => FALSE, 'validators' => []])
+      ->add(['name' => 'similaritems_placement_trial_use_sidebar', 'required' => FALSE])
+      ->add(['name' => 'similaritems_placement_trial_use_strip', 'required' => FALSE])
+      ->add(['name' => 'similaritems_placement_trial_use_floating', 'required' => FALSE])
+      ->add(['name' => 'similaritems_placement_trial_fallback', 'required' => FALSE]);
 
     // Mapping inputs are optional.
     $inputFilter

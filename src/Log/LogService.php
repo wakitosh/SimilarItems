@@ -153,6 +153,8 @@ class LogService {
         'ranks_seen' => "ALTER TABLE `%s` ADD COLUMN `ranks_seen` VARCHAR(64) DEFAULT NULL AFTER `placement`",
         'items_seen_ms' => "ALTER TABLE `%s` ADD COLUMN `items_seen_ms` INT UNSIGNED DEFAULT NULL AFTER `ranks_seen`",
         'items_seen_placement' => "ALTER TABLE `%s` ADD COLUMN `items_seen_placement` VARCHAR(16) DEFAULT NULL AFTER `items_seen_ms`",
+        'placement_arm' => "ALTER TABLE `%s` ADD COLUMN `placement_arm` VARCHAR(16) DEFAULT NULL AFTER `items_seen_placement`, ADD KEY `idx_placement_arm` (`placement_arm`)",
+        'placement_unit' => "ALTER TABLE `%s` ADD COLUMN `placement_unit` CHAR(16) DEFAULT NULL AFTER `placement_arm`",
       ],
       self::TABLE_EVENT => [
         'arm' => "ALTER TABLE `%s` ADD COLUMN `arm` VARCHAR(16) DEFAULT NULL AFTER `variant`, ADD KEY `idx_arm` (`arm`)",
@@ -211,6 +213,8 @@ CREATE TABLE IF NOT EXISTS `similaritems_impression` (
   `ranks_seen` VARCHAR(64) DEFAULT NULL,
   `items_seen_ms` INT UNSIGNED DEFAULT NULL,
   `items_seen_placement` VARCHAR(16) DEFAULT NULL,
+  `placement_arm` VARCHAR(16) DEFAULT NULL,
+  `placement_unit` CHAR(16) DEFAULT NULL,
   `config_hash` CHAR(12) DEFAULT NULL,
   `tiebreak` VARCHAR(32) DEFAULT NULL,
   `jitter` TINYINT(1) NOT NULL DEFAULT 0,
@@ -234,6 +238,7 @@ CREATE TABLE IF NOT EXISTS `similaritems_impression` (
   KEY `idx_variant` (`variant`),
   KEY `idx_arm` (`arm`),
   KEY `idx_placement` (`placement`),
+  KEY `idx_placement_arm` (`placement_arm`),
   KEY `idx_is_bot` (`is_bot`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 SQL;
@@ -344,6 +349,9 @@ SQL;
         'variant' => $this->clip($data['variant'] ?? $this->getVariant(), 64),
         'arm' => $this->clip($data['arm'] ?? NULL, 16),
         'placement' => $this->normalizePlacements($data['placement'] ?? NULL),
+        'placement_arm' => $this->normalizePlacement($data['placement_arm'] ?? NULL),
+        'placement_unit' => (is_string($data['placement_unit'] ?? NULL) && preg_match('/^[a-f0-9]{16}$/', $data['placement_unit']))
+          ? $data['placement_unit'] : NULL,
         'config_hash' => $this->clip($data['config_hash'] ?? NULL, 12),
         'tiebreak' => $this->clip($data['tiebreak'] ?? NULL, 32),
         'jitter' => !empty($data['jitter']) ? 1 : 0,

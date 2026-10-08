@@ -54,14 +54,15 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
     <li><a href="#si-kpi">2. 上部の指標カード</a></li>
     <li><a href="#si-arms">3. 対照群試験（Control-group trial）</a></li>
     <li><a href="#si-place">4. 表示場所別（ブロックの配置）</a></li>
-    <li><a href="#si-rank">5. 順位別クリック率</a></li>
-    <li><a href="#si-depth">6. 回遊深度</a></li>
-    <li><a href="#si-entry">7. 流入経路とデバイス</a></li>
-    <li><a href="#si-top">8. 上位アイテム</a></li>
-    <li><a href="#si-filter">9. 絞り込みと一覧</a></li>
-    <li><a href="#si-export">10. エクスポート</a></li>
-    <li><a href="#si-caveat">11. 数字を読むときの注意</a></li>
-    <li><a href="#si-ops">12. 運用（削除・突合・プライバシー）</a></li>
+    <li><a href="#si-ptrial">5. 配置試験</a></li>
+    <li><a href="#si-rank">6. 順位別クリック率</a></li>
+    <li><a href="#si-depth">7. 回遊深度</a></li>
+    <li><a href="#si-entry">8. 流入経路とデバイス</a></li>
+    <li><a href="#si-top">9. 上位アイテム</a></li>
+    <li><a href="#si-filter">10. 絞り込みと一覧</a></li>
+    <li><a href="#si-export">11. エクスポート</a></li>
+    <li><a href="#si-caveat">12. 数字を読むときの注意</a></li>
+    <li><a href="#si-ops">13. 運用（削除・突合・プライバシー）</a></li>
   </ul>
 </div>
 
@@ -340,7 +341,42 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   配置の効果を比較する試験では、1ページに1種類のブロックだけを出してください。
 </p>
 
-<h3 id="si-rank">5. 順位別クリック率（Click-through rate by rank）</h3>
+<h3 id="si-ptrial">5. 配置試験（Placement trial）</h3>
+
+<p>
+  3種類の配置（右サイドバーの一覧・ビューア下の列・右下のフローティング）を、<strong>閲覧者ごとに無作為に1つだけ</strong>表示して比較する試験です。
+  モジュール設定の「配置試験（研究用）」で有効にし、開始日時と終了日時を指定します。
+</p>
+<ul>
+  <li><strong>振り分けの単位は閲覧者</strong>です。ブラウザの cookie（<code>si_place</code>、60日間、乱数のみ）で固定し、同じ人には毎回同じ配置を出します。cookie を受け付けないブラウザでは、ページごとに振り分けが変わります。</li>
+  <li><strong>期間の前後</strong>は「期間外に表示する配置」（既定は右サイドバーの一覧）だけを表示します。3種類のブロックを前もって割り当てておけば、開始と終了は自動で切り替わります。</li>
+  <li>試験を<strong>無効</strong>にすると、サイトに割り当てたブロックがすべて表示されます。試験の後は、残す配置以外のブロックの割り当てを外してください。</li>
+  <li>ログイン中は、資料ページの URL に <code>?si_placement=sidebar</code>（<code>strip</code>／<code>floating</code>）を付けると、その配置を確認できます。ログイン中の閲覧は記録されないので、データには入りません。</li>
+</ul>
+
+<h4>この画面での見方</h4>
+<p>
+  試験が有効な間、画面上部に「配置試験」の表が出ます。<strong>割り当てられた配置</strong>（実際に表示された配置ではなく）ごとに、
+  インプレッション、項目が見られた数と率、クリックを示します。主要な指標は「見られた率」です。
+  「この画面全体を試験対象だけに絞る」を押すと、他の表もすべて試験期間中の試験対象だけになります。
+</p>
+<p>
+  <strong>振り分けの偏りの点検</strong>（χ² 検定）は、群の大きさが等分からどれだけずれているかを見ます。
+  p が 0.001 を下回ったら、ある配置でだけページ閲覧が記録されていない疑いがあります（ブロックの割り当て漏れ、表示の不具合など）。
+  原因が分かるまで比較の結果は信用できません。試験開始の翌朝に一度確認してください。
+</p>
+<p>
+  「割り当てと実際に表示された配置が食い違う」件数は、通常は 0 です。多い場合はブロックの割り当てを確認してください。
+</p>
+
+<h4>記録される列</h4>
+<p>
+  インプレッションの <code>placement_arm</code> が割り当てられた配置、<code>placement</code> が実際に表示された配置、
+  <code>placement_unit</code> が閲覧者の仮名（cookie の値を試験の種でハッシュしたもの。cookie そのものには戻せません）です。
+  試験期間外の行は <code>placement_arm</code> が空です。
+</p>
+
+<h3 id="si-rank">6. 順位別クリック率（Click-through rate by rank）</h3>
 
 <p>
   <strong>Offered</strong> は「その順位が実際に提示されたインプレッション数」です。
@@ -353,7 +389,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   比べて初めて判定できます。ランダムでは順位別 CTR がほぼ平坦になるはずだからです。
 </p>
 
-<h3 id="si-depth">6. 回遊深度（Browsing depth）</h3>
+<h3 id="si-depth">7. 回遊深度（Browsing depth）</h3>
 
 <table>
   <tr><th>深度</th><th>意味</th></tr>
@@ -366,7 +402,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   深度が1で止まるか、2・3と続くかで「推薦が一度きりの寄り道か、回遊を生んでいるか」が分かります。
 </p>
 
-<h3 id="si-entry">7. 流入経路とデバイス</h3>
+<h3 id="si-entry">8. 流入経路とデバイス</h3>
 
 <table>
   <tr><th>値</th><th>意味</th></tr>
@@ -387,7 +423,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   なお <code>similar_items</code> だけはサーバ側で確定するため、この影響を受けません。
 </div>
 
-<h3 id="si-top">8. 上位アイテム</h3>
+<h3 id="si-top">9. 上位アイテム</h3>
 
 <ul>
   <li><strong>Most recommended-from items</strong> … 推薦の起点になった回数が多い資料。
@@ -397,7 +433,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 </ul>
 <p>資料IDのリンクから管理画面の資料ページへ移動できます。</p>
 
-<h3 id="si-filter">9. 絞り込みと一覧</h3>
+<h3 id="si-filter">10. 絞り込みと一覧</h3>
 
 <p>
   左上の「Filter」で期間・サイト・条件ラベル・デバイス・シード資料・セッションを指定できます。
@@ -411,7 +447,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   1人の閲覧者がどう辿ったかを追うのに便利です。
 </p>
 
-<h3 id="si-export">10. エクスポート</h3>
+<h3 id="si-export">11. エクスポート</h3>
 
 <table>
   <tr><th>データセット</th><th>内容</th></tr>
@@ -427,7 +463,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   日時はサイトのタイムゾーンで ISO 8601 形式、CSV には表計算ソフト向けに BOM が付きます。
 </div>
 
-<h3 id="si-caveat">11. 数字を読むときの注意</h3>
+<h3 id="si-caveat">12. 数字を読むときの注意</h3>
 
 <ul>
   <li><strong>件数が少ないうちは読まない。</strong>
@@ -448,7 +484,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
     提示内容はインプレッションごとに保存しているため、順位単位の集計は正しく行えます。</li>
 </ul>
 
-<h3 id="si-ops">12. 運用（削除・突合・プライバシー）</h3>
+<h3 id="si-ops">13. 運用（削除・突合・プライバシー）</h3>
 
 <h4>ログの削除</h4>
 <p>

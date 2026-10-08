@@ -12,6 +12,7 @@ use SimilarItems\Controller\Admin\LogsController;
 use SimilarItems\Controller\EventController;
 use SimilarItems\Controller\RecommendController as RecommendControllerAlias;
 use SimilarItems\Experiment\ArmAssigner;
+use SimilarItems\Experiment\PlacementAssigner;
 use SimilarItems\Form\ConfigForm;
 use SimilarItems\Log\LogService;
 use Laminas\ServiceManager\ServiceLocatorInterface;
@@ -250,6 +251,15 @@ class Module extends AbstractModule {
       'similaritems_experiment_weight_default' => (int) ($settings->get('similaritems.experiment.weight_default') ?? 80),
       'similaritems_experiment_weight_random' => (int) ($settings->get('similaritems.experiment.weight_random') ?? 10),
       'similaritems_experiment_weight_off' => (int) ($settings->get('similaritems.experiment.weight_off') ?? 10),
+
+      // Placement trial.
+      'similaritems_placement_trial_enable' => (int) ($settings->get('similaritems.placement_trial.enable') ?? 0),
+      'similaritems_placement_trial_start' => $this->formatTrialTime($services, (int) ($settings->get('similaritems.placement_trial.start_at') ?? 0), 'Y-m-d\TH:i'),
+      'similaritems_placement_trial_end' => $this->formatTrialTime($services, (int) ($settings->get('similaritems.placement_trial.end_at') ?? 0), 'Y-m-d\TH:i'),
+      'similaritems_placement_trial_use_sidebar' => (int) ($settings->get('similaritems.placement_trial.use_sidebar') ?? 1),
+      'similaritems_placement_trial_use_strip' => (int) ($settings->get('similaritems.placement_trial.use_strip') ?? 1),
+      'similaritems_placement_trial_use_floating' => (int) ($settings->get('similaritems.placement_trial.use_floating') ?? 1),
+      'similaritems_placement_trial_fallback' => (string) ($settings->get('similaritems.placement_trial.fallback') ?? 'sidebar'),
     ]);
 
     $form->prepare();
@@ -261,8 +271,38 @@ class Module extends AbstractModule {
       '#similaritems-config fieldset:first-of-type { margin-top: 0; }'
     );
 
+    $markup = $renderer->formCollection($form);
+
+    // Show where the placement trial stands, and what would spoil it, right
+    // under its heading. Omeka renders a fieldset's legend but not its info,
+    // so the box is inserted into the markup.
+    try {
+      $status = $this->placementTrialStatus($services);
+      $escape = $renderer->plugin('escapeHtml');
+      $box = '<div class="si-placement-status" style="border-left:4px solid #1779ba;background:#f4f8fb;padding:.6rem .8rem;margin:.5rem 0 1rem;">'
+        . '<p style="margin:0;"><strong>現在の状態：</strong>' . $escape($status['state']) . '</p>';
+      if ($status['problems']) {
+        $box .= '<ul style="margin:.4rem 0 0 1.2rem;color:#a00;">';
+        foreach ($status['problems'] as $problem) {
+          $box .= '<li>' . $escape($problem) . '</li>';
+        }
+        $box .= '</ul>';
+      }
+      $box .= '<p style="margin:.4rem 0 0;">' . $escape('ブロックを割り当てる領域の推奨：右サイドバーの一覧 → 右サイドバー、ビューア下の列 → 全幅メイン（mirador の直後）、右下のフローティング → メイン（末尾）。ログイン中は、資料ページの URL に ?si_placement=sidebar / strip / floating を付けると、その配置を確認できます。') . '</p>'
+        . '</div>';
+      $markup = preg_replace(
+        '#(<fieldset name="similaritems_group_placement">.*?</fieldset>)#s',
+        '$1' . str_replace(['\\', '$'], ['\\\\', '\\$'], $box),
+        $markup,
+        1
+      );
+    }
+    catch (\Throwable $e) {
+      // The status is a convenience; the form works without it.
+    }
+
     // Wrap markup in a scoped container to avoid leaking styles globally.
-    return '<div id="similaritems-config">' . $renderer->formCollection($form) . '</div>';
+    return '<div id="similaritems-config">' . $markup . '</div>';
   }
 
   /**
@@ -352,6 +392,16 @@ class Module extends AbstractModule {
       'similaritems.experiment.weight_default' => 80,
       'similaritems.experiment.weight_random' => 10,
       'similaritems.experiment.weight_off' => 10,
+
+      // Placement trial. Disabled by default; all three placements take part
+      // once enabled, and the sidebar list is shown outside the window.
+      'similaritems.placement_trial.enable' => 0,
+      'similaritems.placement_trial.use_sidebar' => 1,
+      'similaritems.placement_trial.use_strip' => 1,
+      'similaritems.placement_trial.use_floating' => 1,
+      'similaritems.placement_trial.fallback' => 'sidebar',
+      'similaritems.placement_trial.start_at' => 0,
+      'similaritems.placement_trial.end_at' => 0,
     ];
 
     foreach ($defaults as $key => $value) {
@@ -394,6 +444,161 @@ class Module extends AbstractModule {
    * Like the hashing salt, it must be stable for the whole trial: changing it
    * reassigns every visitor and splits the data into two incomparable halves.
    */
+  /**
+   * Block layout name for each placement of the trial.
+   *
+   * Plain strings on purpose: Omeka instantiates this class before the
+   * module's autoloader is registered, and PHP resolves class constants on
+   * first instantiation, so a constant naming PlacementAssigner would fail.
+   */
+  private const PLACEMENT_BLOCKS = [
+    'sidebar' => 'similarItems',
+    'strip' => 'similarItemsStrip',
+    'floating' => 'similarItemsFloating',
+  ];
+
+  /**
+   * Where the placement trial stands, and what would spoil it.
+   *
+   * The trial only works if every public site that uses a resource-page theme
+   * has all the blocks taking part assigned to its item pages: a visitor
+   * assigned to a placement whose block is missing is shown nothing, and that
+   * arm's page views silently drop out of the log.
+   *
+   * @return array
+   *   ['state' => text, 'problems' => list of texts].
+   */
+  private function placementTrialStatus(ServiceLocatorInterface $services): array {
+    $placements = $services->get(PlacementAssigner::class);
+    $state = $placements->getState();
+    $labels = [
+      PlacementAssigner::SIDEBAR => '右サイドバーの一覧',
+      PlacementAssigner::STRIP => 'ビューア下の列',
+      PlacementAssigner::FLOATING => '右下のフローティング',
+    ];
+    $arms = array_map(function ($arm) use ($labels) {
+      return $labels[$arm];
+    }, $placements->getArms());
+    $start = $this->formatTrialTime($services, $placements->getStart(), 'Y-m-d H:i');
+    $end = $this->formatTrialTime($services, $placements->getEnd(), 'Y-m-d H:i');
+    $window = ($start !== '' ? $start : '有効にした時点') . ' 〜 ' . ($end !== '' ? $end : '（終了日時なし）');
+    switch ($state) {
+      case PlacementAssigner::STATE_SCHEDULED:
+        $text = '開始待ち（' . $window . '）。それまでは「' . $labels[$placements->getFallback()] . '」だけを表示します。';
+        break;
+
+      case PlacementAssigner::STATE_ACTIVE:
+        $text = '実施中（' . $window . '）。' . implode('・', $arms) . 'を等分に振り分けています。';
+        break;
+
+      case PlacementAssigner::STATE_ENDED:
+        $text = '終了（' . $window . '）。「' . $labels[$placements->getFallback()] . '」だけを表示しています。';
+        break;
+
+      default:
+        $text = '無効。サイトに割り当てたブロックがすべて表示されます。';
+    }
+
+    $problems = [];
+    if ($state !== PlacementAssigner::STATE_OFF) {
+      $needed = $placements->getArms();
+      $needed[] = $placements->getFallback();
+      $needed = array_values(array_unique($needed));
+      $conn = $services->get('Omeka\Connection');
+      $themes = NULL;
+      try {
+        $themes = $services->get('Omeka\Site\ThemeManager');
+      }
+      catch (\Throwable $e) {
+        $themes = NULL;
+      }
+      foreach ($conn->fetchAllAssociative('SELECT id, slug, theme FROM site WHERE is_public = 1 ORDER BY slug') as $site) {
+        $raw = $conn->fetchOne(
+          'SELECT value FROM site_setting WHERE site_id = ? AND id = ?',
+          [(int) $site['id'], 'theme_settings_' . $site['theme']]
+        );
+        $config = is_string($raw) ? json_decode($raw, TRUE) : NULL;
+        $regions = $config['resource_page_blocks']['items'] ?? NULL;
+        $fromTheme = FALSE;
+        if (!is_array($regions) || !$regions) {
+          // Not configured on the site: the theme's own defaults apply.
+          $fromTheme = TRUE;
+          try {
+            $spec = $themes ? $themes->getTheme($site['theme'])->getConfigSpec() : [];
+            $regions = $spec['resource_page_blocks']['items'] ?? [];
+          }
+          catch (\Throwable $e) {
+            $regions = [];
+          }
+        }
+        $assigned = [];
+        foreach ((array) $regions as $blocks) {
+          foreach ((array) $blocks as $block) {
+            $assigned[(string) $block] = TRUE;
+          }
+        }
+        // A site showing no recommendation block at all is not part of the
+        // trial (an internal site, say), and there is nothing to warn about.
+        if (!array_intersect_key($assigned, array_flip(self::PLACEMENT_BLOCKS))) {
+          continue;
+        }
+        foreach ($needed as $placement) {
+          if (empty($assigned[self::PLACEMENT_BLOCKS[$placement]])) {
+            $problems[] = sprintf('サイト「%s」の資料ページに「%s」のブロックが割り当てられていません%s。この配置に振り分けられた閲覧者には推薦が表示されません。',
+              $site['slug'], $labels[$placement], $fromTheme ? '（ブロック設定がテーマの既定のまま）' : '');
+          }
+        }
+      }
+    }
+    return ['state' => $text, 'problems' => $problems];
+  }
+
+  /**
+   * Parse a date-time entered in the site's time zone into unix time.
+   *
+   * @return int
+   *   Unix time, or 0 for empty or unreadable input.
+   */
+  private function parseTrialTime(ServiceLocatorInterface $services, string $value): int {
+    if ($value === '') {
+      return 0;
+    }
+    $zone = $this->siteTimeZone($services);
+    foreach (['Y-m-d\TH:i', 'Y-m-d\TH:i:s', 'Y-m-d H:i', 'Y-m-d H:i:s'] as $format) {
+      $dt = \DateTimeImmutable::createFromFormat('!' . $format, $value, $zone);
+      if ($dt !== FALSE) {
+        return $dt->getTimestamp();
+      }
+    }
+    return 0;
+  }
+
+  /**
+   * Format unix time in the site's time zone; empty for 0.
+   */
+  private function formatTrialTime(ServiceLocatorInterface $services, int $ts, string $format): string {
+    if ($ts <= 0) {
+      return '';
+    }
+    return (new \DateTimeImmutable('@' . $ts))->setTimezone($this->siteTimeZone($services))->format($format);
+  }
+
+  /**
+   * The installation's configured time zone (Omeka setting), else PHP's.
+   */
+  private function siteTimeZone(ServiceLocatorInterface $services): \DateTimeZone {
+    try {
+      $name = (string) ($services->get('Omeka\Settings')->get('time_zone') ?? '');
+      if ($name !== '') {
+        return new \DateTimeZone($name);
+      }
+    }
+    catch (\Throwable $e) {
+      // Fall through.
+    }
+    return new \DateTimeZone(date_default_timezone_get());
+  }
+
   private function ensureExperimentSeed(ServiceLocatorInterface $services): void {
     try {
       $services->get(ArmAssigner::class)->ensureSeed();
@@ -561,6 +766,49 @@ class Module extends AbstractModule {
       }
       if ($logEnable !== 1) {
         $controller->messenger()->addWarning('The control-group trial needs usage logging: without it the arms cannot be compared.');
+      }
+    }
+
+    // Placement trial.
+    $placeEnable = $getInt('similaritems_placement_trial_enable', 0);
+    $settings->set('similaritems.placement_trial.enable', $placeEnable);
+    foreach (PlacementAssigner::PLACEMENTS as $placement) {
+      $settings->set('similaritems.placement_trial.use_' . $placement, $getInt('similaritems_placement_trial_use_' . $placement, 0));
+    }
+    $fallback = $getStr('similaritems_placement_trial_fallback', PlacementAssigner::SIDEBAR);
+    $settings->set('similaritems.placement_trial.fallback',
+      in_array($fallback, PlacementAssigner::PLACEMENTS, TRUE) ? $fallback : PlacementAssigner::SIDEBAR);
+    $startRaw = trim($getStr('similaritems_placement_trial_start', ''));
+    $endRaw = trim($getStr('similaritems_placement_trial_end', ''));
+    $startAt = $this->parseTrialTime($services, $startRaw);
+    $endAt = $this->parseTrialTime($services, $endRaw);
+    if ($startRaw !== '' && $startAt === 0) {
+      $controller->messenger()->addWarning('配置試験：開始日時を読み取れませんでした。空欄として扱います。');
+    }
+    if ($endRaw !== '' && $endAt === 0) {
+      $controller->messenger()->addWarning('配置試験：終了日時を読み取れませんでした。空欄として扱います。');
+    }
+    $settings->set('similaritems.placement_trial.start_at', $startAt);
+    $settings->set('similaritems.placement_trial.end_at', $endAt);
+    if ($placeEnable === 1) {
+      $placements = $services->get(PlacementAssigner::class);
+      if ($placements->ensureSeed() === '') {
+        $controller->messenger()->addWarning('配置試験：振り分けの種（seed）を保存できませんでした。振り分けが再現できなくなります。');
+      }
+      if (count($placements->getArms()) < 2) {
+        $controller->messenger()->addWarning('配置試験：試験に含める配置が2種類未満です。比較になりません。');
+      }
+      if ($startAt > 0 && $endAt > 0 && $endAt <= $startAt) {
+        $controller->messenger()->addWarning('配置試験：終了日時が開始日時より前です。試験は始まりません。');
+      }
+      if ($logEnable !== 1) {
+        $controller->messenger()->addWarning('配置試験には利用ログが必要です。ログを無効にしたままでは、配置を比較できません。');
+      }
+      if ($expEnable === 1) {
+        $controller->messenger()->addWarning('対照群試験と配置試験が同時に有効です。振り分けが掛け合わされて各群が細ります。どちらか一方にすることをおすすめします。');
+      }
+      foreach ($this->placementTrialStatus($services)['problems'] as $problem) {
+        $controller->messenger()->addWarning('配置試験：' . $problem);
       }
     }
 

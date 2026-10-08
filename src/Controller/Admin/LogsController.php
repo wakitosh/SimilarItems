@@ -13,6 +13,7 @@ use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use Omeka\Form\ConfirmForm;
 use SimilarItems\Experiment\ArmAssigner;
+use SimilarItems\Experiment\PlacementAssigner;
 use SimilarItems\Log\LogService;
 
 /**
@@ -49,9 +50,15 @@ class LogsController extends AbstractActionController {
   /**
    * Constructor.
    */
-  public function __construct(LogService $log, ArmAssigner $arms) {
+  /**
+   * Placement trial.
+   */
+  private ?PlacementAssigner $placements;
+
+  public function __construct(LogService $log, ArmAssigner $arms, ?PlacementAssigner $placements = NULL) {
     $this->log = $log;
     $this->arms = $arms;
+    $this->placements = $placements;
     $this->conn = $log->getConnection();
   }
 
@@ -80,6 +87,7 @@ class LogsController extends AbstractActionController {
       // What the current configuration actually allocates, which is not always
       // what the weight fields suggest once an arm is switched off.
       'allocation' => $this->arms->getAllocation(),
+      'placementTrial' => $this->buildPlacementTrial($filters),
       'confirmForm' => $this->getForm(ConfirmForm::class),
     ]);
     $vm->setTemplate('similar-items/logs/index');
@@ -501,7 +509,7 @@ class LogsController extends AbstractActionController {
         'site_slug', 'locale', 'seed_item_id', 'seed_item_title', 'seed_buckets',
         'seed_item_sets', 'requested_limit', 'result_count', 'candidate_count',
         'duration_ms', 'is_empty', 'variant', 'arm', 'placement', 'ranks_seen', 'items_seen_ms',
-        'items_seen_placement', 'config_hash', 'tiebreak', 'jitter',
+        'items_seen_placement', 'placement_arm', 'placement_unit', 'config_hash', 'tiebreak', 'jitter',
         'parent_event_id', 'parent_impression_id', 'chain_key', 'hop_depth', 'entry_kind',
         'referrer_host', 'device', 'is_bot', 'client_ip', 'results',
       ];
@@ -630,6 +638,109 @@ class LogsController extends AbstractActionController {
   /**
    * Compute the dashboard figures for the current filter set.
    */
+  /**
+   * The placement trial: its window, and the arms compared.
+   *
+   * Counts only impressions that took part (an assigned arm is recorded),
+   * within the other filters. "Items seen" is the outcome the trial is about.
+   * The sample-ratio check compares the arm sizes with the equal split the
+   * assignment aims at: a clear imbalance means something drops page views
+   * from one arm (a block missing on a site, a script failing for one
+   * placement), and the comparison cannot be trusted until it is explained.
+   *
+   * @return array
+   *   State, window, arms with figures, and the sample-ratio check.
+   */
+  private function buildPlacementTrial(array $filters): array {
+    $out = [
+      'state' => PlacementAssigner::STATE_OFF,
+      'start' => 0,
+      'end' => 0,
+      'arms_enabled' => [],
+      'arms' => [],
+      'total' => 0,
+      'mismatch' => 0,
+      'srm' => NULL,
+    ];
+    if (!$this->placements) {
+      return $out;
+    }
+    $out['state'] = $this->placements->getState();
+    $out['start'] = $this->placements->getStart();
+    $out['end'] = $this->placements->getEnd();
+    $out['arms_enabled'] = $this->placements->getArms();
+    if (!$this->conn) {
+      return $out;
+    }
+    $trialFilters = $filters;
+    $trialFilters['trial'] = 1;
+    [$where, $params] = $this->buildWhere($trialFilters, 'impressions');
+    $evt = LogService::TABLE_EVENT;
+    foreach ($this->safeFetchAll(
+      'SELECT i.placement_arm AS arm, i.device AS device, COUNT(*) AS n, '
+      . 'SUM(i.ranks_seen IS NOT NULL AND i.ranks_seen <> \'\') AS items_seen, '
+      . 'COALESCE(SUM(c.clicks), 0) AS clicks, '
+      . 'SUM(COALESCE(i.placement, \'\') <> i.placement_arm) AS mismatch '
+      . 'FROM ' . LogService::TABLE_IMPRESSION . ' i '
+      . 'LEFT JOIN (SELECT impression_key, COUNT(*) AS clicks FROM ' . $evt
+      . ' WHERE event_type = \'click\' GROUP BY impression_key) c ON c.impression_key = i.impression_key '
+      . $where . ' GROUP BY i.placement_arm, i.device',
+      $params
+    ) as $row) {
+      $arm = (string) $row['arm'];
+      if (!isset($out['arms'][$arm])) {
+        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'devices' => []];
+      }
+      foreach (['n', 'items_seen', 'clicks'] as $k) {
+        $out['arms'][$arm][$k] += (int) $row[$k];
+      }
+      $out['arms'][$arm]['devices'][(string) ($row['device'] ?? '')] = [
+        'n' => (int) $row['n'],
+        'items_seen' => (int) $row['items_seen'],
+        'clicks' => (int) $row['clicks'],
+      ];
+      $out['total'] += (int) $row['n'];
+      $out['mismatch'] += (int) $row['mismatch'];
+    }
+    // Arms with no impression yet still count in the expected split.
+    foreach ($out['arms_enabled'] as $arm) {
+      if (!isset($out['arms'][$arm])) {
+        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'devices' => []];
+      }
+    }
+    $k = count($out['arms_enabled']);
+    if ($k >= 2 && $out['total'] > 0) {
+      $expected = $out['total'] / $k;
+      $chi = 0.0;
+      foreach ($out['arms_enabled'] as $arm) {
+        $chi += (($out['arms'][$arm]['n'] - $expected) ** 2) / $expected;
+      }
+      $out['srm'] = ['chi2' => $chi, 'df' => $k - 1, 'p' => $this->chiSquareP($chi, $k - 1)];
+    }
+    return $out;
+  }
+
+  /**
+   * Upper-tail probability of the chi-square distribution, for 1 or 2 degrees
+   * of freedom (the trial has two or three arms), where it has a closed form.
+   */
+  private function chiSquareP(float $x, int $df): ?float {
+    if ($x <= 0) {
+      return 1.0;
+    }
+    if ($df === 2) {
+      return exp(-$x / 2);
+    }
+    if ($df === 1) {
+      // P = erfc(sqrt(x / 2)), with the Abramowitz-Stegun 7.1.26 approximation.
+      $z = sqrt($x / 2);
+      $t = 1 / (1 + 0.3275911 * $z);
+      $poly = $t * (0.254829592 + $t * (-0.284496736 + $t * (1.421413741 + $t * (-1.453152027 + $t * 1.061405429))));
+      return $poly * exp(-$z * $z);
+    }
+    return NULL;
+  }
+
   private function buildSummary(array $filters): array {
     $out = [
       'impressions' => 0,
@@ -934,6 +1045,8 @@ class LogsController extends AbstractActionController {
       'seed_item_id' => (int) $this->params()->fromQuery('seed_item_id', 0),
       'session_key' => trim((string) $this->params()->fromQuery('session_key', '')),
       'include_bots' => (int) $this->params()->fromQuery('include_bots', 0) === 1 ? 1 : 0,
+      // Only page views that took part in the placement trial.
+      'trial' => (int) $this->params()->fromQuery('trial', 0) === 1 ? 1 : 0,
     ];
   }
 
@@ -977,6 +1090,11 @@ class LogsController extends AbstractActionController {
     }
     if (empty($filters['include_bots'])) {
       $clauses[] = 'is_bot = 0';
+    }
+    if (!empty($filters['trial'])) {
+      $clauses[] = ($dataset === 'events')
+        ? 'impression_id IN (SELECT id FROM ' . LogService::TABLE_IMPRESSION . ' WHERE placement_arm IS NOT NULL)'
+        : 'placement_arm IS NOT NULL';
     }
     return ['WHERE ' . implode(' AND ', $clauses), $params];
   }

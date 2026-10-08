@@ -15,6 +15,7 @@ use SimilarItems\Controller\Admin\LogsController;
 use SimilarItems\Controller\EventController;
 use SimilarItems\Controller\RecommendController;
 use SimilarItems\Experiment\ArmAssigner;
+use SimilarItems\Experiment\PlacementAssigner;
 use SimilarItems\Log\LogService;
 use SimilarItems\Service\Log\LogServiceFactory;
 use SimilarItems\Service\ViewHelper\SimilarItemsFactory;
@@ -30,6 +31,12 @@ return [
       ArmAssigner::class => function ($container) {
         return new ArmAssigner($container->get('Omeka\Settings'));
       },
+      PlacementAssigner::class => function ($container) {
+        return new PlacementAssigner(
+          $container->get('Omeka\Settings'),
+          $container->get('Omeka\AuthenticationService')
+        );
+      },
     ],
   ],
   'controllers' => [
@@ -37,7 +44,8 @@ return [
       RecommendController::class => function ($container) {
         return new RecommendController(
           $container->get(LogService::class),
-          $container->get(ArmAssigner::class)
+          $container->get(ArmAssigner::class),
+          $container->get(PlacementAssigner::class)
         );
       },
       EventController::class => function ($container) {
@@ -46,7 +54,8 @@ return [
       LogsController::class => function ($container) {
         return new LogsController(
           $container->get(LogService::class),
-          $container->get(ArmAssigner::class)
+          $container->get(ArmAssigner::class),
+          $container->get(PlacementAssigner::class)
         );
       },
     ],
@@ -203,11 +212,19 @@ return [
     ],
   ],
   'resource_page_block_layouts' => [
-    'invokables' => [
-      // Register as "similarItems" to match theme's default placement key.
-      'similarItems' => SimilarItemsBlock::class,
-      'similarItemsStrip' => SimilarItemsStripBlock::class,
-      'similarItemsFloating' => SimilarItemsFloatingBlock::class,
+    // Factories, not invokables: each block asks the placement trial whether
+    // it is the one to render for this visitor.
+    'factories' => [
+      // Registered as "similarItems" to match the theme's default placement key.
+      'similarItems' => function ($container) {
+        return new SimilarItemsBlock($container->get(PlacementAssigner::class));
+      },
+      'similarItemsStrip' => function ($container) {
+        return new SimilarItemsStripBlock($container->get(PlacementAssigner::class));
+      },
+      'similarItemsFloating' => function ($container) {
+        return new SimilarItemsFloatingBlock($container->get(PlacementAssigner::class));
+      },
     ],
   ],
   'view_manager' => [

@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-10-08
+
+### EN
+
+#### Added
+- **Placement trial.** Compares the three placements of the recommendations (sidebar list, row below the viewer, floating button) by showing each visitor exactly one of them, chosen at random. Switched on and scheduled in the module configuration ("配置試験（研究用）"): a start and an end date-time in the site's time zone, which placements take part, and the placement shown outside the window.
+  - The unit of assignment is the visitor. A first-party cookie (`si_place`, a random key, 60 days, HttpOnly) keeps the assignment, so a visitor coming back on another day sees the same placement. Sessions (30 minutes) are too short for that, and the existing visitor key is rebuilt daily. Without the cookie (refused by the browser) the assignment is made per page.
+  - All three blocks are assigned to the item pages in advance; each block renders only for the visitors assigned to it. Before the window opens and after it closes, only the fallback placement (the sidebar list by default) renders, so the trial starts and stops on time with nobody at the controls. With the trial switched off, every assigned block renders, as before.
+  - The decision is made in the block classes, not in the templates, so a theme overriding a block template needs no change.
+  - Separate from the control-group trial, with its own seed, so the two randomisations are independent. Saving the configuration warns when both are on.
+  - A signed-in user can preview one placement with `?si_placement=sidebar|strip|floating` on an item page. Signed-in visits are not logged, so previews never enter the data.
+- The usage log records, per impression, the placement the visitor was assigned to (`placement_arm`, intention to treat) next to the one actually rendered (`placement`), and a pseudonym of the visitor's assignment key (`placement_unit`, the cookie value hashed with the trial seed, for clustering in analysis). Both are empty outside the trial, and when the request carried no assignment cookie, since a key minted at that point could differ from the one the page was rendered with.
+- The configuration page shows where the trial stands (off, scheduled, running, ended), and checks that every public site showing recommendations has all the blocks taking part assigned. A missing block means visitors assigned to that placement see nothing and drop out of the log, which would bias the comparison.
+- The log screen shows a placement-trial panel: by assigned placement and device, impressions, items seen and their rate, clicks per impression and per items seen; a sample-ratio check (chi-square against the equal split, flagged when p < 0.001); and the number of impressions where the rendered placement differs from the assigned one. A filter ("Placement trial only") restricts the whole screen to trial impressions, and the exports carry the new columns.
+
+#### Fixed (found while testing, before release)
+- The module failed to load when a class constant of `Module` referred to the new assigner class: Omeka instantiates `Module` before the module's autoloader is registered, and PHP resolves class constants on first instantiation. The constant now holds plain strings. This would have stopped the whole site on upgrade.
+
+#### Upgrade notes
+- Upgrade the module, then enable and schedule the trial in the configuration, and only then assign the three blocks to the item pages. In the other order, visitors see all three blocks until the trial is enabled.
+- New columns are added automatically on the first request after the upgrade.
+
+### 日本語
+
+#### 追加
+- **配置試験。** 推薦の3種類の配置（右サイドバーの一覧・ビューア下の列・右下のフローティング）を、閲覧者ごとに無作為に1つだけ表示して比較します。モジュール設定の「配置試験（研究用）」で有効にし、日程を組みます。設定するのは、開始と終了の日時（サイトのタイムゾーン）、試験に含める配置、期間外に表示する配置です。
+  - 振り分けの単位は閲覧者です。ファーストパーティ cookie（`si_place`、乱数、60日間、HttpOnly）で割り当てを保持するので、別の日に再訪しても同じ配置が出ます。セッション（30分）では短すぎ、既存の訪問者キーは日ごとに作り直されるためです。cookie を受け付けないブラウザでは、ページごとに振り分けます。
+  - 3種類のブロックは前もって資料ページに割り当てておき、各ブロックは自分に振り分けられた閲覧者にだけ描画されます。期間の前と後は期間外の配置（既定は右サイドバーの一覧）だけを描画するので、試験は人手を介さず予定どおりに始まり、終わります。試験を無効にすると、これまでどおり割り当てたブロックがすべて描画されます。
+  - 判定はテンプレートではなくブロックのクラスで行うので、ブロックのテンプレートを上書きしているテーマを直す必要はありません。
+  - 対照群試験とは別の種（seed）を使う独立した振り分けです。両方を有効にして保存すると警告します。
+  - ログイン中は、資料ページで `?si_placement=sidebar|strip|floating` を付けると、その配置を確認できます。ログイン中の閲覧は記録されないので、データには入りません。
+- 利用ログのインプレッションに、割り当てられた配置（`placement_arm`、ITT）を、実際に描画された配置（`placement`）と並べて記録します。あわせて、閲覧者の割り当てキーの仮名（`placement_unit`。cookie の値を試験の種でハッシュしたもので、分析時のクラスタ化に使います）も記録します。どちらも試験期間外と、リクエストに割り当ての cookie がなかった場合は空です。その時点で新しく作ったキーは、ページを描画したときのキーと異なる可能性があるためです。
+- 設定画面に試験の状態（無効・開始待ち・実施中・終了）を表示します。あわせて、推薦を表示しているすべての公開サイトに、試験に含めるブロックがすべて割り当てられているかを点検します。ブロックが欠けていると、その配置に振り分けられた閲覧者には何も表示されず、ログからも抜け落ちて比較が偏ります。
+- ログ画面に配置試験のパネルを追加しました。割り当てられた配置と端末ごとに、インプレッション、項目が見られた数と率、インプレッションあたり・見られたあたりのクリックを示します。あわせて、振り分けの偏りの点検（等分に対するχ²検定、p < 0.001 で警告）と、描画された配置が割り当てと食い違う件数も表示します。絞り込みの「Placement trial only」で画面全体を試験対象だけにでき、エクスポートにも新しい列が入ります。
+
+#### 修正（リリース前の試験で発見）
+- `Module` のクラス定数が新しい振り分けクラスを参照していたため、モジュールが読み込めませんでした。Omeka はモジュールのオートローダを登録する前に `Module` をインスタンス化し、PHP は最初のインスタンス化の時点でクラス定数を解決するためです。定数は文字列だけで持つようにしました。このまま更新していれば、サイト全体が停止していました。
+
+#### 更新時の注意
+- 手順は、モジュールの更新 → 設定で試験を有効にして日程を入力 → 3種類のブロックを資料ページに割り当て、の順です。逆の順にすると、試験を有効にするまでの間、閲覧者に3種類すべてが表示されます。
+- 新しい列は、更新後の最初のリクエストで自動的に追加されます。
+
 ## [0.6.0] - 2026-09-30
 
 ### EN
