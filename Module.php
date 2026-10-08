@@ -802,7 +802,7 @@ class Module extends AbstractModule {
         $controller->messenger()->addWarning('配置試験：終了日時が開始日時より前です。試験は始まりません。');
       }
       if ($logEnable !== 1) {
-        $controller->messenger()->addWarning('配置試験には利用ログが必要です。ログを無効にしたままでは、配置を比較できません。');
+        $controller->messenger()->addWarning('配置試験：この画面の「利用ログ収集（研究用）」にある「利用ログを収集する」が無効です。配置ごとの「見られた」「クリック」はこの利用ログに記録されるため、無効のままでは配置を比較できません（表示の振り分け自体は行われます）。');
       }
       if ($expEnable === 1) {
         $controller->messenger()->addWarning('対照群試験と配置試験が同時に有効です。振り分けが掛け合わされて各群が細ります。どちらか一方にすることをおすすめします。');

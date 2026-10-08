@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### EN
+- The warning shown when the placement trial is enabled without usage logging now names the setting ("利用ログ収集（研究用）" → "利用ログを収集する") and says that visitors are still assigned, only not measured.
+
+### 日本語
+- 利用ログが無効なまま配置試験を有効にしたときの警告で、該当する設定（「利用ログ収集（研究用）」の「利用ログを収集する」）を名指しするようにしました。あわせて、振り分け自体は行われ、計測だけができないことも明記しました。
+
 ## [0.7.1] - 2026-10-09
 
 ### EN
