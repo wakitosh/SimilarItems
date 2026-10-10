@@ -32,6 +32,20 @@ $exportUrl = function (string $dataset, string $format) use ($queryFilters) {
 
 $pct = function ($v) { return number_format(((float) $v) * 100, 2) . '%'; };
 $num = function ($v, int $d = 0) { return number_format((float) $v, $d); };
+
+// Codes stored in the log (device, how the visitor arrived, arm, event type)
+// are shown with a readable label when the translation has one, and the code
+// itself in parentheses, so the screen can still be matched with the manual
+// and with exported data. Without a translation the bare code is shown.
+$codeLabel = function (string $kind, $code) use ($translate) {
+    $code = (string) $code;
+    if ($code === '') {
+        return $translate($kind === 'entry' ? '(not classified)' : '(unknown)');
+    }
+    $msgid = $kind . ':' . $code;
+    $label = $translate($msgid);
+    return $label === $msgid ? $code : sprintf($translate('%1$s (%2$s)'), $label, $code);
+};
 ?>
 
 <?= $this->pageTitle($translate('Similar Items logs')) ?>
@@ -56,6 +70,8 @@ $num = function ($v, int $d = 0) { return number_format((float) $v, $d); };
   .si-bar { display: inline-block; height: .6rem; background: #6c8ebf; vertical-align: middle; }
   .si-note { color: #666; font-size: .85rem; margin: .25rem 0 0; }
   .si-warning { border-left: 4px solid #d08a00; background: #fff8e6; padding: .75rem 1rem; margin-bottom: 1rem; }
+  .si-buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .si-buttons .button { margin: 0; }
 </style>
 
 <?php if (!$enabled): ?>
@@ -64,13 +80,10 @@ $num = function ($v, int $d = 0) { return number_format((float) $v, $d); };
   </div>
 <?php endif; ?>
 
+<?php // The header bar holds a few navigation buttons; the exports live in the page body. ?>
 <fieldset id="page-actions">
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-impressions', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Impressions')) ?></a>
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-events', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Events')) ?></a>
-  <a class="button" href="<?= $escapeAttr($exportUrl('impressions', 'csv')) ?>"><?= $escape($translate('Export impressions (CSV)')) ?></a>
-  <a class="button" href="<?= $escapeAttr($exportUrl('events', 'csv')) ?>"><?= $escape($translate('Export events (CSV)')) ?></a>
-  <a class="button" href="<?= $escapeAttr($exportUrl('chains', 'csv')) ?>"><?= $escape($translate('Export chains (CSV)')) ?></a>
-  <a class="button" href="<?= $escapeAttr($exportUrl('impressions', 'tsv')) ?>"><?= $escape($translate('Export impressions (TSV)')) ?></a>
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-help')) ?>"><?= $escape($translate('How to read this page')) ?></a>
 </fieldset>
 
@@ -98,7 +111,7 @@ $num = function ($v, int $d = 0) { return number_format((float) $v, $d); };
         <div class="field-meta"><label for="si-device"><?= $escape($translate('Device')) ?></label></div>
         <div class="inputs">
           <select id="si-device" name="device">
-            <?php foreach (['' => $translate('(any)'), 'desktop' => 'desktop', 'mobile' => 'mobile', 'tablet' => 'tablet', 'unknown' => 'unknown'] as $val => $label): ?>
+            <?php foreach (['' => $translate('(any)'), 'desktop' => $codeLabel('device', 'desktop'), 'mobile' => $codeLabel('device', 'mobile'), 'tablet' => $codeLabel('device', 'tablet'), 'unknown' => $codeLabel('device', 'unknown')] as $val => $label): ?>
               <option value="<?= $escapeAttr((string) $val) ?>" <?= $filters['device'] === (string) $val ? 'selected' : '' ?>><?= $escape($label) ?></option>
             <?php endforeach; ?>
           </select>
@@ -158,6 +171,17 @@ $num = function ($v, int $d = 0) { return number_format((float) $v, $d); };
   </div>
 </div>
 
+<div class="si-section" style="margin-bottom:1rem;">
+  <h3><?= $escape($translate('Export data')) ?></h3>
+  <div class="si-buttons">
+    <a class="button" href="<?= $escapeAttr($exportUrl('impressions', 'csv')) ?>"><?= $escape($translate('Export impressions (CSV)')) ?></a>
+    <a class="button" href="<?= $escapeAttr($exportUrl('events', 'csv')) ?>"><?= $escape($translate('Export events (CSV)')) ?></a>
+    <a class="button" href="<?= $escapeAttr($exportUrl('chains', 'csv')) ?>"><?= $escape($translate('Export chains (CSV)')) ?></a>
+    <a class="button" href="<?= $escapeAttr($exportUrl('impressions', 'tsv')) ?>"><?= $escape($translate('Export impressions (TSV)')) ?></a>
+  </div>
+  <p class="si-note"><?= $escape($translate('The current filter applies to the export as well.')) ?></p>
+</div>
+
 <details class="si-section" style="margin-bottom:1rem;">
   <summary><?= $escape($translate('Joining this log to a web server access log')) ?></summary>
   <p class="si-note" style="margin-top:.5rem;">
@@ -187,7 +211,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
     <span class="si-kpi__label"><?= $escape($translate('Viewed (in viewport)')) ?></span>
     <span class="si-kpi__value"><?= $num($summary['views']) ?></span>
     <span class="si-kpi__sub">
-      <?= $escape($pct($summary['view_rate'])) ?> <?= $escape($translate('of impressions')) ?>
+      <?= $escape(sprintf($translate('%s of impressions'), $pct($summary['view_rate']))) ?>
       <?php if (!empty($summary['never_seen'])): ?>
         &middot; <?= $escape(sprintf($translate('%s never on screen'), $num($summary['never_seen']))) ?>
       <?php endif; ?>
@@ -199,7 +223,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
   <div class="si-kpi">
     <span class="si-kpi__label"><?= $escape($translate('Clicks')) ?></span>
     <span class="si-kpi__value"><?= $num($summary['clicks']) ?></span>
-    <span class="si-kpi__sub">CTR <?= $escape($pct($summary['ctr'])) ?> &middot; <?= $escape($translate('among viewed')) ?> <?= $escape($pct($summary['viewed_ctr'])) ?></span>
+    <span class="si-kpi__sub"><?= $escape(sprintf($translate('CTR %1$s · %2$s among viewed'), $pct($summary['ctr']), $pct($summary['viewed_ctr']))) ?></span>
   </div>
   <div class="si-kpi">
     <span class="si-kpi__label"><?= $escape($translate('Recommendation-driven hops')) ?></span>
@@ -226,8 +250,17 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
 
 <?php
   $pt = $placementTrial ?? null;
-  $ptLabels = ['sidebar' => '右サイドバーの一覧', 'strip' => 'ビューア下の列', 'floating' => '右下のフローティング'];
-  $ptStates = ['off' => '無効', 'scheduled' => '開始待ち', 'active' => '実施中', 'ended' => '終了'];
+  $ptLabels = [
+      'sidebar' => $translate('Sidebar list'),
+      'strip' => $translate('Row below the viewer'),
+      'floating' => $translate('Floating button'),
+  ];
+  $ptStates = [
+      'off' => $translate('Off'),
+      'scheduled' => $translate('Scheduled'),
+      'active' => $translate('Running'),
+      'ended' => $translate('Finished'),
+  ];
   $ptTime = function (int $ts) {
       if ($ts <= 0) { return ''; }
       try {
@@ -241,28 +274,33 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
 ?>
 <?php if ($pt && ($pt['state'] !== 'off' || $pt['total'] > 0)): ?>
   <div class="si-section" style="margin-bottom:1rem;">
-    <h3><?= $escape('配置試験') ?></h3>
+    <h3><?= $escape($translate('Placement trial')) ?></h3>
     <p class="si-note" style="margin-bottom:.5rem;">
-      状態：<strong><?= $escape($ptStates[$pt['state']] ?? $pt['state']) ?></strong>
-      ／ 期間：<?= $escape(($ptTime($pt['start']) ?: '有効にした時点') . ' 〜 ' . ($ptTime($pt['end']) ?: '終了日時なし')) ?>
+      <?= $escape($translate('Status:')) ?> <strong><?= $escape($ptStates[$pt['state']] ?? $pt['state']) ?></strong>
+      &middot; <?= $escape($translate('Period:')) ?>
+      <?= $escape(($ptTime($pt['start']) ?: $translate('when enabled')) . ' – ' . ($ptTime($pt['end']) ?: $translate('no end'))) ?>
       <?php if (empty($filters['trial'])): ?>
-        ／ <a href="<?= $escapeAttr($this->url('admin/similar-items-logs', [], ['query' => array_merge($queryFilters, ['trial' => 1])])) ?>">この画面全体を試験対象だけに絞る</a>
+        &middot; <a href="<?= $escapeAttr($this->url('admin/similar-items-logs', [], ['query' => array_merge($queryFilters, ['trial' => 1])])) ?>"><?= $escape($translate('Restrict this whole page to the trial')) ?></a>
       <?php endif; ?>
     </p>
     <?php if ($pt['total'] > 0): ?>
       <table class="si-table">
         <thead>
           <tr>
-            <th>割り当てられた配置</th><th>端末</th>
-            <th class="num">インプレッション</th>
-            <th class="num">項目が見られた</th><th class="num">見られた率</th>
-            <th class="num">クリック</th><th class="num">インプレッションあたり</th><th class="num">見られたあたり</th>
+            <th><?= $escape($translate('Assigned placement')) ?></th>
+            <th><?= $escape($translate('Device')) ?></th>
+            <th class="num"><?= $escape($translate('Impressions')) ?></th>
+            <th class="num"><?= $escape($translate('Items seen')) ?></th>
+            <th class="num"><?= $escape($translate('Items seen rate')) ?></th>
+            <th class="num"><?= $escape($translate('Clicks')) ?></th>
+            <th class="num"><?= $escape($translate('Clicks per impression')) ?></th>
+            <th class="num"><?= $escape($translate('Clicks per items seen')) ?></th>
           </tr>
         </thead>
         <tbody>
           <?php foreach ($pt['arms'] as $arm => $a): ?>
             <tr>
-              <td><strong><?= $escape($ptLabels[$arm] ?? $arm) ?></strong></td><td>全体</td>
+              <td><strong><?= $escape($ptLabels[$arm] ?? $arm) ?></strong></td><td><?= $escape($translate('all')) ?></td>
               <td class="num"><?= $num($a['n']) ?></td>
               <td class="num"><?= $num($a['items_seen']) ?></td>
               <td class="num"><strong><?= $ptRate($a['items_seen'], $a['n']) ?></strong></td>
@@ -272,7 +310,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
             </tr>
             <?php foreach ($a['devices'] as $device => $d): ?>
               <tr>
-                <td></td><td><?= $escape($device !== '' ? $device : '(unknown)') ?></td>
+                <td></td><td><?= $escape($codeLabel('device', $device)) ?></td>
                 <td class="num"><?= $num($d['n']) ?></td>
                 <td class="num"><?= $num($d['items_seen']) ?></td>
                 <td class="num"><?= $ptRate($d['items_seen'], $d['n']) ?></td>
@@ -287,23 +325,31 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
       <?php if ($pt['srm']): ?>
         <?php $srmBad = $pt['srm']['p'] !== null && $pt['srm']['p'] < 0.001; ?>
         <p class="si-note" style="margin-top:.5rem;<?= $srmBad ? 'color:#b00;font-weight:bold;' : '' ?>">
-          振り分けの偏りの点検：χ² = <?= $num($pt['srm']['chi2'], 2) ?>（自由度 <?= (int) $pt['srm']['df'] ?>）、p = <?= $pt['srm']['p'] === null ? '–' : $escape(number_format($pt['srm']['p'], 4)) ?>。
+          <?= $escape(sprintf(
+            $translate('Sample-ratio check: chi-square = %1$s (%2$d degrees of freedom), p = %3$s.'),
+            $num($pt['srm']['chi2'], 2),
+            (int) $pt['srm']['df'],
+            $pt['srm']['p'] === null ? '–' : number_format($pt['srm']['p'], 4)
+          )) ?>
           <?php if ($srmBad): ?>
-            群の大きさが等分から大きくずれています。ある配置でだけページ閲覧が記録されていない可能性があります（ブロックの割り当て漏れ、表示の不具合など）。原因が分かるまで比較の結果は信用できません。
+            <?= $escape($translate('The arm sizes are far from an equal split. Page views may be going unrecorded in one placement only (a block not assigned on a site, a display fault). Do not trust the comparison until the cause is known.')) ?>
           <?php else: ?>
-            群の大きさは等分からの偶然のずれの範囲です。
+            <?= $escape($translate('The arm sizes are within chance of an equal split.')) ?>
           <?php endif; ?>
         </p>
       <?php endif; ?>
       <?php if ($pt['mismatch'] > 0): ?>
-        <p class="si-note">割り当てと実際に表示された配置が食い違うインプレッション：<?= $num($pt['mismatch']) ?> 件（全 <?= $num($pt['total']) ?> 件）。少数ならキャッシュされたページや別タブでの設定変更、多ければブロックの割り当てを確認してください。</p>
+        <p class="si-note"><?= $escape(sprintf(
+          $translate('Impressions where the placement shown differs from the one assigned: %1$s of %2$s. A few can come from cached pages or a settings change in another tab; many mean the block assignment should be checked.'),
+          $num($pt['mismatch']),
+          $num($pt['total'])
+        )) ?></p>
       <?php endif; ?>
       <p class="si-note">
-        「項目が見られた」は推薦項目の半分以上が画面に入ったインプレッション、「見られた率」はその割合で、試験の主要な指標です。
-        比較は割り当てられた配置で行います（実際に表示された配置ではなく）。ログイン中の閲覧とボットは含みません。
+        <?= $escape($translate('"Items seen" counts impressions where at least one recommended entry was half on screen; its rate is the main measure of the trial. Placements are compared as assigned, not as shown. Signed-in visits and bots are not included.')) ?>
       </p>
     <?php else: ?>
-      <p class="si-note">試験対象のインプレッションはまだありません。</p>
+      <p class="si-note"><?= $escape($translate('No trial impressions yet.')) ?></p>
     <?php endif; ?>
   </div>
 <?php endif; ?>
@@ -346,7 +392,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
         <tbody>
           <?php foreach ($arms as $armName => $a): ?>
             <tr>
-              <td><strong><?= $escape($armName !== '' ? $armName : '(none)') ?></strong></td>
+              <td><strong><?= $escape($armName !== '' ? $codeLabel('arm', $armName) : $translate('(none)')) ?></strong></td>
               <td class="num"><?= $num($a['impressions']) ?></td>
               <td class="num"><?= $num($a['sessions']) ?></td>
               <td class="num"><?= $num($a['pages_per_session'], 2) ?></td>
@@ -480,7 +526,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
           <?php foreach ($p['devices'] as $device => $d): ?>
             <tr>
               <td></td>
-              <td><?= $escape($device !== '' ? $device : '(unknown)') ?></td>
+              <td><?= $escape($codeLabel('device', $device)) ?></td>
               <td class="num"><?= $num($d['n']) ?></td>
               <td class="num"><?= $num($d['items_seen']) ?></td>
               <td class="num"><?= $ratio($d['items_seen'], $d['n']) ?></td>
@@ -523,7 +569,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
     <table class="si-table">
       <tbody>
         <?php foreach ($summary['entry_kinds'] as $kind => $n): ?>
-          <tr><td><?= $escape($kind !== '' ? $kind : '(unknown)') ?></td><td class="num"><?= $num($n) ?></td></tr>
+          <tr><td><?= $escape($codeLabel('entry', $kind)) ?></td><td class="num"><?= $num($n) ?></td></tr>
         <?php endforeach; ?>
       </tbody>
     </table>
@@ -531,7 +577,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
     <table class="si-table">
       <tbody>
         <?php foreach ($summary['devices'] as $device => $n): ?>
-          <tr><td><?= $escape($device !== '' ? $device : '(unknown)') ?></td><td class="num"><?= $num($n) ?></td></tr>
+          <tr><td><?= $escape($codeLabel('device', $device)) ?></td><td class="num"><?= $num($n) ?></td></tr>
         <?php endforeach; ?>
       </tbody>
     </table>
@@ -540,7 +586,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
       <table class="si-table">
         <tbody>
           <?php foreach ($summary['variants'] as $variant => $n): ?>
-            <tr><td><?= $escape($variant !== '' ? $variant : '(none)') ?></td><td class="num"><?= $num($n) ?></td></tr>
+            <tr><td><?= $escape($variant !== '' ? $variant : $translate('(none)')) ?></td><td class="num"><?= $num($n) ?></td></tr>
           <?php endforeach; ?>
         </tbody>
       </table>

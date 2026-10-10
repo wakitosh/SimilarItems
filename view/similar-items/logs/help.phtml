@@ -34,6 +34,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   .si-doc-table { border-collapse: collapse; margin: .5rem 0 1rem; }
   .si-doc-table th, .si-doc-table td { border: 1px solid #ddd; padding: .3rem .6rem; text-align: left; vertical-align: top; }
   .si-doc-table th { background: #f3f3f3; }
+  .si-en { color: #888; font-size: .8em; }
 </style>
 
 <fieldset id="page-actions">
@@ -43,7 +44,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 <div class="si-doc">
 
 <p>
-  「Similar Items logs」は、類似アイテム推薦が<strong>実際にどう使われているか</strong>を記録した画面です。
+  「類似アイテムの利用ログ」（英語表示では Similar Items logs）は、類似アイテム推薦が<strong>実際にどう使われているか</strong>を記録した画面です。
   このページでは、各数値が何を数えていて、どう読むべきかを説明します。
 </p>
 
@@ -110,7 +111,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   これがこの画面の数字を読むうえで最も重要な性質です。
   <ul>
     <li>ブロックが描画される前に閲覧者が離脱すると、スクリプトは何も検知できない
-      → <code>not reported</code> になります</li>
+      → 「報告なし」になります</li>
     <li>回線の切断、ブラウザの強制終了、拡張機能による遮断でも失われます</li>
   </ul>
   そのため<strong>可視化率・CTR はいずれも下限値</strong>です。
@@ -154,40 +155,40 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 <table>
   <tr><th>画面のラベル</th><th>意味と読み方</th></tr>
   <tr>
-    <td class="si-label">Impressions</td>
+    <td class="si-label">インプレッション<br><span class="si-en">Impressions</span></td>
     <td>
-      推薦を返した回数。副題の <code>N empty</code> は<strong>推薦が0件だった回数</strong>で、
+      推薦を返した回数。副題の「推薦0件 N」は<strong>推薦が0件だった回数</strong>で、
       推薦エンジンがその資料をカバーできなかったことを示します。
       これが多い場合はメタデータが薄い資料が多いか、重み設定が厳しすぎます。
     </td>
   </tr>
   <tr>
-    <td class="si-label">Sessions</td>
+    <td class="si-label">セッション<br><span class="si-en">Sessions</span></td>
     <td>
       異なり閲覧セッション数。副題は異なりシード資料数。
       1セッションは最終アクセスから既定30分で切れます（設定で変更可）。
     </td>
   </tr>
   <tr>
-    <td class="si-label">Viewed (in viewport)</td>
+    <td class="si-label">ブロックの画面到達<br><span class="si-en">Viewed (in viewport)</span></td>
     <td>
       <strong>ブロックが実際に画面に入った</strong>回数。「表示された」とは違います。
       推薦がクリックされないとき、「見たけれど選ばれなかった」のか「そもそも見られていない」のかで
       打つ手が変わるため、これを分けて数えています。<br>
-      <strong>インプレッションは必ず次の3つに分かれ、合計は Impressions と一致します。</strong>
+      <strong>インプレッションは必ず次の3つに分かれ、合計はインプレッションと一致します。</strong>
       副題には後ろの2つを表示しています。
       <table style="margin-top:.5rem;">
         <tr><th>区分</th><th>意味</th></tr>
         <tr>
-          <td class="si-label">Viewed</td>
+          <td class="si-label">画面到達<br><span class="si-en">Viewed</span></td>
           <td>ブロックが画面に入った</td>
         </tr>
         <tr>
-          <td class="si-label">never on screen</td>
+          <td class="si-label">画面に入らず<br><span class="si-en">never on screen</span></td>
           <td>描画されたが、一度も画面に入らないまま離脱された（<strong>報告あり</strong>）</td>
         </tr>
         <tr>
-          <td class="si-label">not reported</td>
+          <td class="si-label">報告なし<br><span class="si-en">not reported</span></td>
           <td>
             ブラウザから報告が届かなかった。多くは<strong>推薦の計算が終わる前に離脱された</strong>
             ケースで、ブロックが描画されていないためクライアントが観測対象として認識できません。
@@ -196,38 +197,38 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
         </tr>
       </table>
       この区分は見られたかどうか不明なので、可視化率（副題の％）は
-      <strong>下限値</strong>として読みます。not reported の件数は、
+      <strong>下限値</strong>として読みます。「報告なし」の件数は、
       ビーコン欠落率のおおよその目安にもなります。
       多いときは応答時間との関係を確認する価値がありますが、
       短い滞在や通信の失敗でも同様に起こるため、原因は一つに決まりません。
     </td>
   </tr>
   <tr>
-    <td class="si-label">Clicks</td>
+    <td class="si-label">クリック<br><span class="si-en">Clicks</span></td>
     <td>
       推薦が開かれた回数。副題に<strong>2種類の CTR</strong> が出ます。
       <ul>
         <li><code>CTR</code> … クリック ÷ インプレッション。露出全体に対する反応率。</li>
-        <li><code>among viewed</code> … クリック ÷ 可視化。<strong>実際に見た人の中での反応率</strong>。
+        <li>「画面到達のうち」 … クリック ÷ 画面到達。<strong>実際に見た人の中での反応率</strong>。
           推薦の「中身の良さ」を見たいときはこちらを使います。</li>
       </ul>
     </td>
   </tr>
   <tr>
-    <td class="si-label">Recommendation-driven hops</td>
+    <td class="si-label">推薦経由の回遊<br><span class="si-en">Recommendation-driven hops</span></td>
     <td>
       推薦をたどって到達した資料ページの数。副題は最大の連鎖深度。
       「推薦がどれだけ回遊を生んでいるか」の直接的な数字です。
     </td>
   </tr>
   <tr>
-    <td class="si-label">Chains with ≥1 hop</td>
+    <td class="si-label">推薦を1回以上たどった経路<br><span class="si-en">Chains with ≥1 hop</span></td>
     <td>
       1回以上推薦をたどった経路の数。副題はその経路の平均ページ数。
     </td>
   </tr>
   <tr>
-    <td class="si-label">Cross-domain clicks</td>
+    <td class="si-label">分野越えクリック<br><span class="si-en">Cross-domain clicks</span></td>
     <td>
       クリック先が<strong>シード資料の分野の外</strong>だった割合。分野は設定の
       「分野バケット規則」で決まります。セレンディピティ（意外な発見）の指標です。
@@ -235,7 +236,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
     </td>
   </tr>
   <tr>
-    <td class="si-label">Response time</td>
+    <td class="si-label">応答時間<br><span class="si-en">Response time</span></td>
     <td>
       推薦の計算にかかった平均時間。副題は平均候補数と平均提示件数。
       計算が遅いほどブロックの表示も遅れるため、可視化率を押し下げる方向に働きます。
@@ -249,19 +250,19 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 
 <p>
   推薦の効果を検証するために、閲覧者をセッション単位で無作為に振り分ける機能です。
-  <strong>既定では実施していません</strong>。実施していないときは「The trial is not running」と表示され、
+  <strong>既定では実施していません</strong>。実施していないときは「試験は実施されていません」と表示され、
   全員が通常の推薦を見ています。
 </p>
 
 <table>
   <tr><th>アーム</th><th>閲覧者が見るもの</th><th>比較して分かること</th></tr>
   <tr>
-    <td class="si-label">default</td>
+    <td class="si-label">通常（default）</td>
     <td>通常のスコアリング推薦</td>
     <td>―</td>
   </tr>
   <tr>
-    <td class="si-label">random</td>
+    <td class="si-label">ランダム（random）</td>
     <td>見た目も件数も同じで、資料だけ無作為</td>
     <td>
       default と比べると、<strong>スコアリングの寄与</strong>が分かります。
@@ -270,7 +271,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
     </td>
   </tr>
   <tr>
-    <td class="si-label">off</td>
+    <td class="si-label">非表示（off）</td>
     <td>ブロックを表示しない</td>
     <td>
       default と比べると、<strong>機能そのものが回遊に与える寄与</strong>が分かります。
@@ -281,15 +282,15 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 <p>表の各列は上部カードと同じ定義です。加えて次の2列があります。</p>
 
 <ul>
-  <li><strong>Pages / session、Items / session</strong> …
+  <li><strong>ページ／セッション、資料／セッション</strong> …
     セッションあたりの資料ページ閲覧数と異なり資料数。
     <strong>全アームで比較できる唯一の指標</strong>です。
     <code>off</code> でも「表示しないが閲覧は記録する」ようにしているため、ここだけは揃います。</li>
-  <li><strong>Via recommendation</strong> … そのアームの閲覧のうち、推薦をたどって到達した割合。</li>
+  <li><strong>推薦経由</strong> … そのアームの閲覧のうち、推薦をたどって到達した割合。</li>
 </ul>
 
 <div class="si-note">
-  <code>off</code> アームの Viewed・CTR 列が空なのは仕様です。表示していないので、
+  非表示（<code>off</code>）アームの「画面到達」「CTR（画面到達のうち）」列が空なのは仕様です。表示していないので、
   見ることもクリックすることもできません。
 </div>
 
@@ -312,10 +313,10 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   右サイドバーは、ブロックが1つでもあると列そのものが作られるため、フローティングボタンだけを置くと空の列ができて本文が狭くなります。
 </p>
 
-<h4>Items seen（推薦項目が見られた）— 配置の比較にはこれを使う</h4>
+<h4>項目が見られた — 配置の比較にはこれを使う</h4>
 <p>
   推薦された各項目について、<strong>その半分以上が画面に入ったか</strong>を1件ずつ記録します。
-  1件でも見られたインプレッションを「Items seen」と数えます。
+  1件でも見られたインプレッションを「項目が見られた」と数えます。
   どのブロックでも同じ規則なので、配置どうしを対等に比較できます。
   フローティングボタンの場合、項目はパネルの中にあるため、<strong>パネルを開かない限り見られたことになりません</strong>。
   マウスではキャラクターの上にポインタを0.12秒止めるとパネルが開くので、その時点で見られたと数えます（通りすがりのポインタでは開きません）。スマホではタップで開きます。
@@ -326,7 +327,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   順位ごとの露出が分かるので、位置バイアスの分析に使えます。0.6.0 から記録しており、それ以前の行は空です。
 </p>
 
-<h4>Block on screen (legacy) — 以前からの指標</h4>
+<h4>ブロックの画面到達（従来） — 以前からの指標</h4>
 <p>
   0.6.0 より前から使っている「ブロックの箱の40%が画面に入った」です。サイドバーの数字を過去のデータと比べるために残しています。
   ただし<strong>配置の比較には使えません</strong>。箱の高さによって意味が変わるからです。
@@ -379,7 +380,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 <h3 id="si-rank">6. 順位別クリック率（Click-through rate by rank）</h3>
 
 <p>
-  <strong>Offered</strong> は「その順位が実際に提示されたインプレッション数」です。
+  <strong>提示数</strong>は「その順位が実際に提示されたインプレッション数」です。
   提示件数は資料によって変わるため、全インプレッションを分母にすると下位の順位が不当に低く出ます。
   実際に提示された回数を分母にすることで、<strong>順位どうしを対等に比較できます</strong>。
 </p>
@@ -393,7 +394,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 
 <table>
   <tr><th>深度</th><th>意味</th></tr>
-  <tr><td class="si-label">0 (entry)</td><td>推薦以外の経路で到達した資料ページ（検索、外部リンク、直接など）</td></tr>
+  <tr><td class="si-label">0（入口）</td><td>推薦以外の経路で到達した資料ページ（検索、外部リンク、直接など）</td></tr>
   <tr><td class="si-label">N</td><td>推薦を<strong>N回連続</strong>でたどって到達したページ</td></tr>
 </table>
 
@@ -406,13 +407,13 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 
 <table>
   <tr><th>値</th><th>意味</th></tr>
-  <tr><td class="si-label">similar_items</td><td>推薦をクリックして到達（サーバ側でクリック連鎖から確定）</td></tr>
-  <tr><td class="si-label">internal</td><td>同じサイト内の別ページから到達（検索結果、一覧など）</td></tr>
-  <tr><td class="si-label">search_engine</td><td>検索エンジンから到達</td></tr>
-  <tr><td class="si-label">social</td><td>SNS・チャットサービス等から到達</td></tr>
-  <tr><td class="si-label">external</td><td>その他の外部サイトから到達</td></tr>
-  <tr><td class="si-label">direct</td><td>リファラなし（ブックマーク、URL直接入力、リファラ抑制など）</td></tr>
-  <tr><td class="si-label">(unknown)</td><td><strong>判定できていない</strong>。下記参照</td></tr>
+  <tr><td class="si-label">推薦経由（similar_items）</td><td>推薦をクリックして到達（サーバ側でクリック連鎖から確定）</td></tr>
+  <tr><td class="si-label">サイト内（internal）</td><td>同じサイト内の別ページから到達（検索結果、一覧など）</td></tr>
+  <tr><td class="si-label">検索エンジン（search_engine）</td><td>検索エンジンから到達</td></tr>
+  <tr><td class="si-label">SNS など（social）</td><td>SNS・チャットサービス等から到達</td></tr>
+  <tr><td class="si-label">外部サイト（external）</td><td>その他の外部サイトから到達</td></tr>
+  <tr><td class="si-label">直接（direct）</td><td>リファラなし（ブックマーク、URL直接入力、リファラ抑制など）</td></tr>
+  <tr><td class="si-label">（未判定）</td><td><strong>判定できていない</strong>。下記参照</td></tr>
 </table>
 
 <div class="si-warn">
@@ -426,9 +427,9 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 <h3 id="si-top">9. 上位アイテム</h3>
 
 <ul>
-  <li><strong>Most recommended-from items</strong> … 推薦の起点になった回数が多い資料。
+  <li><strong>推薦元として多い資料</strong> … 推薦の起点になった回数が多い資料。
     よく見られている資料と考えて差し支えありません。</li>
-  <li><strong>Most clicked recommendations</strong> … 推薦としてクリックされた回数が多い資料。
+  <li><strong>よくクリックされた推薦</strong> … 推薦としてクリックされた回数が多い資料。
     「他の資料からの導線で発見されている資料」です。</li>
 </ul>
 <p>資料IDのリンクから管理画面の資料ページへ移動できます。</p>
@@ -436,13 +437,13 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 <h3 id="si-filter">10. 絞り込みと一覧</h3>
 
 <p>
-  左上の「Filter」で期間・サイト・条件ラベル・デバイス・シード資料・セッションを指定できます。
-  <strong>Include bots</strong> にチェックを入れると、ボットと判定された記録も集計に含めます。
+  左上の「フィルター」で期間・サイト・条件ラベル・デバイス・シード資料・セッションを指定できます。
+  <strong>ボットを含める</strong>にチェックを入れると、ボットと判定された記録も集計に含めます。
   ただし収集時にボットを除外する設定（既定）であれば、そもそもボットの記録は存在しないため、
   この絞り込みで結果は変わりません。
 </p>
 <p>
-  「Impressions」「Events」ボタンで生の一覧を見られます。
+  「インプレッション」「イベント」ボタンで生の一覧を見られます。
   インプレッション一覧の<strong>セッション欄のリンクをクリックすると、そのセッションだけに絞り込めます</strong>。
   1人の閲覧者がどう辿ったかを追うのに便利です。
 </p>
@@ -471,7 +472,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   <li><strong>ビーコンの欠測がある。</strong>
     表示・クリックはブラウザから送るため、一定の割合で届きません。
     インプレッションはサーバ側で記録するので影響を受けません。
-    欠測の量は Viewed カードの <code>not reported</code>、
+    欠測の量は「ブロックの画面到達」カードの「報告なし」、
     流入経路の <code>(unknown)</code> の2か所に現れます。</li>
   <li><strong>応答時間は交絡しうる。</strong>
     推薦の計算が遅い資料ほど、ブロックが出る前に離脱される可能性があります。
@@ -492,9 +493,9 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
   エクスポートしてください。</strong>
 </p>
 <ul>
-  <li><strong>まとめて削除</strong> … ログ画面の「Delete logs」から、現在まで・指定日時以前・
+  <li><strong>まとめて削除</strong> … ログ画面の「ログの削除」から、現在まで・指定日時以前・
     期間指定で削除します。</li>
-  <li><strong>選んで削除</strong> … インプレッション一覧で行をチェックし「Delete selected」。
+  <li><strong>選んで削除</strong> … インプレッション一覧で行をチェックし「選択を削除します」。
     動作確認で自分が作った記録を取り除くときなどに使います。
     <strong>対象インプレッションに紐づくイベントも一緒に削除されます。</strong></li>
 </ul>
@@ -514,7 +515,7 @@ $escapeAttr = $this->plugin('escapeHtmlAttr');
 <p>
   送信元アドレスはソルト付きハッシュで保存しています。Web サーバのアクセスログ側の
   アドレスに同じ計算を適用すれば、両者を対応づけられます。
-  計算式とソルトはログ画面の「Joining this log to a web server access log」に表示されます。
+  計算式とソルトはログ画面の「Web サーバのアクセスログとの突き合わせ」に表示されます。
 </p>
 <div class="si-warn">
   <strong>ソルトは公開データに含めないでください。</strong>

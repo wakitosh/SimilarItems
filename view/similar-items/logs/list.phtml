@@ -19,6 +19,7 @@ $queryFilters = array_filter([
     'seed_item_id' => $filters['seed_item_id'] ?: '',
     'session_key' => $filters['session_key'],
     'include_bots' => $filters['include_bots'],
+    'trial' => !empty($filters['trial']) ? 1 : '',
 ], function ($v) { return $v !== '' && $v !== null; });
 
 $title = $dataset === 'events'
@@ -37,16 +38,21 @@ $title = $dataset === 'events'
   .si-log-table code { font-size: .8em; }
   .si-scroll { overflow-x: auto; }
   .si-pagination { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; }
+  .si-buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .si-buttons .button { margin: 0; }
 </style>
 
 <fieldset id="page-actions">
-  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Summary')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Log summary')) ?></a>
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-impressions', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Impressions')) ?></a>
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-events', [], ['query' => $queryFilters])) ?>"><?= $escape($translate('Events')) ?></a>
-  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-export', [], ['query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => 'csv'])])) ?>"><?= $escape($translate('Export CSV')) ?></a>
-  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-export', [], ['query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => 'tsv'])])) ?>"><?= $escape($translate('Export TSV')) ?></a>
   <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-help')) ?>"><?= $escape($translate('How to read this page')) ?></a>
 </fieldset>
+
+<div class="si-buttons" style="margin-bottom:.75rem;">
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-export', [], ['query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => 'csv'])])) ?>"><?= $escape($translate('Export CSV')) ?></a>
+  <a class="button" href="<?= $escapeAttr($this->url('admin/similar-items-logs-export', [], ['query' => array_merge($queryFilters, ['dataset' => $dataset, 'format' => 'tsv'])])) ?>"><?= $escape($translate('Export TSV')) ?></a>
+</div>
 
 <div class="si-scroll">
   <?= $this->table ?>

@@ -34,6 +34,20 @@ $secs = function ($ms) {
     return number_format(((int) $ms) / 1000, 1) . 's';
 };
 
+// Codes stored in the log (device, how the visitor arrived, arm, event type)
+// are shown with a readable label when the translation has one, and the code
+// itself in parentheses, so the screen can still be matched with the manual
+// and with exported data. Without a translation the bare code is shown.
+$codeLabel = function (string $kind, $code) use ($translate) {
+    $code = (string) $code;
+    if ($code === '') {
+        return $translate($kind === 'entry' ? '(not classified)' : '(unknown)');
+    }
+    $msgid = $kind . ':' . $code;
+    $label = $translate($msgid);
+    return $label === $msgid ? $code : sprintf($translate('%1$s (%2$s)'), $label, $code);
+};
+
 $pages = (int) max(1, ceil($total / max(1, $perPage)));
 $baseQuery = array_filter([
     'from' => $filters['from'],
@@ -44,6 +58,7 @@ $baseQuery = array_filter([
     'seed_item_id' => $filters['seed_item_id'] ?: '',
     'session_key' => $filters['session_key'],
     'include_bots' => $filters['include_bots'],
+    'trial' => !empty($filters['trial']) ? 1 : '',
     'per_page' => $perPage,
 ], function ($v) { return $v !== '' && $v !== null; });
 $pageUrl = function (int $p) use ($baseQuery) {
@@ -85,7 +100,7 @@ $pageUrl = function (int $p) use ($baseQuery) {
           <td><?= (int) $r['id'] ?></td>
           <td><?= $escape($fmt($r['created_at'] ?? 0)) ?></td>
           <td>
-            <?= $escape((string) ($r['event_type'] ?? '')) ?>
+            <?= $escape($codeLabel('event', $r['event_type'] ?? '')) ?>
             <?php if ($r['event_type'] === 'view' && empty($r['was_visible'])): ?>
               <span style="color:#999;"> (<?= $escape($translate('never visible')) ?>)</span>
             <?php endif; ?>
@@ -114,7 +129,7 @@ $pageUrl = function (int $p) use ($baseQuery) {
           <td class="num"><?= $escape($secs($r['dwell_ms'] ?? null)) ?></td>
           <td class="num"><?= $escape($secs($r['visible_ms'] ?? null)) ?></td>
           <td><?php if ($sessionKey !== ''): ?><code title="<?= $escapeAttr($sessionKey) ?>"><?= $escape(substr($sessionKey, 0, 8)) ?></code><?php endif; ?></td>
-          <td><?= $escape((string) ($r['device'] ?? '')) ?><?= !empty($r['is_bot']) ? ' (bot)' : '' ?></td>
+          <td><?= $escape($codeLabel('device', $r['device'] ?? '')) ?><?= !empty($r['is_bot']) ? ' ' . $escape($translate('(bot)')) : '' ?></td>
         </tr>
       <?php endforeach; ?>
     <?php endif; ?>

@@ -28,6 +28,20 @@ $fmt = function ($ts) use ($tz) {
     }
 };
 
+// Codes stored in the log (device, how the visitor arrived, arm, event type)
+// are shown with a readable label when the translation has one, and the code
+// itself in parentheses, so the screen can still be matched with the manual
+// and with exported data. Without a translation the bare code is shown.
+$codeLabel = function (string $kind, $code) use ($translate) {
+    $code = (string) $code;
+    if ($code === '') {
+        return $translate($kind === 'entry' ? '(not classified)' : '(unknown)');
+    }
+    $msgid = $kind . ':' . $code;
+    $label = $translate($msgid);
+    return $label === $msgid ? $code : sprintf($translate('%1$s (%2$s)'), $label, $code);
+};
+
 $pages = (int) max(1, ceil($total / max(1, $perPage)));
 $baseQuery = array_filter([
     'from' => $filters['from'],
@@ -38,6 +52,7 @@ $baseQuery = array_filter([
     'seed_item_id' => $filters['seed_item_id'] ?: '',
     'session_key' => $filters['session_key'],
     'include_bots' => $filters['include_bots'],
+    'trial' => !empty($filters['trial']) ? 1 : '',
     'per_page' => $perPage,
 ], function ($v) { return $v !== '' && $v !== null; });
 $pageUrl = function (int $p) use ($baseQuery) {
@@ -115,13 +130,13 @@ $sessionUrl = function (string $key) use ($baseQuery) {
           <td class="num"><?= (int) ($r['candidate_count'] ?? 0) ?></td>
           <td class="num"><?= (int) ($r['duration_ms'] ?? 0) ?></td>
           <td class="num"><?= (int) ($r['hop_depth'] ?? 0) ?></td>
-          <td><?= $escape((string) ($r['entry_kind'] ?? '')) ?></td>
+          <td><?= $escape($codeLabel('entry', $r['entry_kind'] ?? '')) ?></td>
           <td>
             <?php if ($sessionKey !== ''): ?>
               <a href="<?= $escapeAttr($sessionUrl($sessionKey)) ?>" title="<?= $escapeAttr($sessionKey) ?>"><code><?= $escape(substr($sessionKey, 0, 8)) ?></code></a>
             <?php endif; ?>
           </td>
-          <td><?= $escape((string) ($r['device'] ?? '')) ?><?= !empty($r['is_bot']) ? ' (bot)' : '' ?></td>
+          <td><?= $escape($codeLabel('device', $r['device'] ?? '')) ?><?= !empty($r['is_bot']) ? ' ' . $escape($translate('(bot)')) : '' ?></td>
           <td><?= $escape((string) ($r['variant'] ?? '')) ?></td>
           <td>
             <?php if (is_array($results) && $results): ?>
