@@ -295,6 +295,8 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
             <th class="num"><?= $escape($translate('Clicks')) ?></th>
             <th class="num"><?= $escape($translate('Clicks per impression')) ?></th>
             <th class="num"><?= $escape($translate('Clicks per items seen')) ?></th>
+            <th class="num"><?= $escape($translate('Link to sidebar used')) ?></th>
+            <th class="num"><?= $escape($translate('Seen via the link')) ?></th>
           </tr>
         </thead>
         <tbody>
@@ -307,6 +309,8 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
               <td class="num"><?= $num($a['clicks']) ?></td>
               <td class="num"><?= $ptRate($a['clicks'], $a['n']) ?></td>
               <td class="num"><?= $ptRate($a['clicks'], $a['items_seen']) ?></td>
+              <td class="num"><?= $ptRate($a['jumps'], $a['n']) ?></td>
+              <td class="num"><?= $arm === 'sidebar' ? $ptRate($a['seen_via_jump'], $a['items_seen']) : '–' ?></td>
             </tr>
             <?php foreach ($a['devices'] as $device => $d): ?>
               <tr>
@@ -317,6 +321,8 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
                 <td class="num"><?= $num($d['clicks']) ?></td>
                 <td class="num"><?= $ptRate($d['clicks'], $d['n']) ?></td>
                 <td class="num"><?= $ptRate($d['clicks'], $d['items_seen']) ?></td>
+                <td class="num"><?= $ptRate($d['jumps'], $d['n']) ?></td>
+                <td class="num"><?= $arm === 'sidebar' ? $ptRate($d['seen_via_jump'], $d['items_seen']) : '–' ?></td>
               </tr>
             <?php endforeach; ?>
           <?php endforeach; ?>
@@ -347,6 +353,9 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
       <?php endif; ?>
       <p class="si-note">
         <?= $escape($translate('"Items seen" counts impressions where at least one recommended entry was half on screen; its rate is the main measure of the trial. Placements are compared as assigned, not as shown. Signed-in visits and bots are not included.')) ?>
+      </p>
+      <p class="si-note">
+        <?= $escape($translate('"Link to sidebar used": share of impressions where the theme\'s link to the sidebar (shown on phones only) was used. "Seen via the link": for the sidebar list, share of items seen whose first item was seen in the sidebar after the link was used. The link is on the page in every arm, but only the sidebar list has its recommendations there.')) ?>
       </p>
     <?php else: ?>
       <p class="si-note"><?= $escape($translate('No trial impressions yet.')) ?></p>

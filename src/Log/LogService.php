@@ -155,6 +155,7 @@ class LogService {
         'items_seen_placement' => "ALTER TABLE `%s` ADD COLUMN `items_seen_placement` VARCHAR(16) DEFAULT NULL AFTER `items_seen_ms`",
         'placement_arm' => "ALTER TABLE `%s` ADD COLUMN `placement_arm` VARCHAR(16) DEFAULT NULL AFTER `items_seen_placement`, ADD KEY `idx_placement_arm` (`placement_arm`)",
         'placement_unit' => "ALTER TABLE `%s` ADD COLUMN `placement_unit` CHAR(16) DEFAULT NULL AFTER `placement_arm`",
+        'sidebar_jump_ms' => "ALTER TABLE `%s` ADD COLUMN `sidebar_jump_ms` INT UNSIGNED DEFAULT NULL AFTER `placement_unit`",
       ],
       self::TABLE_EVENT => [
         'arm' => "ALTER TABLE `%s` ADD COLUMN `arm` VARCHAR(16) DEFAULT NULL AFTER `variant`, ADD KEY `idx_arm` (`arm`)",
@@ -215,6 +216,7 @@ CREATE TABLE IF NOT EXISTS `similaritems_impression` (
   `items_seen_placement` VARCHAR(16) DEFAULT NULL,
   `placement_arm` VARCHAR(16) DEFAULT NULL,
   `placement_unit` CHAR(16) DEFAULT NULL,
+  `sidebar_jump_ms` INT UNSIGNED DEFAULT NULL,
   `config_hash` CHAR(12) DEFAULT NULL,
   `tiebreak` VARCHAR(32) DEFAULT NULL,
   `jitter` TINYINT(1) NOT NULL DEFAULT 0,
@@ -410,7 +412,7 @@ SQL;
     }
 
     $type = strtolower(trim((string) ($data['type'] ?? '')));
-    if (!in_array($type, self::EVENT_TYPES, TRUE) && $type !== 'exposure') {
+    if (!in_array($type, self::EVENT_TYPES, TRUE) && $type !== 'exposure' && $type !== 'jump') {
       return FALSE;
     }
     $impressionKey = $this->normalizeKey($data['impression'] ?? NULL);
@@ -420,7 +422,7 @@ SQL;
 
     try {
       $impression = $this->conn->fetchAssociative(
-        'SELECT id, impression_key, session_key, site_slug, seed_item_id, seed_buckets, variant, arm, chain_key, hop_depth, parent_event_id, entry_kind, results, result_count, ranks_seen, items_seen_ms '
+        'SELECT id, impression_key, session_key, site_slug, seed_item_id, seed_buckets, variant, arm, chain_key, hop_depth, parent_event_id, entry_kind, results, result_count, ranks_seen, items_seen_ms, sidebar_jump_ms '
         . 'FROM ' . self::TABLE_IMPRESSION . ' WHERE impression_key = ? LIMIT 1',
         [$impressionKey]
       );
@@ -434,6 +436,9 @@ SQL;
 
     if ($type === 'exposure') {
       return $this->recordExposure($impression, $data);
+    }
+    if ($type === 'jump') {
+      return $this->recordSidebarJump($impression, $data);
     }
 
     // A block written off as "not seen" when the visitor switched tabs may
@@ -959,6 +964,37 @@ SQL;
     }
     try {
       $this->conn->update(self::TABLE_IMPRESSION, $update, ['id' => (int) $impression['id']]);
+      return TRUE;
+    }
+    catch (\Throwable $e) {
+      return FALSE;
+    }
+  }
+
+  /**
+   * Record that the visitor used the theme's link to the sidebar.
+   *
+   * On phones the theme puts a link near the top of the page that jumps to
+   * the right sidebar, which otherwise sits after the whole metadata list. The
+   * link is shown in every arm of the placement trial, but only the sidebar
+   * arm has its recommendations there, so it changes what that arm means on a
+   * phone. Storing when the link was first used (milliseconds after the list
+   * was rendered, 0 when it was used before) lets the analysis tell exposure
+   * reached through the link from exposure reached by scrolling: an item seen
+   * in the sidebar at or after this moment counts as seen via the link.
+   *
+   * Only the first use is kept.
+   */
+  private function recordSidebarJump(array $impression, array $data): bool {
+    if ($impression['sidebar_jump_ms'] !== NULL) {
+      return TRUE;
+    }
+    $ms = $this->normalizeDuration($data['ms'] ?? NULL);
+    if ($ms === NULL) {
+      return FALSE;
+    }
+    try {
+      $this->conn->update(self::TABLE_IMPRESSION, ['sidebar_jump_ms' => $ms], ['id' => (int) $impression['id']]);
       return TRUE;
     }
     catch (\Throwable $e) {

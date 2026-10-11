@@ -509,7 +509,7 @@ class LogsController extends AbstractActionController {
         'site_slug', 'locale', 'seed_item_id', 'seed_item_title', 'seed_buckets',
         'seed_item_sets', 'requested_limit', 'result_count', 'candidate_count',
         'duration_ms', 'is_empty', 'variant', 'arm', 'placement', 'ranks_seen', 'items_seen_ms',
-        'items_seen_placement', 'placement_arm', 'placement_unit', 'config_hash', 'tiebreak', 'jitter',
+        'items_seen_placement', 'placement_arm', 'placement_unit', 'sidebar_jump_ms', 'config_hash', 'tiebreak', 'jitter',
         'parent_event_id', 'parent_impression_id', 'chain_key', 'hop_depth', 'entry_kind',
         'referrer_host', 'device', 'is_bot', 'client_ip', 'results',
       ];
@@ -680,7 +680,12 @@ class LogsController extends AbstractActionController {
       'SELECT i.placement_arm AS arm, i.device AS device, COUNT(*) AS n, '
       . 'SUM(i.ranks_seen IS NOT NULL AND i.ranks_seen <> \'\') AS items_seen, '
       . 'COALESCE(SUM(c.clicks), 0) AS clicks, '
-      . 'SUM(COALESCE(i.placement, \'\') <> i.placement_arm) AS mismatch '
+      . 'SUM(COALESCE(i.placement, \'\') <> i.placement_arm) AS mismatch, '
+      // Phones: the theme's link to the sidebar. Used at all, and, for the
+      // sidebar list, whether the first item was seen there after the jump.
+      . 'SUM(i.sidebar_jump_ms IS NOT NULL) AS jumps, '
+      . 'SUM(i.items_seen_placement = \'sidebar\' AND i.sidebar_jump_ms IS NOT NULL '
+      . 'AND i.items_seen_ms IS NOT NULL AND i.items_seen_ms >= i.sidebar_jump_ms) AS seen_via_jump '
       . 'FROM ' . LogService::TABLE_IMPRESSION . ' i '
       . 'LEFT JOIN (SELECT impression_key, COUNT(*) AS clicks FROM ' . $evt
       . ' WHERE event_type = \'click\' GROUP BY impression_key) c ON c.impression_key = i.impression_key '
@@ -689,15 +694,17 @@ class LogsController extends AbstractActionController {
     ) as $row) {
       $arm = (string) $row['arm'];
       if (!isset($out['arms'][$arm])) {
-        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'devices' => []];
+        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'devices' => []];
       }
-      foreach (['n', 'items_seen', 'clicks'] as $k) {
+      foreach (['n', 'items_seen', 'clicks', 'jumps', 'seen_via_jump'] as $k) {
         $out['arms'][$arm][$k] += (int) $row[$k];
       }
       $out['arms'][$arm]['devices'][(string) ($row['device'] ?? '')] = [
         'n' => (int) $row['n'],
         'items_seen' => (int) $row['items_seen'],
         'clicks' => (int) $row['clicks'],
+        'jumps' => (int) $row['jumps'],
+        'seen_via_jump' => (int) $row['seen_via_jump'],
       ];
       $out['total'] += (int) $row['n'];
       $out['mismatch'] += (int) $row['mismatch'];
@@ -705,7 +712,7 @@ class LogsController extends AbstractActionController {
     // Arms with no impression yet still count in the expected split.
     foreach ($out['arms_enabled'] as $arm) {
       if (!isset($out['arms'][$arm])) {
-        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'devices' => []];
+        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'devices' => []];
       }
     }
     $k = count($out['arms_enabled']);

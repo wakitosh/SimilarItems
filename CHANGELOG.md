@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.3] - 2026-10-11
+
+### EN
+
+#### Added
+- The usage log records when the theme's link to the sidebar was first used on a page (`sidebar_jump_ms` on the impression: milliseconds after the list was rendered, 0 when used before). On phones the theme (1.6.0+) puts a link near the top of item pages that jumps to the right sidebar, which otherwise comes after the whole metadata list. The link is on the page in every arm of the placement trial, but only the sidebar arm has its recommendations there, so on phones that arm is "the sidebar, with a link to it". With this column the analysis can tell exposure reached through the link from exposure reached by scrolling: an impression whose first item was seen in the sidebar at or after `sidebar_jump_ms` counts as seen via the link.
+- The placement-trial panel shows, by arm and device, how often the link was used and, for the sidebar arm, the share of items seen that were seen via the link. The column is exported with the impressions.
+- The logging script listens for a `resourcesidebar:jump` event on `document` (dispatched by the theme, 1.6.1+) and reports it once per impression, including when the link is used before the list has loaded. A theme without the event records nothing; nothing else changes.
+
+### 日本語
+
+#### 追加
+- テーマのサイドバーへのリンクが、そのページで最初に使われた時刻を利用ログに記録します（インプレッションの `sidebar_jump_ms`。推薦の表示からのミリ秒で、表示前に使われた場合は 0）。スマホではテーマ（1.6.0 以降）が資料ページの上部に右サイドバーへ移動するリンクを置きます。右サイドバーは、リンクがなければメタデータ一覧のすべての後ろに来ます。このリンクは配置試験のどの群のページにもありますが、推薦がサイドバーにあるのはサイドバー群だけなので、スマホでのサイドバー群は「リンク付きのサイドバー」になります。この列があれば、リンク経由で届いた露出とスクロールで届いた露出を分けられます。最初の項目が `sidebar_jump_ms` 以後にサイドバーで見られたインプレッションを「リンク経由で見られた」とします。
+- 配置試験のパネルに、群と端末ごとのリンクの利用率と、サイドバー群で項目が見られたうちリンク経由の割合を表示します。この列はインプレッションの書き出しにも含まれます。
+- 記録用スクリプトは `document` 上の `resourcesidebar:jump` イベント（テーマ 1.6.1 以降が発行）を受け取り、インプレッションごとに1回だけ報告します。推薦の読み込み前にリンクが使われた場合も記録します。このイベントを出さないテーマでは何も記録されず、ほかの動作は変わりません。
+
 ## [0.7.2] - 2026-10-11
 
 ### EN

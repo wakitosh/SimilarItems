@@ -25,6 +25,12 @@
  * "manual" is seen when it announces so (the floating panel being opened), not
  * when it is on screen.
  *
+ *  - jump     : the theme's link to the sidebar was used (on phones the
+ *               sidebar comes after the whole metadata list, and the theme
+ *               links to it from the top of the page). Sent once per
+ *               impression with the time since the list was rendered, so an
+ *               item seen in the sidebar afterwards can be told apart from one
+ *               reached by scrolling.
  *  - exposure : which ranks reached the screen, item by item (half of an
  *               entry visible). Unlike `view`, which uses 40% of the block's
  *               box and so means different things for blocks of different
@@ -140,6 +146,25 @@
   var registered = {};
 
   /**
+   * When the theme's link to the sidebar was first used on this page, if at
+   * all. Kept at page level: it can be used before the list has loaded.
+   */
+  var sidebarJumpAt = 0;
+
+  function sendJump(block) {
+    if (!sidebarJumpAt || block.jumpSent) {
+      return;
+    }
+    block.jumpSent = true;
+    send(block.meta.endpoint, {
+      type: 'jump',
+      impression: block.meta.impression,
+      // 0 when the link was used before the list was rendered.
+      ms: Math.max(0, sidebarJumpAt - block.renderedAt)
+    });
+  }
+
+  /**
    * Start tracking one impression.
    *
    * @param {Object} meta
@@ -185,6 +210,7 @@
       itemsSeenAt: 0,
       itemsSeenPlacement: null,
       exposureTimer: 0,
+      jumpSent: false,
       byUrl: {},
       byId: {},
       from: takePendingClick()
@@ -206,6 +232,7 @@
       }
       observeItems(block, place);
     });
+    sendJump(block);
   }
 
   function countKeys(obj) {
@@ -520,6 +547,18 @@
       });
       mo.observe(document.documentElement, { childList: true, subtree: true });
     }
+
+    // The theme announces a use of its link to the sidebar (see the theme's
+    // view/common/resource-sidebar-jump.phtml).
+    document.addEventListener('resourcesidebar:jump', function () {
+      if (sidebarJumpAt) {
+        return;
+      }
+      sidebarJumpAt = Date.now();
+      for (var b = 0; b < blocks.length; b++) {
+        sendJump(blocks[b]);
+      }
+    });
 
     document.addEventListener('click', handleActivation, true);
     document.addEventListener('auxclick', handleActivation, true);
