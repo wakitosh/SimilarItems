@@ -509,7 +509,8 @@ class LogsController extends AbstractActionController {
         'site_slug', 'locale', 'seed_item_id', 'seed_item_title', 'seed_buckets',
         'seed_item_sets', 'requested_limit', 'result_count', 'candidate_count',
         'duration_ms', 'is_empty', 'variant', 'arm', 'placement', 'ranks_seen', 'items_seen_ms',
-        'items_seen_placement', 'placement_arm', 'placement_unit', 'sidebar_jump_ms', 'config_hash', 'tiebreak', 'jitter',
+        'items_seen_placement', 'placement_arm', 'placement_unit', 'sidebar_jump_ms', 'activity_ms', 'activity_kind',
+        'client_webdriver', 'client_viewport', 'client_lang', 'config_hash', 'tiebreak', 'jitter',
         'parent_event_id', 'parent_impression_id', 'chain_key', 'hop_depth', 'entry_kind',
         'referrer_host', 'device', 'is_bot', 'client_ip', 'results',
       ];
@@ -685,7 +686,12 @@ class LogsController extends AbstractActionController {
       // sidebar list, whether the first item was seen there after the jump.
       . 'SUM(i.sidebar_jump_ms IS NOT NULL) AS jumps, '
       . 'SUM(i.items_seen_placement = \'sidebar\' AND i.sidebar_jump_ms IS NOT NULL '
-      . 'AND i.items_seen_ms IS NOT NULL AND i.items_seen_ms >= i.sidebar_jump_ms) AS seen_via_jump '
+      . 'AND i.items_seen_ms IS NOT NULL AND i.items_seen_ms >= i.sidebar_jump_ms) AS seen_via_jump, '
+      // A person on the page (0.7.4+): the population the trial is analysed on.
+      . 'SUM(i.activity_ms IS NOT NULL AND COALESCE(i.client_webdriver, 0) = 0) AS human, '
+      . 'SUM(i.activity_ms IS NOT NULL AND COALESCE(i.client_webdriver, 0) = 0 '
+      . 'AND i.ranks_seen IS NOT NULL AND i.ranks_seen <> \'\') AS human_seen, '
+      . 'SUM(i.client_webdriver = 1) AS webdriver '
       . 'FROM ' . LogService::TABLE_IMPRESSION . ' i '
       . 'LEFT JOIN (SELECT impression_key, COUNT(*) AS clicks FROM ' . $evt
       . ' WHERE event_type = \'click\' GROUP BY impression_key) c ON c.impression_key = i.impression_key '
@@ -694,9 +700,9 @@ class LogsController extends AbstractActionController {
     ) as $row) {
       $arm = (string) $row['arm'];
       if (!isset($out['arms'][$arm])) {
-        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'devices' => []];
+        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'human' => 0, 'human_seen' => 0, 'webdriver' => 0, 'devices' => []];
       }
-      foreach (['n', 'items_seen', 'clicks', 'jumps', 'seen_via_jump'] as $k) {
+      foreach (['n', 'items_seen', 'clicks', 'jumps', 'seen_via_jump', 'human', 'human_seen', 'webdriver'] as $k) {
         $out['arms'][$arm][$k] += (int) $row[$k];
       }
       $out['arms'][$arm]['devices'][(string) ($row['device'] ?? '')] = [
@@ -705,6 +711,9 @@ class LogsController extends AbstractActionController {
         'clicks' => (int) $row['clicks'],
         'jumps' => (int) $row['jumps'],
         'seen_via_jump' => (int) $row['seen_via_jump'],
+        'human' => (int) $row['human'],
+        'human_seen' => (int) $row['human_seen'],
+        'webdriver' => (int) $row['webdriver'],
       ];
       $out['total'] += (int) $row['n'];
       $out['mismatch'] += (int) $row['mismatch'];
@@ -712,7 +721,7 @@ class LogsController extends AbstractActionController {
     // Arms with no impression yet still count in the expected split.
     foreach ($out['arms_enabled'] as $arm) {
       if (!isset($out['arms'][$arm])) {
-        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'devices' => []];
+        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'human' => 0, 'human_seen' => 0, 'webdriver' => 0, 'devices' => []];
       }
     }
     $k = count($out['arms_enabled']);
@@ -1054,6 +1063,9 @@ class LogsController extends AbstractActionController {
       'include_bots' => (int) $this->params()->fromQuery('include_bots', 0) === 1 ? 1 : 0,
       // Only page views that took part in the placement trial.
       'trial' => (int) $this->params()->fromQuery('trial', 0) === 1 ? 1 : 0,
+      // Only page views where a person did something (pointer, touch, wheel,
+      // key) and the browser did not say it was automated. Recorded from 0.7.4.
+      'human' => (int) $this->params()->fromQuery('human', 0) === 1 ? 1 : 0,
     ];
   }
 
@@ -1102,6 +1114,12 @@ class LogsController extends AbstractActionController {
       $clauses[] = ($dataset === 'events')
         ? 'impression_id IN (SELECT id FROM ' . LogService::TABLE_IMPRESSION . ' WHERE placement_arm IS NOT NULL)'
         : 'placement_arm IS NOT NULL';
+    }
+    if (!empty($filters['human'])) {
+      $human = 'activity_ms IS NOT NULL AND COALESCE(client_webdriver, 0) = 0';
+      $clauses[] = ($dataset === 'events')
+        ? 'impression_id IN (SELECT id FROM ' . LogService::TABLE_IMPRESSION . ' WHERE ' . $human . ')'
+        : $human;
     }
     return ['WHERE ' . implode(' AND ', $clauses), $params];
   }

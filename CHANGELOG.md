@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.4] - 2026-10-13
+
+### EN
+
+#### Added
+- The usage log records whether a person was on the page. On each impression: the first pointer movement, touch, wheel or key press after the page opened (`activity_kind`, and `activity_ms`: milliseconds after the list was rendered, 0 when it came before), and once per impression a few facts about the browser: whether it declares itself automated (`client_webdriver`, from `navigator.webdriver`), its window size (`client_viewport`) and language (`client_lang`). Since October 2026 a crawler presenting itself as an ordinary desktop Chrome has been loading item pages; the User-Agent check cannot tell it from a person, and it inflates the impression counts that every rate is divided by. People nearly always move the pointer, touch, scroll with the wheel or press a key; a crawler that only loads the page does none of these.
+- Scrolling is deliberately not counted as activity: scroll events also come from scripts and layout (the viewer and the lists scroll themselves while loading), so in testing every page view, automated or not, had one. Events dispatched by scripts (`isTrusted` false) are ignored too.
+- A "Visitor activity only" filter on the log screens keeps impressions with recorded activity from a browser that did not declare automation. It carries over to the impression and event lists and to the exports.
+- The placement-trial panel shows, by arm and device, the share of impressions with visitor activity and the items-seen rate among them. Unlike filtering on whether the list was seen, activity does not depend on where the recommendations are placed, so it can define the population the trial is compared on.
+- The new columns are exported with the impressions. They are empty for impressions recorded before 0.7.4.
+
+### 日本語
+
+#### 追加
+- ページに人がいたかどうかを利用ログに記録します。インプレッションごとに、ページを開いてから最初のマウス移動・タップ・ホイール・キー入力（`activity_kind`。`activity_ms` は推薦の表示からのミリ秒で、表示前なら 0）と、ブラウザについての情報を1回だけ記録します。自動操作を申告しているか（`client_webdriver`。`navigator.webdriver` による）、ウィンドウの大きさ（`client_viewport`）、言語（`client_lang`）です。2026年10月から、通常のパソコン版 Chrome を名乗るクローラが資料ページを巡回しています。User-Agent による判定では人と区別できず、あらゆる率の分母になるインプレッション数を膨らませています。人はほぼ必ずマウスを動かすか、タップするか、ホイールを回すか、キーを押しますが、ページを読み込むだけのクローラはどれも行いません。
+- スクロールは意図的に操作に数えていません。スクロールのイベントはスクリプトやレイアウトの変化でも発生し（ビューアや一覧は読み込み中に自分でスクロールします）、試験では自動操作かどうかにかかわらず、すべての閲覧で発生しました。スクリプトが発行したイベント（`isTrusted` が false）も無視します。
+- 利用ログの画面に「閲覧者の操作があった閲覧のみ」の絞り込みを追加しました。操作が記録され、ブラウザが自動操作を申告していないインプレッションだけを残します。インプレッションとイベントの一覧、書き出しにも引き継がれます。
+- 配置試験のパネルに、群と端末ごとの「閲覧者の操作あり」の割合と、その中での「見られた率」を表示します。「推薦が見られたか」で絞るのと違い、操作の有無は推薦の配置に左右されないので、試験の比較対象を決める条件に使えます。
+- 新しい列はインプレッションの書き出しに含まれます。0.7.4 より前に記録されたインプレッションでは空欄です。
+
 ## [0.7.3] - 2026-10-11
 
 ### EN

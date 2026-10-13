@@ -156,6 +156,11 @@ class LogService {
         'placement_arm' => "ALTER TABLE `%s` ADD COLUMN `placement_arm` VARCHAR(16) DEFAULT NULL AFTER `items_seen_placement`, ADD KEY `idx_placement_arm` (`placement_arm`)",
         'placement_unit' => "ALTER TABLE `%s` ADD COLUMN `placement_unit` CHAR(16) DEFAULT NULL AFTER `placement_arm`",
         'sidebar_jump_ms' => "ALTER TABLE `%s` ADD COLUMN `sidebar_jump_ms` INT UNSIGNED DEFAULT NULL AFTER `placement_unit`",
+        'activity_ms' => "ALTER TABLE `%s` ADD COLUMN `activity_ms` INT UNSIGNED DEFAULT NULL AFTER `sidebar_jump_ms`",
+        'activity_kind' => "ALTER TABLE `%s` ADD COLUMN `activity_kind` VARCHAR(8) DEFAULT NULL AFTER `activity_ms`",
+        'client_webdriver' => "ALTER TABLE `%s` ADD COLUMN `client_webdriver` TINYINT(1) DEFAULT NULL AFTER `activity_kind`",
+        'client_viewport' => "ALTER TABLE `%s` ADD COLUMN `client_viewport` VARCHAR(16) DEFAULT NULL AFTER `client_webdriver`",
+        'client_lang' => "ALTER TABLE `%s` ADD COLUMN `client_lang` VARCHAR(16) DEFAULT NULL AFTER `client_viewport`",
       ],
       self::TABLE_EVENT => [
         'arm' => "ALTER TABLE `%s` ADD COLUMN `arm` VARCHAR(16) DEFAULT NULL AFTER `variant`, ADD KEY `idx_arm` (`arm`)",
@@ -217,6 +222,11 @@ CREATE TABLE IF NOT EXISTS `similaritems_impression` (
   `placement_arm` VARCHAR(16) DEFAULT NULL,
   `placement_unit` CHAR(16) DEFAULT NULL,
   `sidebar_jump_ms` INT UNSIGNED DEFAULT NULL,
+  `activity_ms` INT UNSIGNED DEFAULT NULL,
+  `activity_kind` VARCHAR(8) DEFAULT NULL,
+  `client_webdriver` TINYINT(1) DEFAULT NULL,
+  `client_viewport` VARCHAR(16) DEFAULT NULL,
+  `client_lang` VARCHAR(16) DEFAULT NULL,
   `config_hash` CHAR(12) DEFAULT NULL,
   `tiebreak` VARCHAR(32) DEFAULT NULL,
   `jitter` TINYINT(1) NOT NULL DEFAULT 0,
@@ -412,7 +422,7 @@ SQL;
     }
 
     $type = strtolower(trim((string) ($data['type'] ?? '')));
-    if (!in_array($type, self::EVENT_TYPES, TRUE) && $type !== 'exposure' && $type !== 'jump') {
+    if (!in_array($type, self::EVENT_TYPES, TRUE) && !in_array($type, ['exposure', 'jump', 'client', 'activity'], TRUE)) {
       return FALSE;
     }
     $impressionKey = $this->normalizeKey($data['impression'] ?? NULL);
@@ -422,7 +432,7 @@ SQL;
 
     try {
       $impression = $this->conn->fetchAssociative(
-        'SELECT id, impression_key, session_key, site_slug, seed_item_id, seed_buckets, variant, arm, chain_key, hop_depth, parent_event_id, entry_kind, results, result_count, ranks_seen, items_seen_ms, sidebar_jump_ms '
+        'SELECT id, impression_key, session_key, site_slug, seed_item_id, seed_buckets, variant, arm, chain_key, hop_depth, parent_event_id, entry_kind, results, result_count, ranks_seen, items_seen_ms, sidebar_jump_ms, activity_ms, client_webdriver '
         . 'FROM ' . self::TABLE_IMPRESSION . ' WHERE impression_key = ? LIMIT 1',
         [$impressionKey]
       );
@@ -439,6 +449,12 @@ SQL;
     }
     if ($type === 'jump') {
       return $this->recordSidebarJump($impression, $data);
+    }
+    if ($type === 'client') {
+      return $this->recordClientInfo($impression, $data);
+    }
+    if ($type === 'activity') {
+      return $this->recordActivity($impression, $data);
     }
 
     // A block written off as "not seen" when the visitor switched tabs may
@@ -964,6 +980,72 @@ SQL;
     }
     try {
       $this->conn->update(self::TABLE_IMPRESSION, $update, ['id' => (int) $impression['id']]);
+      return TRUE;
+    }
+    catch (\Throwable $e) {
+      return FALSE;
+    }
+  }
+
+  /**
+   * Record facts about the browser, sent as soon as the list is on the page.
+   *
+   * Since October 2026 a crawler that runs JavaScript and announces itself as
+   * an ordinary desktop Chrome has been loading item pages: it fetches the
+   * recommendations, so it leaves an impression, but it never looks at
+   * anything, and it slips past the user-agent filter. These facts help tell
+   * it apart without depending on the placement being tested:
+   *  - webdriver : navigator.webdriver, which automation frameworks set by
+   *                default (a crawler can hide it, so absence proves little);
+   *  - viewport  : the window's inner size (headless browsers often use a
+   *                fixed default);
+   *  - lang      : navigator.language.
+   * Only the first report is kept.
+   */
+  private function recordClientInfo(array $impression, array $data): bool {
+    if ($impression['client_webdriver'] !== NULL) {
+      return TRUE;
+    }
+    $viewport = is_string($data['viewport'] ?? NULL) && preg_match('/^\d{1,5}x\d{1,5}$/', $data['viewport'])
+      ? $data['viewport'] : NULL;
+    $lang = is_string($data['lang'] ?? NULL) && preg_match('/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$/', $data['lang'])
+      ? $data['lang'] : NULL;
+    try {
+      $this->conn->update(self::TABLE_IMPRESSION, [
+        'client_webdriver' => !empty($data['webdriver']) ? 1 : 0,
+        'client_viewport' => $viewport,
+        'client_lang' => $lang,
+      ], ['id' => (int) $impression['id']]);
+      return TRUE;
+    }
+    catch (\Throwable $e) {
+      return FALSE;
+    }
+  }
+
+  /**
+   * Record the first sign of a person on the page.
+   *
+   * The first pointer movement, touch, wheel or key press, with the time
+   * since the list was rendered (0 when it came before). People nearly always
+   * do one of these; a crawler that only loads the page does none. Scrolling
+   * is not counted, since scripts and layout changes scroll too. The
+   * signal does not depend on where the recommendations are placed, which is
+   * why it can define the population the placement trial is analysed on.
+   * Whether a view was reported cannot: that depends on how soon the block
+   * reaches the screen, which is the very thing being compared.
+   */
+  private function recordActivity(array $impression, array $data): bool {
+    if ($impression['activity_ms'] !== NULL) {
+      return TRUE;
+    }
+    $ms = $this->normalizeDuration($data['ms'] ?? NULL);
+    $kind = strtolower(trim((string) ($data['kind'] ?? '')));
+    if ($ms === NULL || !in_array($kind, ['pointer', 'touch', 'key', 'wheel'], TRUE)) {
+      return FALSE;
+    }
+    try {
+      $this->conn->update(self::TABLE_IMPRESSION, ['activity_ms' => $ms, 'activity_kind' => $kind], ['id' => (int) $impression['id']]);
       return TRUE;
     }
     catch (\Throwable $e) {

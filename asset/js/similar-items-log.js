@@ -25,6 +25,17 @@
  * "manual" is seen when it announces so (the floating panel being opened), not
  * when it is on screen.
  *
+ *  - client   : facts about the browser (navigator.webdriver, window size,
+ *               language), sent once as soon as the list is on the page.
+ *  - activity : the first pointer movement, touch, wheel or key press, with
+ *               its time. People nearly always do one of these; a crawler
+ *               that only loads the page does none. Scrolling is not counted:
+ *               a scroll event also comes from scripts and layout changes
+ *               (the viewer and the lists scroll themselves while loading),
+ *               and a crawler scrolls the page without any input. Unlike whether
+ *               a view was reported, this does not depend on where the
+ *               recommendations are placed, so it can define the population
+ *               the placement trial is analysed on.
  *  - jump     : the theme's link to the sidebar was used (on phones the
  *               sidebar comes after the whole metadata list, and the theme
  *               links to it from the top of the page). Sent once per
@@ -151,6 +162,67 @@
    */
   var sidebarJumpAt = 0;
 
+  /**
+   * First sign of a person on the page: when, and what kind. Kept at page
+   * level, since it can come before the list has loaded.
+   */
+  var activityAt = 0;
+  var activityKind = '';
+
+  function sendClient(block) {
+    var nav = window.navigator || {};
+    send(block.meta.endpoint, {
+      type: 'client',
+      impression: block.meta.impression,
+      webdriver: nav.webdriver === true ? 1 : 0,
+      viewport: (window.innerWidth || 0) + 'x' + (window.innerHeight || 0),
+      lang: String(nav.language || '').slice(0, 16)
+    });
+  }
+
+  function sendActivity(block) {
+    if (!activityAt || block.activitySent) {
+      return;
+    }
+    block.activitySent = true;
+    send(block.meta.endpoint, {
+      type: 'activity',
+      impression: block.meta.impression,
+      kind: activityKind,
+      // 0 when the visitor was already active before the list was rendered.
+      ms: Math.max(0, activityAt - block.renderedAt)
+    });
+  }
+
+  function watchActivity() {
+    var kinds = {
+      pointermove: null, pointerdown: null, touchstart: 'touch',
+      keydown: 'key', wheel: 'wheel'
+    };
+    var names = Object.keys(kinds);
+    var onFirst = function (e) {
+      // Events a script dispatches itself are not a person.
+      if (activityAt || (e && e.isTrusted === false)) {
+        return;
+      }
+      var kind = kinds[e.type];
+      if (kind === null) {
+        kind = (e.pointerType === 'touch' || e.pointerType === 'pen') ? 'touch' : 'pointer';
+      }
+      activityAt = Date.now();
+      activityKind = kind;
+      for (var i = 0; i < names.length; i++) {
+        window.removeEventListener(names[i], onFirst, true);
+      }
+      for (var b = 0; b < blocks.length; b++) {
+        sendActivity(blocks[b]);
+      }
+    };
+    for (var i = 0; i < names.length; i++) {
+      window.addEventListener(names[i], onFirst, { capture: true, passive: true });
+    }
+  }
+
   function sendJump(block) {
     if (!sidebarJumpAt || block.jumpSent) {
       return;
@@ -211,6 +283,7 @@
       itemsSeenPlacement: null,
       exposureTimer: 0,
       jumpSent: false,
+      activitySent: false,
       byUrl: {},
       byId: {},
       from: takePendingClick()
@@ -232,6 +305,8 @@
       }
       observeItems(block, place);
     });
+    sendClient(block);
+    sendActivity(block);
     sendJump(block);
   }
 
@@ -521,6 +596,7 @@
   };
 
   function init() {
+    watchActivity();
     var pending = window.__similarItemsPending || [];
     window.__similarItemsPending = [];
     for (var p = 0; p < pending.length; p++) {

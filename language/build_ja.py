@@ -123,6 +123,11 @@ JA = {
     "\"Items seen\" counts impressions where at least one recommended entry was half on screen; its rate is the main measure of the trial. Placements are compared as assigned, not as shown. Signed-in visits and bots are not included.":
         "「項目が見られた」は、推薦項目の少なくとも1件の半分以上が画面に入ったインプレッションです。「見られた率」はその割合で、試験の主要な指標です。比較は、実際に表示された配置ではなく、割り当てられた配置で行います。ログイン中の閲覧とボットは含みません。",
     "No trial impressions yet.": "試験対象のインプレッションはまだありません。",
+    "Visitor activity only": "閲覧者の操作があった閲覧のみ",
+    "With visitor activity": "閲覧者の操作あり",
+    "Items seen rate (with activity)": "見られた率（操作あり）",
+    "\"With visitor activity\": share of impressions where someone scrolled, moved a pointer, touched, used the wheel or pressed a key, in a browser that did not declare itself automated. The trial is analysed on these impressions; a crawler that runs JavaScript and only loads pages does none of this. \"Items seen rate (with activity)\" is the main measure on that population. Recorded from 0.7.4; earlier impressions count as without activity here.":
+        "「閲覧者の操作あり」は、スクロール・ポインタの移動・タッチ・ホイール・キー入力のいずれかがあり、かつブラウザが自動操作であることを示していないインプレッションの割合です。試験はこのインプレッションを対象に分析します。JavaScript を実行してページを読み込むだけの自動巡回は、これらの操作を一切行いません。「見られた率（操作あり）」が、この対象での主要な指標です。0.7.4 から記録しており、それより前のインプレッションはここでは操作なしの扱いになります。",
     "Link to sidebar used": "サイドバーへのリンク利用",
     "Seen via the link": "リンク経由で見られた",
     "\"Link to sidebar used\": share of impressions where the theme's link to the sidebar (shown on phones only) was used. \"Seen via the link\": for the sidebar list, share of items seen whose first item was seen in the sidebar after the link was used. The link is on the page in every arm, but only the sidebar list has its recommendations there.":

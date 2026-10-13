@@ -53,6 +53,7 @@ $baseQuery = array_filter([
     'session_key' => $filters['session_key'],
     'include_bots' => $filters['include_bots'],
     'trial' => !empty($filters['trial']) ? 1 : '',
+    'human' => !empty($filters['human']) ? 1 : '',
     'per_page' => $perPage,
 ], function ($v) { return $v !== '' && $v !== null; });
 $pageUrl = function (int $p) use ($baseQuery) {
