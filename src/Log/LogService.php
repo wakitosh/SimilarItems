@@ -934,8 +934,8 @@ SQL;
    *
    * The `view` event says whether the block reached the screen: 40% of the
    * block's box. That rule means different things for blocks of different
-   * heights (a 640 px sidebar list needs 256 px on screen, a 125 px row only
-   * its heading), so it cannot compare placements. This records the items
+   * heights (a tall sidebar list needs its heading and a few entries on
+   * screen, a short row only its heading), so it cannot compare placements. This records the items
    * themselves instead: a rank counts once at least half of its entry was on
    * screen. The same rule then holds for every placement, including the
    * floating panel, whose items are only on screen while it is open.
@@ -990,10 +990,10 @@ SQL;
   /**
    * Record facts about the browser, sent as soon as the list is on the page.
    *
-   * Since October 2026 a crawler that runs JavaScript and announces itself as
-   * an ordinary desktop Chrome has been loading item pages: it fetches the
-   * recommendations, so it leaves an impression, but it never looks at
-   * anything, and it slips past the user-agent filter. These facts help tell
+   * A crawler that runs JavaScript and announces itself as an ordinary
+   * desktop Chrome can load item pages: it fetches the recommendations, so it
+   * leaves an impression, but it never looks at anything, and it slips past
+   * the user-agent filter. These facts help tell
    * it apart without depending on the placement being tested:
    *  - webdriver : navigator.webdriver, which automation frameworks set by
    *                default (a crawler can hide it, so absence proves little);
@@ -1054,13 +1054,14 @@ SQL;
   }
 
   /**
-   * Record that the visitor used the theme's link to the sidebar.
+   * Record that the visitor used a link to the sidebar offered by the theme.
    *
-   * On phones the theme puts a link near the top of the page that jumps to
-   * the right sidebar, which otherwise sits after the whole metadata list. The
-   * link is shown in every arm of the placement trial, but only the sidebar
-   * arm has its recommendations there, so it changes what that arm means on a
-   * phone. Storing when the link was first used (milliseconds after the list
+   * Where the sidebar drops below the main content on narrow screens, a theme
+   * may link to it from the top of the page and announce each use with a
+   * `resourcesidebar:jump` event. Such a link is on the page in every arm of
+   * the placement trial, but only the sidebar arm has its recommendations
+   * there, so it changes what that arm means. Storing when the link was first
+   * used (milliseconds after the list
    * was rendered, 0 when it was used before) lets the analysis tell exposure
    * reached through the link from exposure reached by scrolling: an item seen
    * in the sidebar at or after this moment counts as seen via the link.

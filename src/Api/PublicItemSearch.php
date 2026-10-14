@@ -29,20 +29,18 @@ use Omeka\Api\Response;
  * visitor the visibility filter has already put `is_public = 1` in the JOIN
  * condition, so the extra term is a harmless duplicate, whereas for a user
  * holding `view-all` that filter is switched off and the term lands alone in
- * the WHERE clause, where it costs a far worse query plan - measured at 3.0 s
- * against 0.12 s for one property lookup on the production catalogue, and the
- * engine issues one such lookup per mapped value on the seed item. Discarding
- * the few non-public rows afterwards reaches the same answer at no cost: on
- * that catalogue 17 of 36,252 items attached to the public sites are
- * non-public.
+ * the WHERE clause, where it can lead MySQL to a far worse query plan, and
+ * the engine issues one such lookup per mapped value on the seed item.
+ * Discarding the non-public rows afterwards reaches the same answer at no
+ * cost, as long as non-public items are few among those attached to public
+ * sites.
  *
  * Each search is also split in two. Omeka counts every search with a second
  * query that has no LIMIT, and builds a representation for every row; the
  * engine reads only the rows and never the total, so both were being paid for
- * nothing. Asking for bare ids first and then loading exactly that set costs
- * about half as much - 1.9x measured end to end over the gathering phase, with
- * the same items in the same order - and the count is deferred to whoever
- * actually asks for it.
+ * nothing. Asking for bare ids first and then loading exactly that set gives
+ * the same items in the same order for much less work, and the count is
+ * deferred to whoever actually asks for it.
  *
  * Applied in one place rather than on each query, so that a new lookup added to
  * the scoring engine cannot silently omit it.

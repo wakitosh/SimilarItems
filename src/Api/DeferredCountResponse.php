@@ -16,9 +16,9 @@ use Omeka\Api\Response;
  *
  * Omeka counts every search it runs, with a second query that has no LIMIT. The
  * recommendation engine gathers candidates through several searches per request
- * and reads only their contents, so those counts are computed and thrown away -
- * measured on the production catalogue at a third to a half of the whole
- * response. Deferring the count means the engine stops paying for it, while a
+ * and reads only their contents, so those counts are computed and thrown away,
+ * which on a large catalogue can be a large share of the whole response.
+ * Deferring the count means the engine stops paying for it, while a
  * caller that does want a total still gets a true one.
  */
 class DeferredCountResponse extends Response {

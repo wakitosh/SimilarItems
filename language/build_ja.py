@@ -126,12 +126,14 @@ JA = {
     "Visitor activity only": "閲覧者の操作があった閲覧のみ",
     "With visitor activity": "閲覧者の操作あり",
     "Items seen rate (with activity)": "見られた率（操作あり）",
-    "\"With visitor activity\": share of impressions where someone scrolled, moved a pointer, touched, used the wheel or pressed a key, in a browser that did not declare itself automated. The trial is analysed on these impressions; a crawler that runs JavaScript and only loads pages does none of this. \"Items seen rate (with activity)\" is the main measure on that population. Recorded from 0.7.4; earlier impressions count as without activity here.":
-        "「閲覧者の操作あり」は、スクロール・ポインタの移動・タッチ・ホイール・キー入力のいずれかがあり、かつブラウザが自動操作であることを示していないインプレッションの割合です。試験はこのインプレッションを対象に分析します。JavaScript を実行してページを読み込むだけの自動巡回は、これらの操作を一切行いません。「見られた率（操作あり）」が、この対象での主要な指標です。0.7.4 から記録しており、それより前のインプレッションはここでは操作なしの扱いになります。",
+    "Share with activity": "操作ありの割合",
+    "Items seen (with activity)": "項目が見られた（操作あり）",
+    "\"With visitor activity\": impressions where someone moved a pointer, touched, used the wheel or pressed a key, in a browser that did not declare itself automated; \"Share with activity\" is their share of all impressions. The trial is analysed on these impressions; a crawler that runs JavaScript and only loads pages does none of this (scrolling is not counted, since scripts and layout changes scroll too). \"Items seen (with activity)\" and its rate are the main measure on that population. Recorded from 0.7.4; earlier impressions count as without activity here.":
+        "「閲覧者の操作あり」は、マウスの移動・タッチ・ホイール・キー入力のいずれかがあり、かつブラウザが自動操作であることを示していないインプレッションの件数で、「操作ありの割合」はそれが全体に占める割合です。試験はこのインプレッションを対象に分析します。JavaScript を実行してページを読み込むだけの自動巡回は、これらの操作を一切行いません（スクロールはスクリプトやレイアウトの変化でも起きるため数えません）。「項目が見られた（操作あり）」とその率が、この対象での主要な指標です。0.7.4 から記録しており、それより前のインプレッションはここでは操作なしの扱いになります。",
     "Link to sidebar used": "サイドバーへのリンク利用",
     "Seen via the link": "リンク経由で見られた",
-    "\"Link to sidebar used\": share of impressions where the theme's link to the sidebar (shown on phones only) was used. \"Seen via the link\": for the sidebar list, share of items seen whose first item was seen in the sidebar after the link was used. The link is on the page in every arm, but only the sidebar list has its recommendations there.":
-        "「サイドバーへのリンク利用」は、テーマのサイドバーへのリンク（スマホでのみ表示）が使われたインプレッションの割合です。「リンク経由で見られた」は右サイドバーの一覧についてのもので、項目が見られたインプレッションのうち、リンクを使った後にサイドバーで最初の項目が見られた割合です。リンクはどの群のページにもありますが、推薦がサイドバーにあるのは右サイドバーの一覧の群だけです。",
+    "\"Link to sidebar used\": share of impressions where a link to the sidebar offered by the theme was used (recorded when the theme announces it with a resourcesidebar:jump event; otherwise 0). \"Seen via the link\": for the sidebar list, share of items seen whose first item was seen in the sidebar after the link was used. The link can be on the page in every arm, but only the sidebar list has its recommendations there.":
+        "「サイドバーへのリンク利用」は、テーマが出すサイドバーへのリンクが使われたインプレッションの割合です（テーマが resourcesidebar:jump イベントで知らせる場合に記録され、知らせないテーマでは 0 です）。「リンク経由で見られた」は右サイドバーの一覧についてのもので、項目が見られたインプレッションのうち、リンクを使った後にサイドバーで最初の項目が見られた割合です。リンクはどの群のページにもありえますが、推薦がサイドバーにあるのは右サイドバーの一覧の群だけです。",
     "Control-group trial": "対照群試験",
     "Currently allocating:": "現在の配分：",
     "The trial is not running; every visitor gets the normal recommendations. The figures below are historical.":

@@ -31,17 +31,19 @@
  *               its time. People nearly always do one of these; a crawler
  *               that only loads the page does none. Scrolling is not counted:
  *               a scroll event also comes from scripts and layout changes
- *               (the viewer and the lists scroll themselves while loading),
+ *               (a viewer or a list may scroll itself while loading),
  *               and a crawler scrolls the page without any input. Unlike whether
  *               a view was reported, this does not depend on where the
  *               recommendations are placed, so it can define the population
  *               the placement trial is analysed on.
- *  - jump     : the theme's link to the sidebar was used (on phones the
- *               sidebar comes after the whole metadata list, and the theme
- *               links to it from the top of the page). Sent once per
- *               impression with the time since the list was rendered, so an
- *               item seen in the sidebar afterwards can be told apart from one
- *               reached by scrolling.
+ *  - jump     : a link to the sidebar offered by the theme was used. Themes
+ *               whose sidebar drops below the main content on narrow screens
+ *               may link to it from the top of the page; a theme announces a
+ *               use by dispatching `resourcesidebar:jump` on document. Sent
+ *               once per impression with the time since the list was
+ *               rendered, so an item seen in the sidebar afterwards can be
+ *               told apart from one reached by scrolling. Nothing is sent on
+ *               a theme that does not dispatch the event.
  *  - exposure : which ranks reached the screen, item by item (half of an
  *               entry visible). Unlike `view`, which uses 40% of the block's
  *               box and so means different things for blocks of different
@@ -157,8 +159,7 @@
   var registered = {};
 
   /**
-   * When the theme's link to the sidebar was first used on this page, if at
-   * all. Kept at page level: it can be used before the list has loaded.
+   * When a link to the sidebar was first used on this page, if at all. Kept at page level: it can be used before the list has loaded.
    */
   var sidebarJumpAt = 0;
 
@@ -624,8 +625,8 @@
       mo.observe(document.documentElement, { childList: true, subtree: true });
     }
 
-    // The theme announces a use of its link to the sidebar (see the theme's
-    // view/common/resource-sidebar-jump.phtml).
+    // A theme that offers a link to the sidebar announces each use with this
+    // event. Themes without such a link never dispatch it.
     document.addEventListener('resourcesidebar:jump', function () {
       if (sidebarJumpAt) {
         return;

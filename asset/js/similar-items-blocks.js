@@ -350,10 +350,10 @@
   /**
    * Move a placement preview typed after the fragment into the query string.
    *
-   * Item pages often carry a Mirador deep link (#canvas=...). A preview
-   * parameter added at the end of such a URL lands in the fragment, which the
-   * browser never sends: the server cannot see it, and the viewer reads it as
-   * part of the canvas id. Reloading with the parameter moved before the
+   * Item pages may carry a fragment, such as a viewer deep link
+   * (#canvas=...). A preview parameter added at the end of such a URL lands in
+   * the fragment, which the browser never sends: the server cannot see it, and
+   * a viewer may read it as part of its own state. Reloading with the parameter moved before the
    * fragment makes it work wherever it was typed. Only a valid placement name
    * is moved, and the fragment is left without it, so this cannot loop.
    *

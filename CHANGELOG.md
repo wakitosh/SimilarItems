@@ -2,13 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.5] - 2026-10-14
+
+### EN
+
+#### Changed
+- The placement-trial panel shows the visitor-activity population as counts as well as rates: "With visitor activity" is now the number of impressions, followed by its share of all impressions, the number of those where items were seen, and their items-seen rate. With only the two percentages the counts behind the main measure had to be worked out by hand. The panel's table scrolls sideways when it is wider than the screen.
+
+#### Fixed
+- The note under the placement-trial panel still listed scrolling as visitor activity; scrolling was dropped before 0.7.4 was released (scripts and layout changes scroll too). The note and the manual now match what is recorded.
+- The manual, the code comments and this changelog cited figures and arrangements from one particular site: shares of crawler traffic with dates, response times and catalogue sizes measured there, a theme's version numbers, page heights and regions. They depend on the site, so they are gone; the behaviour is described in general terms instead. No change in behaviour or data.
+
+### 日本語
+
+#### 変更
+- 配置試験のパネルで、閲覧者の操作がある閲覧を割合だけでなく件数でも示すようにしました。「閲覧者の操作あり」をインプレッションの件数とし、続けて「操作ありの割合」（全体に占める割合）、「項目が見られた（操作あり）」の件数、「見られた率（操作あり）」を並べます。割合が2つ並ぶだけでは、主要な指標の元になる件数を手で計算する必要があったためです。表が画面より広いときは横にスクロールできます。
+
+#### 修正
+- 配置試験のパネルの注記に、閲覧者の操作として「スクロール」が残っていました。スクロールは 0.7.4 の公開前に判定から外しています（スクリプトやレイアウトの変化でも起きるため）。注記とマニュアルを、実際に記録している内容に合わせました。
+- マニュアル、コードのコメント、この変更履歴に、特定のサイトでの数値や構成を書いていました（日付つきの巡回の割合、そこで測った応答時間や目録の件数、テーマの版番号・ページの高さ・領域名など）。サイトによって異なるものなので削除し、動作を一般的な形で説明するようにしました。動作とデータに変更はありません。
+
 ## [0.7.4] - 2026-10-13
 
 ### EN
 
 #### Added
-- The usage log records whether a person was on the page. On each impression: the first pointer movement, touch, wheel or key press after the page opened (`activity_kind`, and `activity_ms`: milliseconds after the list was rendered, 0 when it came before), and once per impression a few facts about the browser: whether it declares itself automated (`client_webdriver`, from `navigator.webdriver`), its window size (`client_viewport`) and language (`client_lang`). Since October 2026 a crawler presenting itself as an ordinary desktop Chrome has been loading item pages; the User-Agent check cannot tell it from a person, and it inflates the impression counts that every rate is divided by. People nearly always move the pointer, touch, scroll with the wheel or press a key; a crawler that only loads the page does none of these.
-- Scrolling is deliberately not counted as activity: scroll events also come from scripts and layout (the viewer and the lists scroll themselves while loading), so in testing every page view, automated or not, had one. Events dispatched by scripts (`isTrusted` false) are ignored too.
+- The usage log records whether a person was on the page. On each impression: the first pointer movement, touch, wheel or key press after the page opened (`activity_kind`, and `activity_ms`: milliseconds after the list was rendered, 0 when it came before), and once per impression a few facts about the browser: whether it declares itself automated (`client_webdriver`, from `navigator.webdriver`), its window size (`client_viewport`) and language (`client_lang`). A crawler can present itself as an ordinary desktop Chrome and load item pages with JavaScript running; the User-Agent check cannot tell it from a person, and it inflates the impression counts that every rate is divided by. People nearly always move the pointer, touch, scroll with the wheel or press a key; a crawler that only loads the page does none of these.
+- Scrolling is deliberately not counted as activity: scroll events also come from scripts and layout changes (a viewer or a list may scroll itself while loading), so a page view can have one without any input. Events dispatched by scripts (`isTrusted` false) are ignored too.
 - A "Visitor activity only" filter on the log screens keeps impressions with recorded activity from a browser that did not declare automation. It carries over to the impression and event lists and to the exports.
 - The placement-trial panel shows, by arm and device, the share of impressions with visitor activity and the items-seen rate among them. Unlike filtering on whether the list was seen, activity does not depend on where the recommendations are placed, so it can define the population the trial is compared on.
 - The new columns are exported with the impressions. They are empty for impressions recorded before 0.7.4.
@@ -16,8 +36,8 @@ All notable changes to this project will be documented in this file.
 ### 日本語
 
 #### 追加
-- ページに人がいたかどうかを利用ログに記録します。インプレッションごとに、ページを開いてから最初のマウス移動・タップ・ホイール・キー入力（`activity_kind`。`activity_ms` は推薦の表示からのミリ秒で、表示前なら 0）と、ブラウザについての情報を1回だけ記録します。自動操作を申告しているか（`client_webdriver`。`navigator.webdriver` による）、ウィンドウの大きさ（`client_viewport`）、言語（`client_lang`）です。2026年10月から、通常のパソコン版 Chrome を名乗るクローラが資料ページを巡回しています。User-Agent による判定では人と区別できず、あらゆる率の分母になるインプレッション数を膨らませています。人はほぼ必ずマウスを動かすか、タップするか、ホイールを回すか、キーを押しますが、ページを読み込むだけのクローラはどれも行いません。
-- スクロールは意図的に操作に数えていません。スクロールのイベントはスクリプトやレイアウトの変化でも発生し（ビューアや一覧は読み込み中に自分でスクロールします）、試験では自動操作かどうかにかかわらず、すべての閲覧で発生しました。スクリプトが発行したイベント（`isTrusted` が false）も無視します。
+- ページに人がいたかどうかを利用ログに記録します。インプレッションごとに、ページを開いてから最初のマウス移動・タップ・ホイール・キー入力（`activity_kind`。`activity_ms` は推薦の表示からのミリ秒で、表示前なら 0）と、ブラウザについての情報を1回だけ記録します。自動操作を申告しているか（`client_webdriver`。`navigator.webdriver` による）、ウィンドウの大きさ（`client_viewport`）、言語（`client_lang`）です。通常のパソコン版 Chrome を名乗り、JavaScript を実行して資料ページを巡回するクローラがあります。User-Agent による判定では人と区別できず、あらゆる率の分母になるインプレッション数を膨らませます。人はほぼ必ずマウスを動かすか、タップするか、ホイールを回すか、キーを押しますが、ページを読み込むだけのクローラはどれも行いません。
+- スクロールは意図的に操作に数えていません。スクロールのイベントはスクリプトやレイアウトの変化でも発生し（ビューアや一覧が読み込み中に自分でスクロールすることがあります）、操作がなくても起こりうるためです。スクリプトが発行したイベント（`isTrusted` が false）も無視します。
 - 利用ログの画面に「閲覧者の操作があった閲覧のみ」の絞り込みを追加しました。操作が記録され、ブラウザが自動操作を申告していないインプレッションだけを残します。インプレッションとイベントの一覧、書き出しにも引き継がれます。
 - 配置試験のパネルに、群と端末ごとの「閲覧者の操作あり」の割合と、その中での「見られた率」を表示します。「推薦が見られたか」で絞るのと違い、操作の有無は推薦の配置に左右されないので、試験の比較対象を決める条件に使えます。
 - 新しい列はインプレッションの書き出しに含まれます。0.7.4 より前に記録されたインプレッションでは空欄です。
@@ -27,16 +47,16 @@ All notable changes to this project will be documented in this file.
 ### EN
 
 #### Added
-- The usage log records when the theme's link to the sidebar was first used on a page (`sidebar_jump_ms` on the impression: milliseconds after the list was rendered, 0 when used before). On phones the theme (1.6.0+) puts a link near the top of item pages that jumps to the right sidebar, which otherwise comes after the whole metadata list. The link is on the page in every arm of the placement trial, but only the sidebar arm has its recommendations there, so on phones that arm is "the sidebar, with a link to it". With this column the analysis can tell exposure reached through the link from exposure reached by scrolling: an impression whose first item was seen in the sidebar at or after `sidebar_jump_ms` counts as seen via the link.
+- The usage log records when a link to the sidebar offered by the theme was first used on a page (`sidebar_jump_ms` on the impression: milliseconds after the list was rendered, 0 when used before). Where the sidebar drops below the main content on narrow screens, a theme may put such a link near the top of item pages. The link is on the page in every arm of the placement trial, but only the sidebar arm has its recommendations there, so with the link that arm is "the sidebar, with a link to it". With this column the analysis can tell exposure reached through the link from exposure reached by scrolling: an impression whose first item was seen in the sidebar at or after `sidebar_jump_ms` counts as seen via the link.
 - The placement-trial panel shows, by arm and device, how often the link was used and, for the sidebar arm, the share of items seen that were seen via the link. The column is exported with the impressions.
-- The logging script listens for a `resourcesidebar:jump` event on `document` (dispatched by the theme, 1.6.1+) and reports it once per impression, including when the link is used before the list has loaded. A theme without the event records nothing; nothing else changes.
+- The logging script listens for a `resourcesidebar:jump` event on `document` (dispatched by a theme that offers the link) and reports it once per impression, including when the link is used before the list has loaded. A theme without the event records nothing; nothing else changes.
 
 ### 日本語
 
 #### 追加
-- テーマのサイドバーへのリンクが、そのページで最初に使われた時刻を利用ログに記録します（インプレッションの `sidebar_jump_ms`。推薦の表示からのミリ秒で、表示前に使われた場合は 0）。スマホではテーマ（1.6.0 以降）が資料ページの上部に右サイドバーへ移動するリンクを置きます。右サイドバーは、リンクがなければメタデータ一覧のすべての後ろに来ます。このリンクは配置試験のどの群のページにもありますが、推薦がサイドバーにあるのはサイドバー群だけなので、スマホでのサイドバー群は「リンク付きのサイドバー」になります。この列があれば、リンク経由で届いた露出とスクロールで届いた露出を分けられます。最初の項目が `sidebar_jump_ms` 以後にサイドバーで見られたインプレッションを「リンク経由で見られた」とします。
+- テーマが出すサイドバーへのリンクが、そのページで最初に使われた時刻を利用ログに記録します（インプレッションの `sidebar_jump_ms`。推薦の表示からのミリ秒で、表示前に使われた場合は 0）。画面の幅が狭いとサイドバーが本文の後ろに回るテーマでは、資料ページの上部にサイドバーへ移動するリンクを置くことがあります。このリンクは配置試験のどの群のページにもありますが、推薦がサイドバーにあるのはサイドバー群だけなので、リンクがあるとサイドバー群は「リンク付きのサイドバー」になります。この列があれば、リンク経由で届いた露出とスクロールで届いた露出を分けられます。最初の項目が `sidebar_jump_ms` 以後にサイドバーで見られたインプレッションを「リンク経由で見られた」とします。
 - 配置試験のパネルに、群と端末ごとのリンクの利用率と、サイドバー群で項目が見られたうちリンク経由の割合を表示します。この列はインプレッションの書き出しにも含まれます。
-- 記録用スクリプトは `document` 上の `resourcesidebar:jump` イベント（テーマ 1.6.1 以降が発行）を受け取り、インプレッションごとに1回だけ報告します。推薦の読み込み前にリンクが使われた場合も記録します。このイベントを出さないテーマでは何も記録されず、ほかの動作は変わりません。
+- 記録用スクリプトは `document` 上の `resourcesidebar:jump` イベント（リンクを出すテーマが発行）を受け取り、インプレッションごとに1回だけ報告します。推薦の読み込み前にリンクが使われた場合も記録します。このイベントを出さないテーマでは何も記録されず、ほかの動作は変わりません。
 
 ## [0.7.2] - 2026-10-11
 
@@ -75,14 +95,12 @@ All notable changes to this project will be documented in this file.
 ### EN
 
 #### Fixed
-- The placement preview (`?si_placement=…`) did nothing when typed at the end of an item URL that carries a Mirador deep link (`#canvas=…`). Everything after `#` is the fragment, which the browser never sends, so the parameter never reached the server. The shared loader now moves a valid `si_placement` found in the fragment into the query string and reloads once, so the preview works wherever it is typed. The fragment is left without it, so this cannot loop. For visitors who are not signed in the server still ignores the parameter.
-- The same URL also left the viewer loading forever; that part is fixed in the theme (1.5.1), which read the appended text as part of the canvas id.
+- The placement preview (`?si_placement=…`) did nothing when typed at the end of an item URL that carries a fragment, such as a viewer deep link (`#canvas=…`). Everything after `#` is the fragment, which the browser never sends, so the parameter never reached the server. The shared loader now moves a valid `si_placement` found in the fragment into the query string and reloads once, so the preview works wherever it is typed. The fragment is left without it, so this cannot loop. For visitors who are not signed in the server still ignores the parameter.
 
 ### 日本語
 
 #### 修正
-- Mirador のディープリンク（`#canvas=…`）が付いた資料ページの URL の末尾に配置のプレビュー（`?si_placement=…`）を付けても、効きませんでした。`#` 以降はフラグメントで、ブラウザはサーバに送らないため、パラメータがサーバに届いていませんでした。共通の読み込み処理が、フラグメント内に有効な `si_placement` を見つけるとクエリ側へ移して一度だけ開き直すようにしたので、どこに書いても効きます。移した後のフラグメントには残らないため、繰り返し開き直すことはありません。ログインしていない閲覧者に対しては、これまでどおりサーバがパラメータを無視します。
-- 同じ URL でビューアが読み込み中のまま止まる問題は、テーマ側（1.5.1）で直しました。テーマが、末尾に付け足された文字列までキャンバスIDの一部として読んでいたためです。
+- フラグメント（ビューアのディープリンク `#canvas=…` など）が付いた資料ページの URL の末尾に配置のプレビュー（`?si_placement=…`）を付けても、効きませんでした。`#` 以降はフラグメントで、ブラウザはサーバに送らないため、パラメータがサーバに届いていませんでした。共通の読み込み処理が、フラグメント内に有効な `si_placement` を見つけるとクエリ側へ移して一度だけ開き直すようにしたので、どこに書いても効きます。移した後のフラグメントには残らないため、繰り返し開き直すことはありません。ログインしていない閲覧者に対しては、これまでどおりサーバがパラメータを無視します。
 
 ## [0.7.0] - 2026-10-08
 
@@ -131,15 +149,15 @@ All notable changes to this project will be documented in this file.
 ### EN
 
 #### Added
-- Two resource page blocks, so that the placement of the recommendations can be tried out and compared. The sidebar list was measured to reach the screen on about one page view in seven (15.3% over ten days), and on phones one in fourteen, because it comes after the viewer and, on phones, after the whole of the metadata.
-  - **Similar items (row below the viewer)** (`similarItemsStrip`): five recommendations in one row, for the full-width region directly after the viewer. On narrow screens it wraps to three columns rather than scrolling sideways, so every item is on the page when the block is.
-  - **Similar items (floating button)** (`similarItemsFloating`): a character fixed to the bottom-right corner of the window shows a panel with the recommendations. With a mouse the panel opens when the pointer rests on the character (120 ms, so a pointer crossing the corner does not open it) and closes when the pointer leaves the character and the panel (after 250 ms, so the pointer can cross the gap between them). Touch has no hover, so a tap opens and closes it; the keyboard uses Enter or Space. Escape and a click outside close it in every case. A hover never moves the focus. It appears once the list has loaded and never when there is nothing to recommend. It takes no room in the page flow; assign it to the main region, which exists on every item page (a block in a sidebar creates the column, so a sidebar holding only this block would narrow the page for nothing).
+- Two resource page blocks, so that the placement of the recommendations can be tried out and compared. A sidebar list can sit far down the page - after the viewer and, on narrow screens, after the whole of the metadata - and then reaches the screen on only a small share of page views.
+  - **Similar items (row below the viewer)** (`similarItemsStrip`): five recommendations in one row, for the region directly after the viewer (a full-width one, where the theme has it). On narrow screens it wraps to three columns rather than scrolling sideways, so every item is on the page when the block is.
+  - **Similar items (floating button)** (`similarItemsFloating`): a character fixed to the bottom-right corner of the window shows a panel with the recommendations. With a mouse the panel opens when the pointer rests on the character (120 ms, so a pointer crossing the corner does not open it) and closes when the pointer leaves the character and the panel (after 250 ms, so the pointer can cross the gap between them). Touch has no hover, so a tap opens and closes it; the keyboard uses Enter or Space. Escape and a click outside close it in every case. A hover never moves the focus. It appears once the list has loaded and never when there is nothing to recommend. It takes no room in the page flow; assign it to the main region, which exists on every item page (in some themes a block in a sidebar creates the column, so a sidebar holding only this block would narrow the page for nothing).
 - The usage log records where the recommendations were shown (`placement`: `sidebar`, `strip`, `floating`) on the impression, and on each event the block it came from.
-- The usage log records which recommended items reached the screen, item by item (`ranks_seen`, `items_seen_ms`, `items_seen_placement` on the impression): a rank counts once at least half of its entry was on screen. This is the measure to compare placements with. The existing `view` rule (40% of the block's box) means different things for blocks of different heights: a 640 px sidebar list needs 256 px on screen, a 125 px row below the viewer only its heading. On a 1440 × 900 window that row counted as seen on page load with nothing done, and when the floating panel was opened first the page was still credited to the row. The `view` rule is unchanged and kept, so that the sidebar figures stay comparable with the data collected so far.
+- The usage log records which recommended items reached the screen, item by item (`ranks_seen`, `items_seen_ms`, `items_seen_placement` on the impression): a rank counts once at least half of its entry was on screen. This is the measure to compare placements with. The existing `view` rule (40% of the block's box) means different things for blocks of different heights: a tall sidebar list needs its heading and a few entries on screen, a short row below the viewer only its heading. So the row could count as seen on page load with nothing done, and be credited even when the floating panel was opened first. The `view` rule is unchanged and kept, so that the sidebar figures stay comparable with the data collected so far.
 - The log screen shows a table by placement and device: impressions, items seen and their rate, the legacy on-screen rate, clicks, and clicks per items seen. On pages showing several blocks, it also shows in which block an item was first seen and which blocks the clicks came from. The manual has a section on it.
 
 #### Changed
-- All Similar Items blocks on a page are served by one request (`asset/js/similar-items-blocks.js`), and a page view is one impression however many blocks show it. Previously each block fetched for itself, so two blocks on one page would have counted the page twice, with two different jitter draws. The module's default sidebar template uses the shared loader; themes that override it should too (see the theme's 1.5.0).
+- All Similar Items blocks on a page are served by one request (`asset/js/similar-items-blocks.js`), and a page view is one impression however many blocks show it. Previously each block fetched for itself, so two blocks on one page would have counted the page twice, with two different jitter draws. The module's default sidebar template uses the shared loader; themes that override it should too.
 - Visibility of the sidebar list is measured exactly as before: the same element, the same 40% threshold, the same timing.
 
 #### Upgrade notes
@@ -149,15 +167,15 @@ All notable changes to this project will be documented in this file.
 ### 日本語
 
 #### 追加
-- 推薦の配置を試して比較できるよう、資料ページのブロックを2種類追加しました。サイドバーの推薦は、画面に入るのがページ表示の約7回に1回（10日間で15.3%）、スマホでは約14回に1回でした。ビューアの下、スマホではメタデータ全体のさらに後ろに位置するためです。
-  - **Similar items (row below the viewer)**（`similarItemsStrip`）：推薦5件を1列に並べます。ビューア直後の全幅領域に置く想定です。狭い画面では横スクロールではなく3列に折り返すので、ブロックが画面にあれば全件がページ上にあります。
-  - **Similar items (floating button)**（`similarItemsFloating`）：画面右下に固定したキャラクターから推薦のパネルを出します。マウスではキャラクターの上にポインタを止めると開き（0.12秒。通りすがりのポインタでは開きません）、キャラクターとパネルの外へ出ると閉じます（0.25秒の猶予。両者の間の隙間を渡れるようにするため）。タッチ操作にはマウスオーバーがないため、タップで開閉します。キーボードでは Enter または Space で開きます。Esc キーとパネル外のクリックでは、どの操作でも閉じます。マウスオーバーでフォーカスを移すことはありません。一覧の読み込み後に現れ、推薦がない資料では現れません。ページの流れの中では場所を取らないので、どの資料ページにもあるメイン領域に割り当ててください（サイドバーはブロックが1つあると列が作られるため、このブロックだけを置くと本文が無駄に狭くなります）。
+- 推薦の配置を試して比較できるよう、資料ページのブロックを2種類追加しました。サイドバーの推薦は、ビューアの下、画面の幅が狭いとメタデータ全体のさらに後ろに位置するため、画面に入るのがページ表示のごく一部にとどまることがあります。
+  - **Similar items (row below the viewer)**（`similarItemsStrip`）：推薦5件を1列に並べます。ビューアの直後（テーマに全幅の領域があればそこ）に置く想定です。狭い画面では横スクロールではなく3列に折り返すので、ブロックが画面にあれば全件がページ上にあります。
+  - **Similar items (floating button)**（`similarItemsFloating`）：画面右下に固定したキャラクターから推薦のパネルを出します。マウスではキャラクターの上にポインタを止めると開き（0.12秒。通りすがりのポインタでは開きません）、キャラクターとパネルの外へ出ると閉じます（0.25秒の猶予。両者の間の隙間を渡れるようにするため）。タッチ操作にはマウスオーバーがないため、タップで開閉します。キーボードでは Enter または Space で開きます。Esc キーとパネル外のクリックでは、どの操作でも閉じます。マウスオーバーでフォーカスを移すことはありません。一覧の読み込み後に現れ、推薦がない資料では現れません。ページの流れの中では場所を取らないので、どの資料ページにもあるメイン領域に割り当ててください（テーマによってはサイドバーにブロックが1つあると列が作られるため、このブロックだけを置くと本文が無駄に狭くなります）。
 - 利用ログに、推薦を表示した場所（`placement`：`sidebar`・`strip`・`floating`）をインプレッションに、各イベントにはどのブロックからのものかを記録します。
-- 利用ログに、どの推薦項目が画面に入ったかを1件ずつ記録します（インプレッションの `ranks_seen`・`items_seen_ms`・`items_seen_placement`）。項目の半分以上が画面に入ると、その順位を見られたと数えます。**配置の比較にはこれを使います。** 従来の `view` の規則（ブロックの箱の40%）は、ブロックの高さで意味が変わります。高さ640 pxのサイドバーは256 px入る必要があるのに対し、高さ125 pxのビューア下の列は見出しだけで成立します。1440×900の画面では、何も操作しないうちにビューア下の列が「見られた」と記録され、フローティングのパネルを先に開いた場合も列の手柄になっていました。`view` の規則は変えずに残しています。サイドバーの数字をこれまでのデータと比べられるようにするためです。
+- 利用ログに、どの推薦項目が画面に入ったかを1件ずつ記録します（インプレッションの `ranks_seen`・`items_seen_ms`・`items_seen_placement`）。項目の半分以上が画面に入ると、その順位を見られたと数えます。**配置の比較にはこれを使います。** 従来の `view` の規則（ブロックの箱の40%）は、ブロックの高さで意味が変わります。背の高いサイドバーは見出しと数件分が画面に入る必要があるのに対し、背の低いビューア下の列は見出しだけで成立します。そのため、何も操作しないうちにビューア下の列が「見られた」と記録されたり、フローティングのパネルを先に開いた場合も列の手柄になったりすることがありました。`view` の規則は変えずに残しています。サイドバーの数字をこれまでのデータと比べられるようにするためです。
 - ログ画面に、表示場所と端末別の表を追加しました（インプレッション、項目が見られた数と割合、従来の画面到達率、クリック、項目が見られたあたりのクリック）。複数のブロックがあるページについては、どのブロックで最初に項目が見られたか、どのブロックからクリックされたかも示します。マニュアルに節を追加しました。
 
 #### 変更
-- 1ページにあるすべての推薦ブロックを1回の取得でまかない（`asset/js/similar-items-blocks.js`）、ブロックがいくつあってもページ表示1回をインプレッション1件とします。これまでは各ブロックが個別に取得していたため、同じページに2つ置くとページが2回数えられ、ゆらぎの抽選も2回別々に行われていました。モジュール既定のサイドバー用テンプレートは共通の取得処理を使います。これを上書きしているテーマも同様にしてください（テーマ 1.5.0 を参照）。
+- 1ページにあるすべての推薦ブロックを1回の取得でまかない（`asset/js/similar-items-blocks.js`）、ブロックがいくつあってもページ表示1回をインプレッション1件とします。これまでは各ブロックが個別に取得していたため、同じページに2つ置くとページが2回数えられ、ゆらぎの抽選も2回別々に行われていました。モジュール既定のサイドバー用テンプレートは共通の取得処理を使います。これを上書きしているテーマも同様にしてください。
 - サイドバーの推薦の画面到達の計測は、従来とまったく同じです（同じ要素、同じ40%のしきい値、同じタイミング）。
 
 #### 更新時の注意
@@ -169,13 +187,13 @@ All notable changes to this project will be documented in this file.
 ### EN
 
 #### Changed
-- Candidate lookups are about 1.9x faster. Omeka counts every search with a second query that has no LIMIT, and builds a representation for every row it returns. The engine reads only the rows and never the total, so both were being paid for nothing: on the production catalogue the count alone was a third to a half of the whole response (2,668 ms of 5,956 ms for a seed item with 51 mapped values). Each lookup now asks for bare ids, then loads exactly that set, and the count is deferred to a caller that actually asks for one. Measured over the gathering phase: 1.81x, 1.84x and 1.90x on three seed items spanning the cost range, returning the same items in the same order in every case. Verified on production against a baseline of thirteen seed items taken before the change with jitter switched off: the recommended items and the candidate counts are identical for all thirteen, and the total time fell from 31,974 ms to 21,410 ms (1.49x end to end, the remainder being scoring work that is unchanged).
+- Candidate lookups are faster. Omeka counts every search with a second query that has no LIMIT, and builds a representation for every row it returns. The engine reads only the rows and never the total, so both were being paid for nothing; on a large catalogue the count alone can be a large share of the whole response. Each lookup now asks for bare ids, then loads exactly that set, and the count is deferred to a caller that actually asks for one. The same items are returned in the same order, and with jitter switched off the recommended items and candidate counts are unchanged.
 - Searches asking for a single row are passed through unchanged. Those exist to read a total, which is what the arm assignment samples against, so splitting them would only move the cost they exist to pay.
 
 ### 日本語
 
 #### 変更
-- 候補検索が約1.9倍速くなりました。Omeka は検索のたびに LIMIT のない2本目のクエリで総件数を数え、返す行すべてについて表現オブジェクトを構築します。推薦エンジンは行の中身しか読まず総件数を一度も参照していないため、どちらも無駄でした。本番目録では総件数の算出だけで応答全体の3分の1から半分を占めていました（マップ値51件の資料で 5,956 ms 中 2,668 ms）。各検索はまずIDのみを取得し、そのIDの集合だけを読み込む形に変えました。総件数は実際に必要とする呼び出し元のために遅延評価されます。コストの幅を代表する3資料で候補収集の位相を実測し、1.81倍・1.84倍・1.90倍。いずれも同じ資料が同じ順序で返ることを確認しています。さらに本番で、変更前にゆらぎを切って取得した13資料の基準値と突き合わせ、推薦資料・候補数とも13件すべてで一致すること、所要時間の合計が 31,974 ms から 21,410 ms になること（全体で1.49倍。残りは変更していない採点の処理）を確認しました。
+- 候補検索が速くなりました。Omeka は検索のたびに LIMIT のない2本目のクエリで総件数を数え、返す行すべてについて表現オブジェクトを構築します。推薦エンジンは行の中身しか読まず総件数を一度も参照していないため、どちらも無駄でした。大きな目録では、総件数の算出だけで応答全体のかなりの部分を占めることがあります。各検索はまずIDのみを取得し、そのIDの集合だけを読み込む形に変えました。総件数は実際に必要とする呼び出し元のために遅延評価されます。同じ資料が同じ順序で返り、ゆらぎを切った状態では推薦資料・候補数とも変わりません。
 - 1件だけを求める検索は従来どおりそのまま通します。これは総件数を読むためのもので、アーム割り当ての標本抽出がそれを使っています。分割しても、その検索が払うべきコストを移動させるだけです。
 
 ## [0.5.11] - 2026-09-17
@@ -183,20 +201,20 @@ All notable changes to this project will be documented in this file.
 ### EN
 
 #### Fixed
-- Recommendations took about 16 seconds for signed-in staff while anonymous visitors were served in about one second. 0.5.9 kept non-public items out of the results by adding `is_public` to every item query. For an anonymous visitor that term is a duplicate: Omeka's visibility filter has already placed `is_public = 1` in the JOIN condition, so the query plan is unaffected. For a user holding `view-all` that filter is switched off, the term lands alone in the WHERE clause, and MySQL chooses a far worse plan - 3.0 s against 0.12 s for a single property lookup on the production catalogue. The engine issues one such lookup per mapped value on the seed item, so the cost multiplied by five to fifty. Non-public items are now removed from the results instead of from the query, which reaches the same answer: measured at 24.4x faster over fourteen real lookups, with identical result sets in thirteen of them.
-- The exception is a lookup that fills its 200-row limit. Filtering after the query can leave fewer than 200 candidates where filtering inside it would have returned 200 public ones. On the production catalogue 17 of 36,252 items attached to the public sites are non-public, so at most a handful of candidates are lost from a pool that feeds a list of five. No non-public item can reach the results either way.
+- Recommendations were far slower for signed-in users holding `view-all` than for anonymous visitors. 0.5.9 kept non-public items out of the results by adding `is_public` to every item query. For an anonymous visitor that term is a duplicate: Omeka's visibility filter has already placed `is_public = 1` in the JOIN condition, so the query plan is unaffected. For a user holding `view-all` that filter is switched off, the term lands alone in the WHERE clause, and MySQL can choose a far worse plan. The engine issues one such lookup per mapped value on the seed item, so the cost is multiplied accordingly. Non-public items are now removed from the results instead of from the query, which reaches the same answer except as below.
+- The exception is a lookup that fills its 200-row limit. Filtering after the query can leave fewer than 200 candidates where filtering inside it would have returned 200 public ones. Where non-public items are few among those attached to public sites, at most a handful of candidates are lost from a pool that feeds a short list. No non-public item can reach the results either way.
 
 #### Notes
-- Public visitors were never affected. Across the 177 impressions recorded since 0.5.9 the median response was 1,116 ms and the slowest 6,348 ms, with none above 10 s. Signed-in visits are not recorded, so no collected usage data contains the slow responses.
+- Anonymous visitors were not affected. Signed-in visits are not recorded by default, so collected usage data does not contain the slow responses.
 
 ### 日本語
 
 #### 修正
-- ログイン中の職員に対して推薦が約16秒かかっていました（匿名の閲覧者は約1秒）。0.5.9 は非公開資料を結果から除くために、すべての資料検索へ `is_public` を追加していました。匿名の閲覧者ではこれは重複した条件です。Omeka の可視性フィルタが既に JOIN 条件へ `is_public = 1` を入れているため、実行計画は変わりません。しかし `view-all` を持つ利用者ではそのフィルタが無効化されるため、この条件が単独で WHERE 句に残り、MySQL がはるかに悪い実行計画を選びます（本番目録で単一のプロパティ検索が 0.12 秒に対し 3.0 秒）。推薦1回はシード資料のマップ値数だけ検索を発行するので、この差が5〜50倍に積み上がっていました。非公開資料の除外を、クエリ条件ではなく取得後の除外に変更しました。結果は同じです。実在する14件の検索で 24.4 倍速くなり、うち13件は結果集合が完全に一致しました。
-- 例外は、200件の上限に達する検索です。取得後に除外すると、クエリ内で除外した場合に得られたはずの「公開200件」より候補が少なくなります。本番目録では公開サイトに紐づく36,252件のうち非公開は17件なので、5件の一覧を作るための候補プールから失われるのは多くても数件です。いずれの方式でも非公開資料が結果に現れることはありません。
+- `view-all` を持つログイン中の利用者に対して、推薦が匿名の閲覧者よりはるかに遅くなっていました。0.5.9 は非公開資料を結果から除くために、すべての資料検索へ `is_public` を追加していました。匿名の閲覧者ではこれは重複した条件です。Omeka の可視性フィルタが既に JOIN 条件へ `is_public = 1` を入れているため、実行計画は変わりません。しかし `view-all` を持つ利用者ではそのフィルタが無効化されるため、この条件が単独で WHERE 句に残り、MySQL がはるかに悪い実行計画を選ぶことがあります。推薦1回はシード資料のマップ値数だけ検索を発行するので、この差が積み上がります。非公開資料の除外を、クエリ条件ではなく取得後の除外に変更しました。次の例外を除き、結果は同じです。
+- 例外は、200件の上限に達する検索です。取得後に除外すると、クエリ内で除外した場合に得られたはずの「公開200件」より候補が少なくなります。公開サイトに紐づく資料のうち非公開のものが少なければ、短い一覧を作るための候補プールから失われるのは多くても数件です。いずれの方式でも非公開資料が結果に現れることはありません。
 
 #### 備考
-- 一般の閲覧者は影響を受けていません。0.5.9 以降に記録された177件のインプレッションで、応答時間は中央値 1,116 ms、最大 6,348 ms、10秒を超えたものはありません。ログイン中の閲覧は記録対象外のため、収集済みの利用ログにこの遅延は含まれていません。
+- 匿名の閲覧者は影響を受けていません。ログイン中の閲覧は既定で記録対象外のため、収集済みの利用ログにこの遅延は含まれていません。
 
 ## [0.5.10] - 2026-09-17
 
@@ -204,22 +222,22 @@ All notable changes to this project will be documented in this file.
 
 #### Fixed
 - The module configuration and the manual still justified excluding signed-in visits by saying that staff are shown private items, which stopped being true in 0.5.9. The reason is now the one that still holds: staff browse to check the site rather than to discover, so their behaviour is not comparable, and verification clicks would otherwise land in the data.
-- Two claims about response time were stated more firmly than the evidence supports. Production showed almost no difference in response time between impressions that were reported and those that were not (1,217 ms vs 1,252 ms), so "suspect the response time" is now "worth checking, but a short visit or a failed request produces the same result".
+- Two claims about response time were stated more firmly than the evidence supports. A slow response is one possible reason for a missing report, not necessarily the main one, so "suspect the response time" is now "worth checking, but a short visit or a failed request produces the same result".
 
 #### Added
 - The manual says that non-public items are never recommended, which is the answer to "why does my unpublished item never appear".
-- The bot note now uses what was actually measured: most requests to the recommendation endpoint come from crawlers that do execute JavaScript, and are excluded by user agent before anything is recorded.
+- The bot note now says that crawlers which execute JavaScript do request recommendations, and that those identifying themselves are excluded by user agent before anything is recorded.
 - "Include bots" on the log screen does nothing when bots are excluded at collection time, since no bot rows exist. The manual says so.
 
 ### 日本語
 
 #### 修正
 - モジュール設定とマニュアルが、ログイン中の閲覧を除外する理由として「職員には非公開資料も推薦されるため」と説明したままでした。0.5.9 でこれは事実でなくなっています。現在も成り立つ理由（職員は発見のためではなく確認のために閲覧するので行動が比較できない、動作確認のクリックが混ざる）に書き換えました。
-- 応答時間に関する2つの記述が、根拠より強く断定していました。本番では報告のあったインプレッションと無かったものとで応答時間にほとんど差がなく（1,217 ms 対 1,252 ms）、「まず応答時間を疑う」ではなく「確認する価値はあるが、短い滞在や通信の失敗でも同じことが起きる」に改めました。
+- 応答時間に関する2つの記述が、根拠より強く断定していました。応答の遅さは報告が届かない理由の一つにすぎず、主な理由とは限らないため、「まず応答時間を疑う」ではなく「確認する価値はあるが、短い滞在や通信の失敗でも同じことが起きる」に改めました。
 
 #### 追加
 - 非公開資料が誰にも推薦されないことをマニュアルに明記しました（「未公開の資料が推薦に出てこない」理由になります）。
-- ボットに関する説明を実測に基づく記述にしました。推薦エンドポイントへの要求の大半は JavaScript を実行するクローラであり、記録前に User-Agent で除外しています。
+- ボットに関する説明を改めました。JavaScript を実行するクローラも推薦を要求すること、名乗りのあるクローラは記録前に User-Agent で除外していることを記しました。
 - ログ画面の「Include bots」は、収集時にボットを除外している場合はボットの記録自体が存在しないため結果が変わりません。その旨を明記しました。
 
 ## [0.5.9] - 2026-09-17
@@ -307,14 +325,14 @@ All notable changes to this project will be documented in this file.
 ### EN
 
 #### Fixed
-- Internal navigation was filed as `external`. The self-host comparison used `HTTP_HOST`, which behind a reverse proxy is not the host the visitor used, so every in-site referrer failed the check - 39% of the first day's impressions were mislabelled and not one `internal` row was produced. The browser now reports whether the referrer is same-origin, which is the only reliable judgement, and the server-side fallback also considers `X-Forwarded-Host`. Existing rows can be corrected in place from the stored `referrer_host`.
-- Visibility tracking died permanently once a block was written off as "not seen". Switching tabs fires `visibilitychange`, which flushed a `was_visible = 0` view and set the sent flag, so a visitor who came back and scrolled to the block was still recorded as never having seen it - and any subsequent click reported `was_visible = 0` with no `visible_ms`, which cannot happen in reality. Production showed 7 such clicks on the first day. The observer now keeps running, records the moment of first visibility regardless, and sends a follow-up that upgrades the earlier row; the server applies the upgrade instead of rejecting the duplicate.
+- Internal navigation was filed as `external`. The self-host comparison used `HTTP_HOST`, which behind a reverse proxy is not the host the visitor used, so every in-site referrer failed the check and not one `internal` row was produced. The browser now reports whether the referrer is same-origin, which is the only reliable judgement, and the server-side fallback also considers `X-Forwarded-Host`. Existing rows can be corrected in place from the stored `referrer_host`.
+- Visibility tracking died permanently once a block was written off as "not seen". Switching tabs fires `visibilitychange`, which flushed a `was_visible = 0` view and set the sent flag, so a visitor who came back and scrolled to the block was still recorded as never having seen it - and any subsequent click reported `was_visible = 0` with no `visible_ms`, which cannot happen in reality. The observer now keeps running, records the moment of first visibility regardless, and sends a follow-up that upgrades the earlier row; the server applies the upgrade instead of rejecting the duplicate.
 
 ### 日本語
 
 #### 修正
-- サイト内遷移が `external` に分類されていました。自ホスト判定に `HTTP_HOST` を使っていましたが、リバースプロキシ経由では閲覧者が実際に使ったホストと一致しないため、サイト内リファラがすべて判定に失敗していました（初日のインプレッションの 39% が誤分類され、`internal` は 1 件も生成されず）。リファラが同一オリジンかどうかはブラウザだけが確実に判定できるため、その結果を送信する方式に変更し、サーバ側のフォールバックでも `X-Forwarded-Host` を見るようにしました。既存の行は保存済みの `referrer_host` から補正できます。
-- 一度「未可視」と記録されると、以後の可視化追跡が永久に止まっていました。タブ切替で `visibilitychange` が発火すると `was_visible = 0` の view を確定送信して送信済みフラグが立つため、閲覧者が戻ってブロックまでスクロールしても「見ていない」ままになり、その後のクリックが `was_visible = 0`・`visible_ms` なしで記録されていました（現実にはあり得ない組み合わせで、本番初日に 7 件発生）。監視を継続し、初回可視時刻は送信状況にかかわらず記録し、先の行を訂正する追送を行うようにしました。サーバ側は重複として拒否せず訂正を適用します。
+- サイト内遷移が `external` に分類されていました。自ホスト判定に `HTTP_HOST` を使っていましたが、リバースプロキシ経由では閲覧者が実際に使ったホストと一致しないため、サイト内リファラがすべて判定に失敗していました（`internal` は 1 件も生成されず）。リファラが同一オリジンかどうかはブラウザだけが確実に判定できるため、その結果を送信する方式に変更し、サーバ側のフォールバックでも `X-Forwarded-Host` を見るようにしました。既存の行は保存済みの `referrer_host` から補正できます。
+- 一度「未可視」と記録されると、以後の可視化追跡が永久に止まっていました。タブ切替で `visibilitychange` が発火すると `was_visible = 0` の view を確定送信して送信済みフラグが立つため、閲覧者が戻ってブロックまでスクロールしても「見ていない」ままになり、その後のクリックが `was_visible = 0`・`visible_ms` なしで記録されていました（現実にはあり得ない組み合わせ）。監視を継続し、初回可視時刻は送信状況にかかわらず記録し、先の行を訂正する追送を行うようにしました。サーバ側は重複として拒否せず訂正を適用します。
 
 ## [0.5.2] - 2026-09-15
 
@@ -333,14 +351,14 @@ All notable changes to this project will be documented in this file.
 ### EN
 
 #### Fixed
-- The client logging script was never loaded on themes that override `layout.phtml` without repeating `$this->trigger('view.layout')`. That event is fired only from Omeka's own layout, so every listener attached to it is silently dropped by such a theme - and the theme in production here is one of them. The result was that impressions were recorded but **no `view` or `click` event ever arrived**, and the "off" arm's hiding stylesheet would not have been applied either. The assets are now queued on the MVC render event, which runs regardless of the layout in use. Verified on both an overriding and a non-overriding theme, on browse, item and error pages, injecting exactly once.
+- The client logging script was never loaded on themes that override `layout.phtml` without repeating `$this->trigger('view.layout')`. That event is fired only from Omeka's own layout, so every listener attached to it is silently dropped by such a theme. The result was that impressions were recorded but **no `view` or `click` event ever arrived**, and the "off" arm's hiding stylesheet would not have been applied either. The assets are now queued on the MVC render event, which runs regardless of the layout in use. Verified on both an overriding and a non-overriding theme, on browse, item and error pages, injecting exactly once.
 
 > Operators: any other module relying on `view.layout` (CSSEditor, for one) is affected by the same theme behaviour and should be checked separately.
 
 ### 日本語
 
 #### 修正
-- `layout.phtml` を上書きし `$this->trigger('view.layout')` を呼ばないテーマでは、クライアント側ログ収集スクリプトが読み込まれませんでした。このイベントは Omeka コアのレイアウトからしか発火されないため、そうしたテーマでは同イベントに登録したリスナーがすべて無視されます（本番で使用中のテーマが該当）。結果としてインプレッションは記録されるものの、**`view`・`click` イベントが 1 件も届かない**状態になり、対照群「非表示」アームの非表示スタイルも適用されないところでした。MVC の render イベントで登録する方式に変更し、レイアウトの実装に依存しないようにしました。上書きテーマ・非上書きテーマの双方、一覧／資料／エラーページで、重複なく 1 回だけ注入されることを確認済みです。
+- `layout.phtml` を上書きし `$this->trigger('view.layout')` を呼ばないテーマでは、クライアント側ログ収集スクリプトが読み込まれませんでした。このイベントは Omeka コアのレイアウトからしか発火されないため、そうしたテーマでは同イベントに登録したリスナーがすべて無視されます。結果としてインプレッションは記録されるものの、**`view`・`click` イベントが 1 件も届かない**状態になり、対照群「非表示」アームの非表示スタイルも適用されないところでした。MVC の render イベントで登録する方式に変更し、レイアウトの実装に依存しないようにしました。上書きテーマ・非上書きテーマの双方、一覧／資料／エラーページで、重複なく 1 回だけ注入されることを確認済みです。
 
 > 運用上の注意: `view.layout` に依存する他のモジュール（CSSEditor など）も同じ影響を受けます。別途確認してください。
 
@@ -763,7 +781,7 @@ Initial release.
   - Use Item Sets with weight
   - Up to four property-based criteria (term, match type: eq/cont/in, weight)
   - Cap of terms per property and a pool-size multiplier to balance API calls vs. ranking quality
-- Theme integration (example: foundation_tsukuba2025) supporting:
+- Theme integration supporting:
   - Two-column UI with list + mascot and hover thumbnail popovers
   - Speech bubble row (JA/EN), right-aligned with pointer
   - Title text (JA/EN) and show/hide toggle; maximum results

@@ -288,7 +288,7 @@ class Module extends AbstractModule {
         }
         $box .= '</ul>';
       }
-      $box .= '<p style="margin:.4rem 0 0;">' . $escape('ブロックを割り当てる領域の推奨：右サイドバーの一覧 → 右サイドバー、ビューア下の列 → 全幅メイン（mirador の直後）、右下のフローティング → メイン（末尾）。ログイン中は、資料ページの URL に ?si_placement=sidebar / strip / floating を付けると、その配置を確認できます。') . '</p>'
+      $box .= '<p style="margin:.4rem 0 0;">' . $escape('ブロックを割り当てる場所の推奨：右サイドバーの一覧 → サイドバー、ビューア下の列 → ビューアの直後（テーマに本文幅いっぱいの領域があればそこ）、右下のフローティング → 本文の領域（末尾など）。ログイン中は、資料ページの URL に ?si_placement=sidebar / strip / floating を付けると、その配置を確認できます。') . '</p>'
         . '</div>';
       $markup = preg_replace(
         '#(<fieldset name="similaritems_group_placement">.*?</fieldset>)#s',

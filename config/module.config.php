@@ -215,7 +215,8 @@ return [
     // Factories, not invokables: each block asks the placement trial whether
     // it is the one to render for this visitor.
     'factories' => [
-      // Registered as "similarItems" to match the theme's default placement key.
+      // Registered as "similarItems", the key themes use for this block in
+      // their default placement.
       'similarItems' => function ($container) {
         return new SimilarItemsBlock($container->get(PlacementAssigner::class));
       },

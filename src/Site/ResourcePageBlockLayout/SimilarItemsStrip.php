@@ -12,10 +12,10 @@ use SimilarItems\Experiment\PlacementAssigner;
 /**
  * Resource page block: similar items as a single row of five.
  *
- * Meant for the full-width region directly below the viewer, where it reaches
- * the screen as soon as the visitor scrolls at all. The sidebar block sits below
- * the viewer and after the export and download panels, and was measured to be
- * seen on about one page view in seven.
+ * Meant for the region directly below the viewer, where it reaches the screen
+ * as soon as the visitor scrolls at all. A sidebar list can sit far down the
+ * page, after the viewer and whatever other panels the sidebar holds, and so
+ * may be seen on only a small share of page views.
  */
 class SimilarItemsStrip implements ResourcePageBlockLayoutInterface {
 

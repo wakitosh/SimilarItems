@@ -682,7 +682,7 @@ class LogsController extends AbstractActionController {
       . 'SUM(i.ranks_seen IS NOT NULL AND i.ranks_seen <> \'\') AS items_seen, '
       . 'COALESCE(SUM(c.clicks), 0) AS clicks, '
       . 'SUM(COALESCE(i.placement, \'\') <> i.placement_arm) AS mismatch, '
-      // Phones: the theme's link to the sidebar. Used at all, and, for the
+      // A link to the sidebar offered by the theme: used at all, and, for the
       // sidebar list, whether the first item was seen there after the jump.
       . 'SUM(i.sidebar_jump_ms IS NOT NULL) AS jumps, '
       . 'SUM(i.items_seen_placement = \'sidebar\' AND i.sidebar_jump_ms IS NOT NULL '
@@ -915,8 +915,8 @@ class LogsController extends AbstractActionController {
       $out['entry_kinds'][(string) ($row['entry_kind'] ?? '')] = (int) $row['n'];
     }
     // Where the recommendations were shown, and how often they were seen
-    // there. This is the comparison the placement trial is about: the sidebar
-    // list was measured to reach the screen on about one page view in seven.
+    // there. This is the comparison the placement trial is about: a sidebar
+    // list far down the page may reach the screen on few page views.
     // "Seen" is a visible view; for the floating button that means the panel
     // was opened, since the button itself is always on screen.
     foreach ($this->safeFetchAll(

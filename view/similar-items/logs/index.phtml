@@ -289,6 +289,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
       <?php endif; ?>
     </p>
     <?php if ($pt['total'] > 0): ?>
+      <div style="overflow-x:auto;">
       <table class="si-table">
         <thead>
           <tr>
@@ -303,6 +304,8 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
             <th class="num"><?= $escape($translate('Link to sidebar used')) ?></th>
             <th class="num"><?= $escape($translate('Seen via the link')) ?></th>
             <th class="num"><?= $escape($translate('With visitor activity')) ?></th>
+            <th class="num"><?= $escape($translate('Share with activity')) ?></th>
+            <th class="num"><?= $escape($translate('Items seen (with activity)')) ?></th>
             <th class="num"><?= $escape($translate('Items seen rate (with activity)')) ?></th>
           </tr>
         </thead>
@@ -318,7 +321,9 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
               <td class="num"><?= $ptRate($a['clicks'], $a['items_seen']) ?></td>
               <td class="num"><?= $ptRate($a['jumps'], $a['n']) ?></td>
               <td class="num"><?= $arm === 'sidebar' ? $ptRate($a['seen_via_jump'], $a['items_seen']) : '–' ?></td>
+              <td class="num"><?= $num($a['human']) ?></td>
               <td class="num"><?= $ptRate($a['human'], $a['n']) ?></td>
+              <td class="num"><?= $num($a['human_seen']) ?></td>
               <td class="num"><strong><?= $ptRate($a['human_seen'], $a['human']) ?></strong></td>
             </tr>
             <?php foreach ($a['devices'] as $device => $d): ?>
@@ -332,13 +337,16 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
                 <td class="num"><?= $ptRate($d['clicks'], $d['items_seen']) ?></td>
                 <td class="num"><?= $ptRate($d['jumps'], $d['n']) ?></td>
                 <td class="num"><?= $arm === 'sidebar' ? $ptRate($d['seen_via_jump'], $d['items_seen']) : '–' ?></td>
+                <td class="num"><?= $num($d['human']) ?></td>
                 <td class="num"><?= $ptRate($d['human'], $d['n']) ?></td>
+                <td class="num"><?= $num($d['human_seen']) ?></td>
                 <td class="num"><?= $ptRate($d['human_seen'], $d['human']) ?></td>
               </tr>
             <?php endforeach; ?>
           <?php endforeach; ?>
         </tbody>
       </table>
+      </div>
       <?php if ($pt['srm']): ?>
         <?php $srmBad = $pt['srm']['p'] !== null && $pt['srm']['p'] < 0.001; ?>
         <p class="si-note" style="margin-top:.5rem;<?= $srmBad ? 'color:#b00;font-weight:bold;' : '' ?>">
@@ -366,10 +374,10 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
         <?= $escape($translate('"Items seen" counts impressions where at least one recommended entry was half on screen; its rate is the main measure of the trial. Placements are compared as assigned, not as shown. Signed-in visits and bots are not included.')) ?>
       </p>
       <p class="si-note">
-        <?= $escape($translate('"With visitor activity": share of impressions where someone scrolled, moved a pointer, touched, used the wheel or pressed a key, in a browser that did not declare itself automated. The trial is analysed on these impressions; a crawler that runs JavaScript and only loads pages does none of this. "Items seen rate (with activity)" is the main measure on that population. Recorded from 0.7.4; earlier impressions count as without activity here.')) ?>
+        <?= $escape($translate('"With visitor activity": impressions where someone moved a pointer, touched, used the wheel or pressed a key, in a browser that did not declare itself automated; "Share with activity" is their share of all impressions. The trial is analysed on these impressions; a crawler that runs JavaScript and only loads pages does none of this (scrolling is not counted, since scripts and layout changes scroll too). "Items seen (with activity)" and its rate are the main measure on that population. Recorded from 0.7.4; earlier impressions count as without activity here.')) ?>
       </p>
       <p class="si-note">
-        <?= $escape($translate('"Link to sidebar used": share of impressions where the theme\'s link to the sidebar (shown on phones only) was used. "Seen via the link": for the sidebar list, share of items seen whose first item was seen in the sidebar after the link was used. The link is on the page in every arm, but only the sidebar list has its recommendations there.')) ?>
+        <?= $escape($translate('"Link to sidebar used": share of impressions where a link to the sidebar offered by the theme was used (recorded when the theme announces it with a resourcesidebar:jump event; otherwise 0). "Seen via the link": for the sidebar list, share of items seen whose first item was seen in the sidebar after the link was used. The link can be on the page in every arm, but only the sidebar list has its recommendations there.')) ?>
       </p>
     <?php else: ?>
       <p class="si-note"><?= $escape($translate('No trial impressions yet.')) ?></p>
