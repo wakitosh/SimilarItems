@@ -212,6 +212,9 @@ msgstr "この画面全体を試験対象だけに絞る"
 msgid "Assigned placement"
 msgstr "割り当てられた配置"
 
+msgid "Visitors"
+msgstr "閲覧者"
+
 msgid "Items seen"
 msgstr "項目が見られた"
 
@@ -246,14 +249,17 @@ msgid "all"
 msgstr "全体"
 
 #, php-format
-msgid "Sample-ratio check: chi-square = %1$s (%2$d degrees of freedom), p = %3$s."
-msgstr "振り分けの偏りの点検：χ² = %1$s（自由度 %2$d）、p = %3$s。"
+msgid "Sample-ratio check on visitors: chi-square = %1$s (%2$d degrees of freedom), p = %3$s."
+msgstr "振り分けの偏りの点検（閲覧者数）：χ² = %1$s（自由度 %2$d）、p = %3$s。"
 
-msgid "The arm sizes are far from an equal split. Page views may be going unrecorded in one placement only (a block not assigned on a site, a display fault). Do not trust the comparison until the cause is known."
-msgstr "群の大きさが等分から大きくずれています。ある配置でだけページ閲覧が記録されていない可能性があります（ブロックの割り当て漏れ、表示の不具合など）。原因が分かるまで、比較の結果は信用できません。"
+msgid "The numbers of visitors are far from an equal split. Visitors may be going unrecorded in one placement only (a block not assigned on a site, a display fault). Do not trust the comparison until the cause is known."
+msgstr "閲覧者数が等分から大きくずれています。ある配置でだけ閲覧者が記録されていない疑いがあります（サイトへのブロックの割り当て漏れ、表示の不具合など）。原因が分かるまで、比較の結果は信用しないでください。"
 
-msgid "The arm sizes are within chance of an equal split."
-msgstr "群の大きさは、等分からの偶然のずれの範囲です。"
+msgid "The numbers of visitors are within chance of an equal split."
+msgstr "閲覧者数は、等分からの偶然のずれの範囲です。"
+
+msgid "Visitors are what is assigned, so they are what should split evenly. Impressions can differ more between arms, since a few visitors reading many pages move one arm alone; on their own that is not a fault."
+msgstr "振り分けの単位は閲覧者なので、等分になるべきなのは閲覧者数です。インプレッションは群の間でもっと大きく違うことがあります。多くのページを読む少数の閲覧者が、その群の件数だけを押し上げるためで、それだけでは不具合ではありません。"
 
 #, php-format
 msgid "Impressions where the placement shown differs from the one assigned: %1$s of %2$s. A few can come from cached pages or a settings change in another tab; many mean the block assignment should be checked."

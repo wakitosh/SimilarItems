@@ -295,6 +295,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
           <tr>
             <th><?= $escape($translate('Assigned placement')) ?></th>
             <th><?= $escape($translate('Device')) ?></th>
+            <th class="num"><?= $escape($translate('Visitors')) ?></th>
             <th class="num"><?= $escape($translate('Impressions')) ?></th>
             <th class="num"><?= $escape($translate('Items seen')) ?></th>
             <th class="num"><?= $escape($translate('Items seen rate')) ?></th>
@@ -313,6 +314,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
           <?php foreach ($pt['arms'] as $arm => $a): ?>
             <tr>
               <td><strong><?= $escape($ptLabels[$arm] ?? $arm) ?></strong></td><td><?= $escape($translate('all')) ?></td>
+              <td class="num"><?= $num($a['units']) ?></td>
               <td class="num"><?= $num($a['n']) ?></td>
               <td class="num"><?= $num($a['items_seen']) ?></td>
               <td class="num"><strong><?= $ptRate($a['items_seen'], $a['n']) ?></strong></td>
@@ -329,6 +331,7 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
             <?php foreach ($a['devices'] as $device => $d): ?>
               <tr>
                 <td></td><td><?= $escape($codeLabel('device', $device)) ?></td>
+                <td class="num"><?= $num($d['units']) ?></td>
                 <td class="num"><?= $num($d['n']) ?></td>
                 <td class="num"><?= $num($d['items_seen']) ?></td>
                 <td class="num"><?= $ptRate($d['items_seen'], $d['n']) ?></td>
@@ -351,16 +354,17 @@ salt = <?= $escape((string) ($salt ?? '')) ?></pre>
         <?php $srmBad = $pt['srm']['p'] !== null && $pt['srm']['p'] < 0.001; ?>
         <p class="si-note" style="margin-top:.5rem;<?= $srmBad ? 'color:#b00;font-weight:bold;' : '' ?>">
           <?= $escape(sprintf(
-            $translate('Sample-ratio check: chi-square = %1$s (%2$d degrees of freedom), p = %3$s.'),
+            $translate('Sample-ratio check on visitors: chi-square = %1$s (%2$d degrees of freedom), p = %3$s.'),
             $num($pt['srm']['chi2'], 2),
             (int) $pt['srm']['df'],
             $pt['srm']['p'] === null ? '–' : number_format($pt['srm']['p'], 4)
           )) ?>
           <?php if ($srmBad): ?>
-            <?= $escape($translate('The arm sizes are far from an equal split. Page views may be going unrecorded in one placement only (a block not assigned on a site, a display fault). Do not trust the comparison until the cause is known.')) ?>
+            <?= $escape($translate('The numbers of visitors are far from an equal split. Visitors may be going unrecorded in one placement only (a block not assigned on a site, a display fault). Do not trust the comparison until the cause is known.')) ?>
           <?php else: ?>
-            <?= $escape($translate('The arm sizes are within chance of an equal split.')) ?>
+            <?= $escape($translate('The numbers of visitors are within chance of an equal split.')) ?>
           <?php endif; ?>
+          <?= $escape($translate('Visitors are what is assigned, so they are what should split evenly. Impressions can differ more between arms, since a few visitors reading many pages move one arm alone; on their own that is not a fault.')) ?>
         </p>
       <?php endif; ?>
       <?php if ($pt['mismatch'] > 0): ?>

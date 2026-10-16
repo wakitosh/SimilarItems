@@ -679,6 +679,7 @@ class LogsController extends AbstractActionController {
     $evt = LogService::TABLE_EVENT;
     foreach ($this->safeFetchAll(
       'SELECT i.placement_arm AS arm, i.device AS device, COUNT(*) AS n, '
+      . 'COUNT(DISTINCT i.placement_unit) AS units, '
       . 'SUM(i.ranks_seen IS NOT NULL AND i.ranks_seen <> \'\') AS items_seen, '
       . 'COALESCE(SUM(c.clicks), 0) AS clicks, '
       . 'SUM(COALESCE(i.placement, \'\') <> i.placement_arm) AS mismatch, '
@@ -700,13 +701,14 @@ class LogsController extends AbstractActionController {
     ) as $row) {
       $arm = (string) $row['arm'];
       if (!isset($out['arms'][$arm])) {
-        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'human' => 0, 'human_seen' => 0, 'webdriver' => 0, 'devices' => []];
+        $out['arms'][$arm] = ['n' => 0, 'units' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'human' => 0, 'human_seen' => 0, 'webdriver' => 0, 'devices' => []];
       }
       foreach (['n', 'items_seen', 'clicks', 'jumps', 'seen_via_jump', 'human', 'human_seen', 'webdriver'] as $k) {
         $out['arms'][$arm][$k] += (int) $row[$k];
       }
       $out['arms'][$arm]['devices'][(string) ($row['device'] ?? '')] = [
         'n' => (int) $row['n'],
+        'units' => (int) $row['units'],
         'items_seen' => (int) $row['items_seen'],
         'clicks' => (int) $row['clicks'],
         'jumps' => (int) $row['jumps'],
@@ -718,20 +720,36 @@ class LogsController extends AbstractActionController {
       $out['total'] += (int) $row['n'];
       $out['mismatch'] += (int) $row['mismatch'];
     }
+    // Visitors per arm, counted over all devices (a visitor seen on two
+    // devices with the same cookie is one visitor).
+    foreach ($this->safeFetchAll(
+      'SELECT i.placement_arm AS arm, COUNT(DISTINCT i.placement_unit) AS units FROM '
+      . LogService::TABLE_IMPRESSION . ' i ' . $where . ' GROUP BY i.placement_arm',
+      $params
+    ) as $row) {
+      if (isset($out['arms'][(string) $row['arm']])) {
+        $out['arms'][(string) $row['arm']]['units'] = (int) $row['units'];
+      }
+    }
     // Arms with no impression yet still count in the expected split.
     foreach ($out['arms_enabled'] as $arm) {
       if (!isset($out['arms'][$arm])) {
-        $out['arms'][$arm] = ['n' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'human' => 0, 'human_seen' => 0, 'webdriver' => 0, 'devices' => []];
+        $out['arms'][$arm] = ['n' => 0, 'units' => 0, 'items_seen' => 0, 'clicks' => 0, 'jumps' => 0, 'seen_via_jump' => 0, 'human' => 0, 'human_seen' => 0, 'webdriver' => 0, 'devices' => []];
       }
     }
+    // The sample-ratio check counts visitors, the unit of assignment. Page
+    // views are not independent: one visitor reading many pages moves the
+    // impression count of a single arm, so a chi-square on impressions flags
+    // ordinary browsing as a fault.
     $k = count($out['arms_enabled']);
-    if ($k >= 2 && $out['total'] > 0) {
-      $expected = $out['total'] / $k;
+    $units = array_sum(array_map(fn($arm) => $out['arms'][$arm]['units'], $out['arms_enabled']));
+    if ($k >= 2 && $units > 0) {
+      $expected = $units / $k;
       $chi = 0.0;
       foreach ($out['arms_enabled'] as $arm) {
-        $chi += (($out['arms'][$arm]['n'] - $expected) ** 2) / $expected;
+        $chi += (($out['arms'][$arm]['units'] - $expected) ** 2) / $expected;
       }
-      $out['srm'] = ['chi2' => $chi, 'df' => $k - 1, 'p' => $this->chiSquareP($chi, $k - 1)];
+      $out['srm'] = ['chi2' => $chi, 'df' => $k - 1, 'p' => $this->chiSquareP($chi, $k - 1), 'units' => $units];
     }
     return $out;
   }

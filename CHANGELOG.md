@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.6] - 2026-10-16
+
+### EN
+
+#### Fixed
+- The placement-trial panel's sample-ratio check counted impressions, so it could flag a fault where there was none. Assignment is per visitor and a visitor keeps their placement on every page, so pages from one visitor are not independent: a few visitors reading many pages raise the impression count of their arm alone, and a chi-square on impressions reads that ordinary browsing as an uneven split. The check now counts visitors (distinct `placement_unit`), which is what the assignment splits.
+- The panel shows the number of visitors per arm and device next to the impressions, and says that impressions can differ between arms more than visitors do without anything being wrong. The manual explains the same.
+
+### 日本語
+
+#### 修正
+- 配置試験のパネルの「振り分けの偏りの点検」がインプレッションの件数で検定していたため、不具合がないのに偏りを警告することがありました。振り分けは閲覧者ごとで、同じ人はどのページでも同じ配置を見るので、同じ人の複数ページは独立ではありません。多くのページを読む少数の閲覧者がいるとその群のインプレッションだけが増え、インプレッションで χ² 検定をすると、ふつうの閲覧を偏った振り分けと判定してしまいます。点検を、振り分けの単位である閲覧者の数（`placement_unit` の異なり数）で行うようにしました。
+- パネルに群と端末ごとの閲覧者数をインプレッションと並べて表示し、インプレッションは閲覧者数より群の間で大きく違うことがあり、それだけでは不具合ではないことを記しました。マニュアルにも同じ説明を加えました。
+
 ## [0.7.5] - 2026-10-14
 
 ### EN

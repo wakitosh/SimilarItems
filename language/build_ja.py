@@ -113,11 +113,6 @@ JA = {
     "Clicks per impression": "インプレッションあたりのクリック",
     "Clicks per items seen": "見られたあたりのクリック",
     "all": "全体",
-    "Sample-ratio check: chi-square = %1$s (%2$d degrees of freedom), p = %3$s.":
-        "振り分けの偏りの点検：χ² = %1$s（自由度 %2$d）、p = %3$s。",
-    "The arm sizes are far from an equal split. Page views may be going unrecorded in one placement only (a block not assigned on a site, a display fault). Do not trust the comparison until the cause is known.":
-        "群の大きさが等分から大きくずれています。ある配置でだけページ閲覧が記録されていない可能性があります（ブロックの割り当て漏れ、表示の不具合など）。原因が分かるまで、比較の結果は信用できません。",
-    "The arm sizes are within chance of an equal split.": "群の大きさは、等分からの偶然のずれの範囲です。",
     "Impressions where the placement shown differs from the one assigned: %1$s of %2$s. A few can come from cached pages or a settings change in another tab; many mean the block assignment should be checked.":
         "割り当てと実際に表示された配置が食い違うインプレッション：%1$s 件（全 %2$s 件）。少数ならキャッシュされたページや別タブでの設定変更、多ければブロックの割り当てを確認してください。",
     "\"Items seen\" counts impressions where at least one recommended entry was half on screen; its rate is the main measure of the trial. Placements are compared as assigned, not as shown. Signed-in visits and bots are not included.":
@@ -131,6 +126,13 @@ JA = {
     "\"With visitor activity\": impressions where someone moved a pointer, touched, used the wheel or pressed a key, in a browser that did not declare itself automated; \"Share with activity\" is their share of all impressions. The trial is analysed on these impressions; a crawler that runs JavaScript and only loads pages does none of this (scrolling is not counted, since scripts and layout changes scroll too). \"Items seen (with activity)\" and its rate are the main measure on that population. Recorded from 0.7.4; earlier impressions count as without activity here.":
         "「閲覧者の操作あり」は、マウスの移動・タッチ・ホイール・キー入力のいずれかがあり、かつブラウザが自動操作であることを示していないインプレッションの件数で、「操作ありの割合」はそれが全体に占める割合です。試験はこのインプレッションを対象に分析します。JavaScript を実行してページを読み込むだけの自動巡回は、これらの操作を一切行いません（スクロールはスクリプトやレイアウトの変化でも起きるため数えません）。「項目が見られた（操作あり）」とその率が、この対象での主要な指標です。0.7.4 から記録しており、それより前のインプレッションはここでは操作なしの扱いになります。",
     "Link to sidebar used": "サイドバーへのリンク利用",
+    "Visitors": "閲覧者",
+    "Sample-ratio check on visitors: chi-square = %1$s (%2$d degrees of freedom), p = %3$s.": "振り分けの偏りの点検（閲覧者数）：χ² = %1$s（自由度 %2$d）、p = %3$s。",
+    "The numbers of visitors are far from an equal split. Visitors may be going unrecorded in one placement only (a block not assigned on a site, a display fault). Do not trust the comparison until the cause is known.":
+        "閲覧者数が等分から大きくずれています。ある配置でだけ閲覧者が記録されていない疑いがあります（サイトへのブロックの割り当て漏れ、表示の不具合など）。原因が分かるまで、比較の結果は信用しないでください。",
+    "The numbers of visitors are within chance of an equal split.": "閲覧者数は、等分からの偶然のずれの範囲です。",
+    "Visitors are what is assigned, so they are what should split evenly. Impressions can differ more between arms, since a few visitors reading many pages move one arm alone; on their own that is not a fault.":
+        "振り分けの単位は閲覧者なので、等分になるべきなのは閲覧者数です。インプレッションは群の間でもっと大きく違うことがあります。多くのページを読む少数の閲覧者が、その群の件数だけを押し上げるためで、それだけでは不具合ではありません。",
     "Seen via the link": "リンク経由で見られた",
     "\"Link to sidebar used\": share of impressions where a link to the sidebar offered by the theme was used (recorded when the theme announces it with a resourcesidebar:jump event; otherwise 0). \"Seen via the link\": for the sidebar list, share of items seen whose first item was seen in the sidebar after the link was used. The link can be on the page in every arm, but only the sidebar list has its recommendations there.":
         "「サイドバーへのリンク利用」は、テーマが出すサイドバーへのリンクが使われたインプレッションの割合です（テーマが resourcesidebar:jump イベントで知らせる場合に記録され、知らせないテーマでは 0 です）。「リンク経由で見られた」は右サイドバーの一覧についてのもので、項目が見られたインプレッションのうち、リンクを使った後にサイドバーで最初の項目が見られた割合です。リンクはどの群のページにもありえますが、推薦がサイドバーにあるのは右サイドバーの一覧の群だけです。",
